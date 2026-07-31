@@ -164,7 +164,7 @@ export function AvailableTasks() {
                       <FolderKanban className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
+                      <span className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-semibold">{p.name}</span>
                         <IdBadge id={p.code} />
                         <span className="rounded-sm bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success">

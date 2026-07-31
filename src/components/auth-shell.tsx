@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Rocket, ShieldCheck, TrendingUp } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import dimisiLogo from "@/assets/dimisi-mark.png.asset.json";
+import { BRAND_MARK_SRC } from "@/lib/brand";
 
 function DimisiMark({ className = "" }: { className?: string }) {
   return (
     <img
-      src={dimisiLogo.url}
+      src={BRAND_MARK_SRC}
       alt="Dimisi Technologies"
       className={`rounded-xl object-contain ${className}`}
     />

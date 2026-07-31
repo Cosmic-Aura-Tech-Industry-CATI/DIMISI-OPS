@@ -1,8 +1,17 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ShieldCheck, User, ArrowRight, Mail, Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react";
-import { useAuth, type Role } from "@/lib/auth";
+import { useAuth, type Role, type AuthUser } from "@/lib/auth";
 import { verifyCredentials } from "@/lib/accounts";
+import { logAudit } from "@/lib/audit-log";
+import { sendOtp } from "@/lib/otp";
+import { OtpVerification } from "@/components/otp-verification";
+
+interface PendingLogin {
+  role: Role;
+  user: AuthUser;
+}
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +47,7 @@ function LoginPage() {
   const [touched, setTouched] = useState({ email: false, password: false });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [pending, setPending] = useState<PendingLogin | null>(null);
 
   useEffect(() => {
     if (user) navigate({ to: user.role === "admin" ? "/admin" : "/employee" });
@@ -54,6 +64,17 @@ function LoginPage() {
     inactive: "This account is inactive. Contact an administrator.",
   };
 
+  const logLoginFailure = (reason: string, actorName?: string, actorId?: string) =>
+    logAudit({
+      category: "authentication",
+      action: "Login attempt",
+      target: role === "admin" ? "Admin portal" : "Employee portal",
+      details: `Failed login for ${email.trim()} — ${reason}.`,
+      status: "failed",
+      actorName: actorName ?? email.trim(),
+      actorId: actorId ?? "UNKNOWN",
+    });
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ email: true, password: true });
@@ -61,24 +82,67 @@ function LoginPage() {
     if (!canSubmit) return;
     setSubmitting(true);
     setTimeout(() => {
-      const result = verifyCredentials(role, email, password);
-      if (!result.ok) {
+      void (async () => {
+        const result = verifyCredentials(role, email, password);
+        if (!result.ok) {
+          setSubmitting(false);
+          setFormError(messages[result.reason]);
+          logLoginFailure(
+            result.reason === "wrong_password" ? "Invalid Password" : messages[result.reason],
+          );
+          return;
+        }
+        const c = result.credential;
+        // Credentials are valid — issue the mandatory second factor.
+        await sendOtp(c.email);
         setSubmitting(false);
-        setFormError(messages[result.reason]);
-        return;
-      }
-      const c = result.credential;
-      signInWith({ id: c.id, code: c.code, name: c.name, email: c.email, role, avatar: c.avatar });
-      toast.success(`Welcome back, ${c.name.split(" ")[0]}!`);
-      navigate({ to: role === "admin" ? "/admin" : "/employee" });
+        setPending({
+          role,
+          user: { id: c.id, code: c.code, name: c.name, email: c.email, role, avatar: c.avatar },
+        });
+      })();
     }, 500);
   };
+
+  const onVerified = () => {
+    if (!pending) return;
+    const u = pending.user;
+    signInWith(u);
+    logAudit({
+      category: "authentication",
+      action: "Login verified (OTP)",
+      target: pending.role === "admin" ? "Admin portal" : "Employee portal",
+      details: `Two-step verification completed for ${u.email}.`,
+      status: "success",
+      actorName: u.name,
+      actorId: u.code,
+    });
+    toast.success(`Welcome back, ${u.name.split(" ")[0]}!`);
+    navigate({ to: pending.role === "admin" ? "/admin" : "/employee" });
+  };
+
+  if (pending) {
+    return (
+      <AuthShell
+        title="Verify your identity"
+        subtitle="We've sent a 6-digit verification code to your registered email address."
+      >
+        <OtpVerification
+          email={pending.user.email}
+          onVerified={onVerified}
+          onBack={() => setPending(null)}
+          onFailure={(reason) => logLoginFailure(reason, pending.user.name, pending.user.code)}
+        />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to continue to your workspace."
     >
+
       <form onSubmit={onSubmit} noValidate>
         <div className="grid grid-cols-2 gap-3">
           {(

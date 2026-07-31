@@ -39,6 +39,7 @@ import { Route as EmployeeProfileRouteImport } from './routes/employee.profile'
 import { Route as EmployeeRejectedRouteImport } from './routes/employee.rejected'
 import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
 import { Route as EmployeeStatisticsRouteImport } from './routes/employee.statistics'
+import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
 import { Route as AdminAdminsIndexRouteImport } from './routes/admin.admins.index'
 import { Route as AdminAdminsIdRouteImport } from './routes/admin.admins.$id'
 import { Route as AdminAdminsNewRouteImport } from './routes/admin.admins.new'
@@ -49,6 +50,7 @@ import { Route as AdminTasksIndexRouteImport } from './routes/admin.tasks.index'
 import { Route as AdminTasksIdRouteImport } from './routes/admin.tasks.$id'
 import { Route as AdminTasksNewRouteImport } from './routes/admin.tasks.new'
 import { Route as EmployeeTasksIndexRouteImport } from './routes/employee.tasks.index'
+import { Route as EmployeeTasksIdRouteImport } from './routes/employee.tasks.$id'
 import { Route as AdminAdminsIdEditRouteImport } from './routes/admin.admins.$id.edit'
 import { Route as AdminEmployeesIdEditRouteImport } from './routes/admin.employees.$id.edit'
 import { Route as AdminTasksIdEditRouteImport } from './routes/admin.tasks.$id.edit'
@@ -206,6 +208,11 @@ const EmployeeStatisticsRoute = EmployeeStatisticsRouteImport.update({
   path: '/statistics',
   getParentRoute: () => EmployeeRoute,
 } as any)
+const EmployeeTasksRoute = EmployeeTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => EmployeeRoute,
+} as any)
 const AdminAdminsIndexRoute = AdminAdminsIndexRouteImport.update({
   id: '/admins/',
   path: '/admins/',
@@ -252,9 +259,14 @@ const AdminTasksNewRoute = AdminTasksNewRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any)
 const EmployeeTasksIndexRoute = EmployeeTasksIndexRouteImport.update({
-  id: '/tasks/',
-  path: '/tasks/',
-  getParentRoute: () => EmployeeRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => EmployeeTasksRoute,
+} as any)
+const EmployeeTasksIdRoute = EmployeeTasksIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => EmployeeTasksRoute,
 } as any)
 const AdminAdminsIdEditRoute = AdminAdminsIdEditRouteImport.update({
   id: '/edit',
@@ -272,20 +284,20 @@ const AdminTasksIdEditRoute = AdminTasksIdEditRouteImport.update({
   getParentRoute: () => AdminTasksIdRoute,
 } as any)
 const EmployeeTasksIdIndexRoute = EmployeeTasksIdIndexRouteImport.update({
-  id: '/tasks/$id/',
-  path: '/tasks/$id/',
-  getParentRoute: () => EmployeeRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => EmployeeTasksIdRoute,
 } as any)
 const EmployeeTasksIdSubmissionRoute =
   EmployeeTasksIdSubmissionRouteImport.update({
-    id: '/tasks/$id/submission',
-    path: '/tasks/$id/submission',
-    getParentRoute: () => EmployeeRoute,
+    id: '/submission',
+    path: '/submission',
+    getParentRoute: () => EmployeeTasksIdRoute,
   } as any)
 const EmployeeTasksIdSubmitRoute = EmployeeTasksIdSubmitRouteImport.update({
-  id: '/tasks/$id/submit',
-  path: '/tasks/$id/submit',
-  getParentRoute: () => EmployeeRoute,
+  id: '/submit',
+  path: '/submit',
+  getParentRoute: () => EmployeeTasksIdRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -317,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/employee/rejected': typeof EmployeeRejectedRoute
   '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/statistics': typeof EmployeeStatisticsRoute
+  '/employee/tasks': typeof EmployeeTasksRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
   '/admin/admins/$id': typeof AdminAdminsIdRouteWithChildren
@@ -325,6 +338,7 @@ export interface FileRoutesByFullPath {
   '/admin/employees/new': typeof AdminEmployeesNewRoute
   '/admin/tasks/$id': typeof AdminTasksIdRouteWithChildren
   '/admin/tasks/new': typeof AdminTasksNewRoute
+  '/employee/tasks/$id': typeof EmployeeTasksIdRouteWithChildren
   '/admin/admins/': typeof AdminAdminsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/admin/tasks/': typeof AdminTasksIndexRoute
@@ -412,6 +426,7 @@ export interface FileRoutesById {
   '/employee/rejected': typeof EmployeeRejectedRoute
   '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/statistics': typeof EmployeeStatisticsRoute
+  '/employee/tasks': typeof EmployeeTasksRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
   '/admin/admins/$id': typeof AdminAdminsIdRouteWithChildren
@@ -420,6 +435,7 @@ export interface FileRoutesById {
   '/admin/employees/new': typeof AdminEmployeesNewRoute
   '/admin/tasks/$id': typeof AdminTasksIdRouteWithChildren
   '/admin/tasks/new': typeof AdminTasksNewRoute
+  '/employee/tasks/$id': typeof EmployeeTasksIdRouteWithChildren
   '/admin/admins/': typeof AdminAdminsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/admin/tasks/': typeof AdminTasksIndexRoute
@@ -462,6 +478,7 @@ export interface FileRouteTypes {
     | '/employee/rejected'
     | '/employee/settings'
     | '/employee/statistics'
+    | '/employee/tasks'
     | '/admin/'
     | '/employee/'
     | '/admin/admins/$id'
@@ -470,6 +487,7 @@ export interface FileRouteTypes {
     | '/admin/employees/new'
     | '/admin/tasks/$id'
     | '/admin/tasks/new'
+    | '/employee/tasks/$id'
     | '/admin/admins/'
     | '/admin/employees/'
     | '/admin/tasks/'
@@ -556,6 +574,7 @@ export interface FileRouteTypes {
     | '/employee/rejected'
     | '/employee/settings'
     | '/employee/statistics'
+    | '/employee/tasks'
     | '/admin/'
     | '/employee/'
     | '/admin/admins/$id'
@@ -564,6 +583,7 @@ export interface FileRouteTypes {
     | '/admin/employees/new'
     | '/admin/tasks/$id'
     | '/admin/tasks/new'
+    | '/employee/tasks/$id'
     | '/admin/admins/'
     | '/admin/employees/'
     | '/admin/tasks/'
@@ -797,6 +817,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeeStatisticsRouteImport
       parentRoute: typeof EmployeeRoute
     }
+    '/employee/tasks': {
+      id: '/employee/tasks'
+      path: '/tasks'
+      fullPath: '/employee/tasks'
+      preLoaderRoute: typeof EmployeeTasksRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
     '/admin/admins/': {
       id: '/admin/admins/'
       path: '/admins'
@@ -862,10 +889,17 @@ declare module '@tanstack/react-router' {
     }
     '/employee/tasks/': {
       id: '/employee/tasks/'
-      path: '/tasks'
+      path: '/'
       fullPath: '/employee/tasks/'
       preLoaderRoute: typeof EmployeeTasksIndexRouteImport
-      parentRoute: typeof EmployeeRoute
+      parentRoute: typeof EmployeeTasksRoute
+    }
+    '/employee/tasks/$id': {
+      id: '/employee/tasks/$id'
+      path: '/$id'
+      fullPath: '/employee/tasks/$id'
+      preLoaderRoute: typeof EmployeeTasksIdRouteImport
+      parentRoute: typeof EmployeeTasksRoute
     }
     '/admin/admins/$id/edit': {
       id: '/admin/admins/$id/edit'
@@ -890,24 +924,24 @@ declare module '@tanstack/react-router' {
     }
     '/employee/tasks/$id/': {
       id: '/employee/tasks/$id/'
-      path: '/tasks/$id'
+      path: '/'
       fullPath: '/employee/tasks/$id/'
       preLoaderRoute: typeof EmployeeTasksIdIndexRouteImport
-      parentRoute: typeof EmployeeRoute
+      parentRoute: typeof EmployeeTasksIdRoute
     }
     '/employee/tasks/$id/submission': {
       id: '/employee/tasks/$id/submission'
-      path: '/tasks/$id/submission'
+      path: '/submission'
       fullPath: '/employee/tasks/$id/submission'
       preLoaderRoute: typeof EmployeeTasksIdSubmissionRouteImport
-      parentRoute: typeof EmployeeRoute
+      parentRoute: typeof EmployeeTasksIdRoute
     }
     '/employee/tasks/$id/submit': {
       id: '/employee/tasks/$id/submit'
-      path: '/tasks/$id/submit'
+      path: '/submit'
       fullPath: '/employee/tasks/$id/submit'
       preLoaderRoute: typeof EmployeeTasksIdSubmitRouteImport
-      parentRoute: typeof EmployeeRoute
+      parentRoute: typeof EmployeeTasksIdRoute
     }
   }
 }
@@ -993,6 +1027,36 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface EmployeeTasksIdRouteChildren {
+  EmployeeTasksIdSubmissionRoute: typeof EmployeeTasksIdSubmissionRoute
+  EmployeeTasksIdSubmitRoute: typeof EmployeeTasksIdSubmitRoute
+  EmployeeTasksIdIndexRoute: typeof EmployeeTasksIdIndexRoute
+}
+
+const EmployeeTasksIdRouteChildren: EmployeeTasksIdRouteChildren = {
+  EmployeeTasksIdSubmissionRoute: EmployeeTasksIdSubmissionRoute,
+  EmployeeTasksIdSubmitRoute: EmployeeTasksIdSubmitRoute,
+  EmployeeTasksIdIndexRoute: EmployeeTasksIdIndexRoute,
+}
+
+const EmployeeTasksIdRouteWithChildren = EmployeeTasksIdRoute._addFileChildren(
+  EmployeeTasksIdRouteChildren,
+)
+
+interface EmployeeTasksRouteChildren {
+  EmployeeTasksIdRoute: typeof EmployeeTasksIdRouteWithChildren
+  EmployeeTasksIndexRoute: typeof EmployeeTasksIndexRoute
+}
+
+const EmployeeTasksRouteChildren: EmployeeTasksRouteChildren = {
+  EmployeeTasksIdRoute: EmployeeTasksIdRouteWithChildren,
+  EmployeeTasksIndexRoute: EmployeeTasksIndexRoute,
+}
+
+const EmployeeTasksRouteWithChildren = EmployeeTasksRoute._addFileChildren(
+  EmployeeTasksRouteChildren,
+)
+
 interface EmployeeRouteChildren {
   EmployeeCompletedRoute: typeof EmployeeCompletedRoute
   EmployeeHistoryRoute: typeof EmployeeHistoryRoute
@@ -1007,11 +1071,8 @@ interface EmployeeRouteChildren {
   EmployeeRejectedRoute: typeof EmployeeRejectedRoute
   EmployeeSettingsRoute: typeof EmployeeSettingsRoute
   EmployeeStatisticsRoute: typeof EmployeeStatisticsRoute
+  EmployeeTasksRoute: typeof EmployeeTasksRouteWithChildren
   EmployeeIndexRoute: typeof EmployeeIndexRoute
-  EmployeeTasksIndexRoute: typeof EmployeeTasksIndexRoute
-  EmployeeTasksIdSubmissionRoute: typeof EmployeeTasksIdSubmissionRoute
-  EmployeeTasksIdSubmitRoute: typeof EmployeeTasksIdSubmitRoute
-  EmployeeTasksIdIndexRoute: typeof EmployeeTasksIdIndexRoute
 }
 
 const EmployeeRouteChildren: EmployeeRouteChildren = {
@@ -1028,11 +1089,8 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeRejectedRoute: EmployeeRejectedRoute,
   EmployeeSettingsRoute: EmployeeSettingsRoute,
   EmployeeStatisticsRoute: EmployeeStatisticsRoute,
+  EmployeeTasksRoute: EmployeeTasksRouteWithChildren,
   EmployeeIndexRoute: EmployeeIndexRoute,
-  EmployeeTasksIndexRoute: EmployeeTasksIndexRoute,
-  EmployeeTasksIdSubmissionRoute: EmployeeTasksIdSubmissionRoute,
-  EmployeeTasksIdSubmitRoute: EmployeeTasksIdSubmitRoute,
-  EmployeeTasksIdIndexRoute: EmployeeTasksIdIndexRoute,
 }
 
 const EmployeeRouteWithChildren = EmployeeRoute._addFileChildren(

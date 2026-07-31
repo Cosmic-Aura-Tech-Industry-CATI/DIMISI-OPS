@@ -20,7 +20,7 @@ function NotFoundComponent() {
       <div className="pointer-events-none absolute inset-0 opacity-40 [background:radial-gradient(600px_circle_at_50%_30%,rgb(255_255_255_/_0.08),transparent_60%)]" />
       <div className="glass relative w-full max-w-lg rounded-3xl p-10 text-center">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-background/60 border border-border">
-          <img src="/__l5e/assets-v1/49a76d0e-b1f5-4c85-ac57-35d79263bc2e/dimisi-mark.png" alt="Dimisi" className="h-9 w-9 object-contain" />
+          <img src="/assets/dimisi-mark.png" alt="Dimisi" className="h-9 w-9 object-contain" />
         </div>
         <h1 className="mt-6 font-display text-7xl font-bold tracking-tight text-gradient">404</h1>
         <h2 className="mt-3 text-xl font-semibold">Page not found</h2>
@@ -99,6 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Serif+Display:ital@0;1&display=swap" },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "apple-touch-icon", href: "/assets/dimisi-mark.png" },
     ],
   }),
   shellComponent: RootShell,

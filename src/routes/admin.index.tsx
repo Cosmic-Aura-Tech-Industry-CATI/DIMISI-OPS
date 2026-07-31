@@ -338,8 +338,8 @@ function AdminOverview() {
             </div>
             <Link to="/admin/employees" className="text-xs text-primary hover:underline">Manage</Link>
           </div>
-          <div className="mt-4 overflow-hidden rounded-xl border border-border/60">
-            <table className="w-full text-sm">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-border/60">
+            <table className="w-full min-w-[420px] text-sm">
               <thead className="bg-secondary/50 text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Name</th>

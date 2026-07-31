@@ -109,15 +109,15 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
         </div>
       </dl>
 
-      <div className="mt-auto flex flex-col gap-2 pt-4 sm:flex-row">
+      <div className="mt-auto flex flex-col gap-2 pt-4 lg:flex-row">
         <Button
           variant="outline"
-          className="w-full rounded-md sm:flex-1"
+          className="w-full min-w-0 rounded-md lg:flex-1"
           onClick={() => setDetailOpen(true)}
         >
           <Eye className="mr-1.5 h-4 w-4" /> View Task
         </Button>
-        <div className="w-full sm:flex-1">
+        <div className="w-full min-w-0 lg:flex-1">
           <ActionButton bucket={bucket} task={task} onViewSubmission={() => setSubmissionOpen(true)} />
         </div>
       </div>

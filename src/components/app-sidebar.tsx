@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import dimisiMark from "@/assets/dimisi-mark.png.asset.json";
+import { BRAND_MARK_SRC } from "@/lib/brand";
 import {
   LayoutDashboard,
   Users,
@@ -34,6 +34,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth, type Role } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,12 @@ const employeeNav = {
 export function AppSidebar({ role }: { role: Role }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, logout } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  // On mobile the sidebar is a drawer: close it as soon as a nav item is picked.
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const isActive = (url: string) => (url === `/${role}` ? pathname === url : pathname.startsWith(url));
 
@@ -106,11 +113,12 @@ export function AppSidebar({ role }: { role: Role }) {
       <SidebarHeader className="border-b border-sidebar-border/60">
         <Link
           to={role === "admin" ? "/admin" : "/employee"}
+          onClick={closeOnMobile}
           className="group/logo flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors"
           aria-label="Dimisi home"
         >
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-background/60 border border-border transition-transform duration-300 group-hover/logo:scale-105">
-            <img src={dimisiMark.url} alt="Dimisi" className="h-6 w-6 object-contain" />
+            <img src={BRAND_MARK_SRC} alt="Dimisi" className="h-6 w-6 object-contain" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-display text-lg font-bold leading-none tracking-tight">Dimisi</span>
@@ -134,6 +142,7 @@ export function AppSidebar({ role }: { role: Role }) {
                       <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
                         <Link
                           to={item.url}
+                          onClick={closeOnMobile}
                           aria-current={active ? "page" : undefined}
                           className={cn(
                             "group/nav relative flex items-center gap-2 rounded-lg transition-all duration-200",
@@ -179,7 +188,10 @@ export function AppSidebar({ role }: { role: Role }) {
             <div className="truncate font-mono text-[10px] tracking-wider text-muted-foreground">{user?.code}</div>
           </div>
           <button
-            onClick={logout}
+            onClick={() => {
+              closeOnMobile();
+              logout();
+            }}
             className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground group-data-[collapsible=icon]:hidden"
             aria-label="Sign out"
           >
