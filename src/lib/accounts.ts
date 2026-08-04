@@ -309,6 +309,7 @@ export function verifyCredentials(
  * ------------------------------------------------------------------ */
 
 const PWD_KEY = "dimisi-password-overrides";
+const SESSION_PWD_KEY = "dimisi-session-passwords";
 
 function readOverrides(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -319,20 +320,62 @@ function readOverrides(): Record<string, string> {
   }
 }
 
+function readSessionPasswords(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_PWD_KEY) || "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Remembers the password actually used at sign-in. In OPEN_ACCESS mode any
+ * password is accepted at login, so this is what the user considers their
+ * "current password" in Settings.
+ */
+export function rememberSignInPassword(email: string, password: string) {
+  if (typeof window === "undefined") return;
+  const e = email.trim().toLowerCase();
+  if (!e || !password) return;
+  try {
+    const all = readSessionPasswords();
+    all[e] = password;
+    localStorage.setItem(SESSION_PWD_KEY, JSON.stringify(all));
+  } catch {}
+}
+
 /** The password currently valid for this email. */
 export function currentPasswordFor(email: string): string {
   hydrate();
   const e = email.trim().toLowerCase();
   const override = readOverrides()[e];
   if (override) return override;
+  const session = readSessionPasswords()[e];
+  if (session) return session;
   const created = state.credentials.find((c) => c.email.toLowerCase() === e);
   return created?.password ?? DEMO_PASSWORD;
 }
 
 /** Strict check used by the Settings → Change password flow. */
 export function verifyCurrentPassword(email: string, password: string): boolean {
-  return password === currentPasswordFor(email);
+  hydrate();
+  const e = email.trim().toLowerCase();
+  if (!password) return false;
+  const override = readOverrides()[e];
+  if (override) return password === override;
+
+  // No password has been changed yet: accept anything the user could have
+  // legitimately signed in with (session password, created-account password,
+  // or the demo password).
+  const accepted = new Set<string>([DEMO_PASSWORD]);
+  const session = readSessionPasswords()[e];
+  if (session) accepted.add(session);
+  const created = state.credentials.find((c) => c.email.toLowerCase() === e);
+  if (created) accepted.add(created.password);
+  return accepted.has(password);
 }
+
 
 /** Persist a new password for this email (mock). */
 export function updatePassword(email: string, nextPassword: string) {
@@ -342,7 +385,11 @@ export function updatePassword(email: string, nextPassword: string) {
     const all = readOverrides();
     all[e] = nextPassword;
     localStorage.setItem(PWD_KEY, JSON.stringify(all));
+    const sessions = readSessionPasswords();
+    sessions[e] = nextPassword;
+    localStorage.setItem(SESSION_PWD_KEY, JSON.stringify(sessions));
   } catch {}
+
   const idx = state.credentials.findIndex((c) => c.email.toLowerCase() === e);
   if (idx >= 0) {
     const credentials = state.credentials.slice();

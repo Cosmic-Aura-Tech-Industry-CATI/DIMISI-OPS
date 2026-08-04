@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ShieldCheck, User, ArrowRight, Mail, Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { useAuth, type Role, type AuthUser } from "@/lib/auth";
-import { verifyCredentials } from "@/lib/accounts";
+import { rememberSignInPassword, verifyCredentials } from "@/lib/accounts";
 import { logAudit } from "@/lib/audit-log";
 import { sendOtp } from "@/lib/otp";
 import { OtpVerification } from "@/components/otp-verification";
@@ -93,8 +93,11 @@ function LoginPage() {
           return;
         }
         const c = result.credential;
+        // Remember what the user typed so Settings can validate it later.
+        rememberSignInPassword(c.email, password);
         // Credentials are valid — issue the mandatory second factor.
         await sendOtp(c.email);
+
         setSubmitting(false);
         setPending({
           role,
