@@ -18,6 +18,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin.audit-logs'
+import { Route as AdminDepartmentsRouteImport } from './routes/admin.departments'
 import { Route as AdminLeaderboardRouteImport } from './routes/admin.leaderboard'
 import { Route as AdminNoticesRouteImport } from './routes/admin.notices'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
@@ -101,6 +102,11 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
 const AdminAuditLogsRoute = AdminAuditLogsRouteImport.update({
   id: '/audit-logs',
   path: '/audit-logs',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDepartmentsRoute = AdminDepartmentsRouteImport.update({
+  id: '/departments',
+  path: '/departments',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLeaderboardRoute = AdminLeaderboardRouteImport.update({
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/departments': typeof AdminDepartmentsRoute
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/departments': typeof AdminDepartmentsRoute
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -406,6 +414,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/departments': typeof AdminDepartmentsRoute
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -458,6 +467,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/admin/activity'
     | '/admin/audit-logs'
+    | '/admin/departments'
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
@@ -506,6 +516,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/admin/activity'
     | '/admin/audit-logs'
+    | '/admin/departments'
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
@@ -554,6 +565,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/admin/activity'
     | '/admin/audit-logs'
+    | '/admin/departments'
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
@@ -668,6 +680,13 @@ declare module '@tanstack/react-router' {
       path: '/audit-logs'
       fullPath: '/admin/audit-logs'
       preLoaderRoute: typeof AdminAuditLogsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/departments': {
+      id: '/admin/departments'
+      path: '/departments'
+      fullPath: '/admin/departments'
+      preLoaderRoute: typeof AdminDepartmentsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/leaderboard': {
@@ -984,6 +1003,7 @@ const AdminTasksIdRouteWithChildren = AdminTasksIdRoute._addFileChildren(
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
+  AdminDepartmentsRoute: typeof AdminDepartmentsRoute
   AdminLeaderboardRoute: typeof AdminLeaderboardRoute
   AdminNoticesRoute: typeof AdminNoticesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -1006,6 +1026,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
+  AdminDepartmentsRoute: AdminDepartmentsRoute,
   AdminLeaderboardRoute: AdminLeaderboardRoute,
   AdminNoticesRoute: AdminNoticesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,

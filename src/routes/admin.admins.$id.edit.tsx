@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-r
 import { useState } from "react";
 import { ArrowLeft, Save, UserX } from "lucide-react";
 import { toast } from "sonner";
+import { useDepartments } from "@/lib/department-store";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/admin/admins/$id/edit")({
   component: EditAdminPage,
 });
 
-const departments = ["Operations", "People", "Engineering", "Design", "Product", "Finance", "Legal"];
+
 const permissions = [
   { id: "manage_employees", label: "Manage employees" },
   { id: "manage_tasks", label: "Manage tasks" },
@@ -37,6 +38,7 @@ function EditAdminPage() {
   const { id } = useParams({ from: "/admin/admins/$id/edit" });
   const navigate = useNavigate();
   const person = admins.find((a) => a.id === id);
+  const departments = useDepartments();
 
   if (!person) {
     return (
@@ -91,7 +93,7 @@ function EditAdminPage() {
         <Field label="Department">
           <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+            <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
 

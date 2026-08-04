@@ -301,3 +301,52 @@ export function verifyCredentials(
     },
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Password management (frontend mock)
+ * Overrides live in their own localStorage bucket so seeded accounts,
+ * created accounts and guest sessions can all change their password.
+ * ------------------------------------------------------------------ */
+
+const PWD_KEY = "dimisi-password-overrides";
+
+function readOverrides(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(PWD_KEY) || "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** The password currently valid for this email. */
+export function currentPasswordFor(email: string): string {
+  hydrate();
+  const e = email.trim().toLowerCase();
+  const override = readOverrides()[e];
+  if (override) return override;
+  const created = state.credentials.find((c) => c.email.toLowerCase() === e);
+  return created?.password ?? DEMO_PASSWORD;
+}
+
+/** Strict check used by the Settings → Change password flow. */
+export function verifyCurrentPassword(email: string, password: string): boolean {
+  return password === currentPasswordFor(email);
+}
+
+/** Persist a new password for this email (mock). */
+export function updatePassword(email: string, nextPassword: string) {
+  hydrate();
+  const e = email.trim().toLowerCase();
+  try {
+    const all = readOverrides();
+    all[e] = nextPassword;
+    localStorage.setItem(PWD_KEY, JSON.stringify(all));
+  } catch {}
+  const idx = state.credentials.findIndex((c) => c.email.toLowerCase() === e);
+  if (idx >= 0) {
+    const credentials = state.credentials.slice();
+    credentials[idx] = { ...credentials[idx], password: nextPassword };
+    setState({ ...state, credentials });
+  }
+}

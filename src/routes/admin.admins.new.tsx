@@ -5,8 +5,6 @@ import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
 import { AccountCreatedDialog } from "@/components/account-created-dialog";
 import {
-  DEPARTMENTS,
-  DESIGNATIONS,
   Field,
   PasswordInput,
   PasswordStrength,
@@ -23,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { createAdminAccount, emailTaken, nextAdminIdCode, useAccounts } from "@/lib/accounts";
 import { isStrongPassword } from "@/lib/password";
+import { useDepartments } from "@/lib/department-store";
 
 export const Route = createFileRoute("/admin/admins/new")({
   head: () => ({
@@ -46,8 +45,8 @@ const blank = {
   email: "",
   password: "",
   confirm: "",
-  jobTitle: DESIGNATIONS[0],
-  department: "Operations",
+  department: "",
+  jobTitle: "",
   joinedAt: today(),
   phone: "",
   status: "active" as "active" | "inactive",
@@ -56,11 +55,15 @@ const blank = {
 function NewAdminPage() {
   const navigate = useNavigate();
   const accounts = useAccounts();
+  const departments = useDepartments();
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<{ name: string; code: string; email: string } | null>(null);
 
   const previewId = useMemo(() => nextAdminIdCode(), [accounts]);
+
+  const designations =
+    departments.find((d) => d.name === form.department)?.designations ?? [];
 
   const set = <K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -75,6 +78,7 @@ function NewAdminPage() {
     else if (!isStrongPassword(form.password)) e.password = "Password does not meet all requirements";
     if (!form.confirm) e.confirm = "Please confirm the password";
     else if (form.confirm !== form.password) e.confirm = "Passwords do not match";
+    if (!form.department) e.department = "Department is required";
     if (!form.jobTitle) e.jobTitle = "Designation is required";
     if (!form.joinedAt) e.joinedAt = "Joining date is required";
     setErrors(e);
@@ -143,27 +147,39 @@ function NewAdminPage() {
                 placeholder="name@dimisi.com"
               />
             </Field>
-            <Field label="Designation" required error={errors.jobTitle}>
-              <Select value={form.jobTitle} onValueChange={(v) => set("jobTitle", v)}>
+            <Field label="Department" required error={errors.department}>
+              <Select
+                value={form.department}
+                onValueChange={(v) => setForm((f) => ({ ...f, department: v, jobTitle: "" }))}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DESIGNATIONS.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.name}>
+                      {d.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Department">
-              <Select value={form.department} onValueChange={(v) => set("department", v)}>
+            <Field
+              label="Designation"
+              required
+              error={errors.jobTitle}
+              hint={!form.department ? "Select a department first" : undefined}
+            >
+              <Select
+                value={form.jobTitle}
+                onValueChange={(v) => set("jobTitle", v)}
+                disabled={!form.department || designations.length === 0}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={designations.length ? "Select designation" : "No designations"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEPARTMENTS.map((d) => (
+                  {designations.map((d) => (
                     <SelectItem key={d} value={d}>
                       {d}
                     </SelectItem>

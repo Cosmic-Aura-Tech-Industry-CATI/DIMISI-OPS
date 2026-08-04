@@ -5,24 +5,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { passwordRules, passwordScore, strengthLabel } from "@/lib/password";
 
-export const DESIGNATIONS = [
-  "Frontend Developer",
-  "Backend Developer",
-  "UI Designer",
-  "QA Tester",
-  "Market Researcher",
-];
+export { useDepartments, designationsFor } from "@/lib/department-store";
 
-export const DEPARTMENTS = [
-  "Engineering",
-  "Design",
-  "Marketing",
-  "Sales",
-  "Support",
-  "Product",
-  "Operations",
-  "People",
-];
 
 export function Field({
   label,

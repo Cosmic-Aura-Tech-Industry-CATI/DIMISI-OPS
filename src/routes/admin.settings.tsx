@@ -36,6 +36,8 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/audit-log";
+import { ChangePasswordCard } from "@/components/change-password-card";
+
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({
@@ -142,17 +144,14 @@ function saveToast(label: string) {
 function SecuritySection() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <SettingCard
-        title="Change password"
-        description="Use a strong password you don't reuse elsewhere."
-        actions={<Button className="rounded-md" onClick={saveToast("Password")}><Key className="mr-1.5 h-4 w-4" />Update</Button>}
-      >
-        <div className="space-y-4">
-          <Field label="Current password" type="password" placeholder="••••••••" />
-          <Field label="New password" type="password" placeholder="At least 12 characters" />
-          <Field label="Confirm new password" type="password" placeholder="Re-enter new password" />
-        </div>
-      </SettingCard>
+      <ChangePasswordCard
+        wrapper={(p) => (
+          <SettingCard title={p.title} description={p.description} actions={p.actions}>
+            {p.children}
+          </SettingCard>
+        )}
+      />
+
 
       <SettingCard title="Two-factor authentication" description="Add an extra layer of protection to your account.">
         <div className="space-y-3">
