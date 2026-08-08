@@ -11,4 +11,4 @@ export interface MessageResponse {
   message: string;
 }
 
-export type { ApiError } from "@/api/errors";
+export type { ApiError } from "@/api/client/errors";
