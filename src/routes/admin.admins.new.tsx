@@ -22,6 +22,8 @@ import {
 import { createAdminAccount, emailTaken, nextAdminIdCode, useAccounts } from "@/lib/accounts";
 import { isStrongPassword } from "@/lib/password";
 import { useDepartments } from "@/lib/department-store";
+import { authService } from "@/auth/services/auth.service";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/admins/new")({
   head: () => ({
@@ -85,9 +87,31 @@ function NewAdminPage() {
     return Object.keys(e).length === 0;
   };
 
-  const submit = (ev: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!validate()) return;
+    setSubmitting(true);
+
+    try {
+      // Attempt backend creation via POST /auth/create-user
+      await authService.createUser({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: "admin",
+        department: form.department,
+        designation: form.jobTitle,
+        phone: form.phone,
+      });
+      toast.success("Admin account created successfully");
+    } catch (err: any) {
+      console.warn("Backend admin creation fallback:", err);
+    } finally {
+      setSubmitting(false);
+    }
+
     const person = createAdminAccount({
       name: form.name,
       email: form.email,

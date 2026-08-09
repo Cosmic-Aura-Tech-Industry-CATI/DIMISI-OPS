@@ -14,7 +14,10 @@ function Index() {
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/login" });
-    else navigate({ to: user.role === "admin" ? "/admin" : "/employee" });
+    else {
+      const isAdminOrDirector = user.role === "admin" || user.role === "director";
+      navigate({ to: isAdminOrDirector ? "/admin" : "/employee" });
+    }
   }, [user, loading, navigate]);
 
   return <PageSpinner />;

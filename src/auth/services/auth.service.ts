@@ -40,7 +40,6 @@ export async function verifyLogin(payload: VerifyLoginRequest) {
   const res = await http.post<VerifyLoginResponse>(auth.verifyLogin, payload, {
     authMode: "none",
   });
-  if (res?.accessToken) setAccessToken(res.accessToken);
   return res;
 }
 
@@ -52,19 +51,18 @@ export function resendOtp(payload: ResendOtpRequest) {
 /** POST /api/v1/auth/refresh — uses the httpOnly refresh-token cookie. */
 export async function refreshSession() {
   const res = await http.post<RefreshResponse>(auth.refresh, undefined, { authMode: "none" });
-  if (res?.accessToken) setAccessToken(res.accessToken);
   return res;
 }
 
-/** POST /api/v1/auth/create-user — requires a Director bearer token. */
+/** POST /api/v1/auth/create-user — requires authenticated session. */
 export function createUser(payload: CreateUserRequest) {
   return http.post<CreateUserResponse>(auth.createUser, payload, { authMode: "bearer" });
 }
 
-/** POST /api/v1/auth/logout — requires a bearer token. */
+/** POST /api/v1/auth/logout — clears backend session cookies. */
 export async function logout() {
   try {
-    return await http.post<MessageResponse>(auth.logout, undefined, { authMode: "bearer" });
+    return await http.post<MessageResponse>(auth.logout, undefined, { authMode: "none" });
   } finally {
     clearTokens();
   }

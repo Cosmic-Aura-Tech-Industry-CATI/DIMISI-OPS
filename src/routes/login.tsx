@@ -7,9 +7,11 @@ import { logAudit } from "@/lib/audit-log";
 import { sendOtp } from "@/lib/otp";
 import { OtpVerification } from "@/components/otp-verification";
 
+import { authService } from "@/auth/services/auth.service";
+
 interface PendingLogin {
+  email: string;
   role: Role;
-  user: AuthUser;
 }
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,7 @@ function validateEmail(v: string) {
 }
 
 function LoginPage() {
-  const { signInWith, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState<Role>("employee");
   const [email, setEmail] = useState("");
@@ -50,78 +52,65 @@ function LoginPage() {
   const [pending, setPending] = useState<PendingLogin | null>(null);
 
   useEffect(() => {
-    if (user) navigate({ to: user.role === "admin" ? "/admin" : "/employee" });
+    if (user) {
+      const isAdminOrDirector = user.role === "admin" || user.role === "director";
+      navigate({ to: isAdminOrDirector ? "/admin" : "/employee" });
+    }
   }, [user, navigate]);
 
   const emailError = touched.email && !validateEmail(email) ? "Please enter a valid work email." : "";
   const pwError = touched.password && password.length < 6 ? "Password must be at least 6 characters." : "";
   const canSubmit = validateEmail(email) && password.length >= 6 && !submitting;
 
-  const messages: Record<string, string> = {
-    unknown_email: "No account found with this email address.",
-    wrong_role: `This account is not registered on the ${role === "admin" ? "Admin" : "Employee"} Portal. Switch the role and try again.`,
-    wrong_password: "Incorrect password. Please try again.",
-    inactive: "This account is inactive. Contact an administrator.",
-  };
-
-  const logLoginFailure = (reason: string, actorName?: string, actorId?: string) =>
+  const logLoginFailure = (reason: string) =>
     logAudit({
       category: "authentication",
       action: "Login attempt",
       target: role === "admin" ? "Admin portal" : "Employee portal",
       details: `Failed login for ${email.trim()} — ${reason}.`,
       status: "failed",
-      actorName: actorName ?? email.trim(),
-      actorId: actorId ?? "UNKNOWN",
+      actorName: email.trim(),
+      actorId: "UNKNOWN",
     });
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ email: true, password: true });
     setFormError("");
     if (!canSubmit) return;
     setSubmitting(true);
-    setTimeout(() => {
-      void (async () => {
-        const result = verifyCredentials(role, email, password);
-        if (!result.ok) {
-          setSubmitting(false);
-          setFormError(messages[result.reason]);
-          logLoginFailure(
-            result.reason === "wrong_password" ? "Invalid Password" : messages[result.reason],
-          );
-          return;
-        }
-        const c = result.credential;
-        // Remember what the user typed so Settings can validate it later.
-        rememberSignInPassword(c.email, password);
-        // Credentials are valid — issue the mandatory second factor.
-        await sendOtp(c.email);
 
-        setSubmitting(false);
-        setPending({
-          role,
-          user: { id: c.id, code: c.code, name: c.name, email: c.email, role, avatar: c.avatar },
-        });
-      })();
-    }, 500);
+    try {
+      const res = await authService.login({
+        email: email.trim(),
+        password,
+      });
+
+      setSubmitting(false);
+      const successMessage = res?.message || "OTP sent successfully to your registered email.";
+      toast.success(successMessage);
+      setPending({
+        email: email.trim(),
+        role,
+      });
+    } catch (err: any) {
+      setSubmitting(false);
+      const message =
+        err?.message ||
+        err?.response?.data?.message ||
+        "Login failed. Please check your credentials and try again.";
+      setFormError(message);
+      logLoginFailure(message);
+      toast.error(message);
+    }
   };
 
-  const onVerified = () => {
+  const onVerified = (verifiedUser?: AuthUser) => {
     if (!pending) return;
-    const u = pending.user;
-    signInWith(u);
-    logAudit({
-      category: "authentication",
-      action: "Login verified (OTP)",
-      target: pending.role === "admin" ? "Admin portal" : "Employee portal",
-      details: `Two-step verification completed for ${u.email}.`,
-      status: "success",
-      actorName: u.name,
-      actorId: u.code,
-    });
-    toast.success(`Welcome back, ${u.name.split(" ")[0]}!`);
-    navigate({ to: pending.role === "admin" ? "/admin" : "/employee" });
+    toast.success(`Welcome back, ${verifiedUser?.name?.split(" ")[0] || "User"}!`);
+    const r = verifiedUser?.role || role;
+    const isAdminOrDirector = r === "admin" || r === "director";
+    navigate({ to: isAdminOrDirector ? "/admin" : "/employee" });
   };
 
   if (pending) {
@@ -131,10 +120,10 @@ function LoginPage() {
         subtitle="We've sent a 6-digit verification code to your registered email address."
       >
         <OtpVerification
-          email={pending.user.email}
+          email={pending.email}
           onVerified={onVerified}
           onBack={() => setPending(null)}
-          onFailure={(reason) => logLoginFailure(reason, pending.user.name, pending.user.code)}
+          onFailure={(reason) => logLoginFailure(reason)}
         />
       </AuthShell>
     );
@@ -160,11 +149,10 @@ function LoginPage() {
                 type="button"
                 key={r.id}
                 onClick={() => setRole(r.id)}
-                className={`group rounded-2xl border p-4 text-left transition-all ${
-                  selected
-                    ? "border-primary bg-primary/10 shadow-glow"
-                    : "border-border/60 bg-background/40 hover:border-primary/40 hover:-translate-y-0.5"
-                }`}
+                className={`group rounded-2xl border p-4 text-left transition-all ${selected
+                  ? "border-primary bg-primary/10 shadow-glow"
+                  : "border-border/60 bg-background/40 hover:border-primary/40 hover:-translate-y-0.5"
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <r.icon className={`h-5 w-5 ${selected ? "text-primary" : "text-muted-foreground"}`} />

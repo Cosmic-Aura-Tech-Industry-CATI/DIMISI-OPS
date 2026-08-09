@@ -62,22 +62,23 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
   onUnauthorized = handler;
 }
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
 /** Refresh the access token using the httpOnly refresh cookie. De-duplicated. */
-export function refreshAccessToken(): Promise<string | null> {
-  refreshPromise ??= apiClient
-    .post<{ accessToken?: string; data?: { accessToken?: string } }>(
+export function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = apiClient
+    .post<{ status?: string; message?: string }>(
       API_ENDPOINTS.auth.refresh,
       undefined,
       { authMode: "none", _retried: true },
     )
     .then((res) => {
-      const token = res.data?.accessToken ?? res.data?.data?.accessToken ?? null;
-      if (token) setAccessToken(token);
-      return token;
+      const ok = res.status === 200 || res.data?.status === "success";
+      return ok;
     })
-    .catch(() => null)
+    .catch(() => false)
     .finally(() => {
       refreshPromise = null;
     });
@@ -90,15 +91,21 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as (InternalAxiosRequestConfig & AxiosRequestConfig) | undefined;
     const status = error.response?.status;
-    const mode: AuthMode = config?.authMode ?? "bearer";
+    const url = config?.url ?? "";
 
-    const canRetry =
-      status === 401 && !!config && !config._retried && mode === "bearer" && !!getAccessToken();
+    const isAuthEndpoint =
+      url.includes("/auth/login") ||
+      url.includes("/auth/verify-login") ||
+      url.includes("/auth/refresh");
+
+    const canRetry = status === 401 && !!config && !config._retried && !isAuthEndpoint;
 
     if (canRetry) {
       config._retried = true;
-      const token = await refreshAccessToken();
-      if (token) return apiClient(config);
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return apiClient(config);
+      }
 
       clearTokens();
       onUnauthorized?.();

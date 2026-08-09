@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await authService.refreshSession();
         if (!active) return;
         if (res?.user) setUser(res.user);
-        setStatus(res?.accessToken || getAccessToken() ? "authenticated" : "unauthenticated");
+        setStatus(res?.user || res?.status === "success" ? "authenticated" : "unauthenticated");
       } catch {
         if (active) endSession();
       }
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       isPending,
       hasRole: (role) =>
-        !!user && (Array.isArray(role) ? role.includes(user.role) : user.role === role),
+        !!user && (Array.isArray(role) ? role.includes(user.role as UserRole) : user.role === role),
       login: async (payload) => {
         await run(() => loginMutation.mutateAsync(payload));
       },

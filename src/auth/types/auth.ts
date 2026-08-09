@@ -1,18 +1,24 @@
 /** Domain types for the authentication module. */
 
-export type UserRole = "director" | "admin" | "employee";
+export type UserRole = "director" | "admin" | "employee" | "intern";
 
 export interface AuthUser {
   id: string;
+  _id?: string;
   code?: string;
+  empId?: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string;
   designation?: string;
   department?: string;
   avatar?: string;
   isActive?: boolean;
+  points?: number;
+  phone?: string;
+  joinDate?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 /* ---------------------------------- health --------------------------------- */
@@ -33,37 +39,33 @@ export interface LoginRequest {
 
 /** Step 1 — credentials accepted, an OTP was emailed. */
 export interface LoginResponse {
+  status?: string;
   message?: string;
-  email: string;
-  /** Opaque handle identifying the pending OTP challenge, when the API issues one. */
-  otpToken?: string;
-  expiresIn?: number;
+  email?: string;
 }
 
 export interface VerifyLoginRequest {
   email: string;
   otp: string;
-  otpToken?: string;
 }
 
-/** Step 2 — OTP verified, session issued (refresh token set as httpOnly cookie). */
+/** Step 2 — OTP verified, session issued (cookies set automatically). */
 export interface VerifyLoginResponse {
-  accessToken: string;
-  expiresIn?: number;
+  status?: string;
   user: AuthUser;
 }
 
 export interface ResendOtpRequest {
   email: string;
-  otpToken?: string;
+  type?: string;
 }
 
 /* --------------------------------- refresh --------------------------------- */
 
 /** Uses the refresh-token cookie — no request body. */
 export interface RefreshResponse {
-  accessToken: string;
-  expiresIn?: number;
+  status?: string;
+  message?: string;
   user?: AuthUser;
 }
 

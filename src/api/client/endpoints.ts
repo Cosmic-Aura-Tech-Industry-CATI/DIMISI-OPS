@@ -5,14 +5,14 @@
 export const API_ENDPOINTS = {
   health: "/",
   auth: {
-    login: "/api/v1/auth/login",
-    verifyLogin: "/api/v1/auth/verify-login",
-    resendOtp: "/api/v1/auth/resend-otp",
-    refresh: "/api/v1/auth/refresh",
-    createUser: "/api/v1/auth/create-user",
-    logout: "/api/v1/auth/logout",
-    forgetPassword: "/api/v1/auth/forget-password",
-    verifyResetOtp: "/api/v1/auth/verify-reset-otp",
-    resetPassword: "/api/v1/auth/reset-password",
+    login: "/auth/login",
+    verifyLogin: "/auth/verify-login",
+    resendOtp: "/auth/resend-otp",
+    refresh: "/auth/refresh",
+    createUser: "/auth/create-user",
+    logout: "/auth/logout",
+    forgetPassword: "/auth/forget-password",
+    verifyResetOtp: "/auth/verify-reset-otp",
+    resetPassword: "/auth/reset-password",
   },
 } as const;

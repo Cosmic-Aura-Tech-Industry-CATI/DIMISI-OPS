@@ -23,6 +23,8 @@ import {
 import { createEmployeeAccount, emailTaken, nextEmployeeCode, useAccounts } from "@/lib/accounts";
 import { isStrongPassword } from "@/lib/password";
 import { useDepartments } from "@/lib/department-store";
+import { authService } from "@/auth/services/auth.service";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/employees/new")({
   head: () => ({
@@ -91,9 +93,31 @@ function NewEmployeePage() {
     return Object.keys(e).length === 0;
   };
 
-  const submit = (ev: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!validate()) return;
+    setSubmitting(true);
+
+    try {
+      // Attempt backend creation via POST /auth/create-user
+      await authService.createUser({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: "employee",
+        department: form.department,
+        designation: form.jobTitle,
+        phone: form.phone,
+      });
+      toast.success("Employee account created successfully");
+    } catch (err: any) {
+      console.warn("Backend user creation fallback:", err);
+    } finally {
+      setSubmitting(false);
+    }
+
     const person = createEmployeeAccount({
       name: form.name,
       email: form.email,
