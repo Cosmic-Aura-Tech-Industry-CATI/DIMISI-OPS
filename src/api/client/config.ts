@@ -6,7 +6,15 @@
  * on top of these values.
  */
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+let rawBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+
+if (rawBaseUrl.includes(":3000")) {
+  rawBaseUrl = rawBaseUrl.replace(":3000", ":8080");
+}
+
+if (rawBaseUrl.includes("localhost:8080") && !rawBaseUrl.includes("/api/v1")) {
+  rawBaseUrl = `${rawBaseUrl.replace(/\/+$/, "")}/api/v1`;
+}
 
 /** Base URL of the backend, without a trailing slash. */
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");

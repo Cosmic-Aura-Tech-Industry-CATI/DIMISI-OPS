@@ -15,10 +15,10 @@ function AdminLayout() {
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/login" });
-    else if (user.role !== "admin") navigate({ to: "/employee" });
+    else if (user.role !== "admin" && user.role !== "director") navigate({ to: "/employee" });
   }, [user, loading, navigate]);
 
-  if (loading || !user || user.role !== "admin") return <PageSpinner />;
+  if (loading || !user || (user.role !== "admin" && user.role !== "director")) return <PageSpinner />;
 
   return (
     <DashboardShell role="admin">

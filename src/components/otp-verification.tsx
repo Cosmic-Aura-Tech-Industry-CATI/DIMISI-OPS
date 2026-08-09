@@ -7,9 +7,9 @@ import {
   OTP_MAX_ATTEMPTS,
   OTP_RESEND_SECONDS,
   clearOtp,
-  sendOtp,
-  verifyOtp,
 } from "@/lib/otp";
+import { authService } from "@/auth/services/auth.service";
+import { useAuth, normalizeUser, type AuthUser } from "@/lib/auth";
 import { toast } from "sonner";
 
 function fmt(sec: number) {
@@ -25,11 +25,12 @@ export function OtpVerification({
   onFailure,
 }: {
   email: string;
-  onVerified: () => void;
+  onVerified: (user?: AuthUser) => void;
   onBack: () => void;
   /** Reported for audit logging: "Invalid OTP" | "OTP Expired" | "OTP Locked" */
   onFailure?: (reason: string) => void;
 }) {
+  const { signInWith } = useAuth();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
@@ -50,41 +51,62 @@ export function OtpVerification({
     if (busy || locked || value.length !== OTP_LENGTH) return;
     setBusy(true);
     setError("");
-    const res = await verifyOtp(email, value);
-    setBusy(false);
-    if (res.ok) {
-      toast.success("Authentication successful");
-      onVerified();
-      return;
-    }
-    setCode("");
-    setAttemptsLeft(res.attemptsLeft);
-    if (res.reason === "locked") {
-      setLocked(true);
-      setError("Too many incorrect attempts. Please request a new OTP.");
-      onFailure?.("Invalid OTP");
-    } else if (res.reason === "expired" || res.reason === "no_code") {
-      setError("This verification code has expired. Please request a new one.");
-      onFailure?.("OTP Expired");
-    } else {
-      setError(
-        `Incorrect verification code. ${res.attemptsLeft} attempt${res.attemptsLeft === 1 ? "" : "s"} remaining.`,
-      );
-      onFailure?.("Invalid OTP");
+
+    try {
+      const res = await authService.verifyLogin({ email, otp: value });
+      setBusy(false);
+      if (res?.user) {
+        toast.success("Authentication successful");
+        const normalized = normalizeUser(res.user);
+        signInWith(normalized);
+        onVerified(normalized);
+        return;
+      }
+    } catch (err: any) {
+      setBusy(false);
+      setCode("");
+      const message =
+        err?.message ||
+        err?.response?.data?.message ||
+        "Invalid or expired OTP. Please try again.";
+      setError(message);
+
+      if (
+        message.toLowerCase().includes("too many") ||
+        message.toLowerCase().includes("5 attempts") ||
+        message.toLowerCase().includes("locked")
+      ) {
+        setLocked(true);
+        onFailure?.("OTP Locked");
+      } else if (message.toLowerCase().includes("expired")) {
+        onFailure?.("OTP Expired");
+      } else {
+        onFailure?.("Invalid OTP");
+      }
     }
   };
 
   const resend = async () => {
     if (seconds > 0 || resending) return;
     setResending(true);
-    await sendOtp(email);
-    setResending(false);
-    setCode("");
     setError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    toast.success("A new verification code has been sent to your email.");
+    try {
+      await authService.resendOtp({ email, type: "login" as any });
+      setCode("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } catch (err: any) {
+      const msg =
+        err?.message ||
+        err?.response?.data?.message ||
+        "Failed to resend verification code. Please try again.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setResending(false);
+    }
   };
 
   const back = () => {

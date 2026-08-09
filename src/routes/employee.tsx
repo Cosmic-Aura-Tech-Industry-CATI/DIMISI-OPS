@@ -15,10 +15,10 @@ function EmployeeLayout() {
   useEffect(() => {
     if (loading) return;
     if (!user) navigate({ to: "/login" });
-    else if (user.role !== "employee") navigate({ to: "/admin" });
+    else if (user.role !== "employee" && user.role !== "intern") navigate({ to: "/admin" });
   }, [user, loading, navigate]);
 
-  if (loading || !user || user.role !== "employee") return <PageSpinner />;
+  if (loading || !user || (user.role !== "employee" && user.role !== "intern")) return <PageSpinner />;
 
   return (
     <DashboardShell role="employee">

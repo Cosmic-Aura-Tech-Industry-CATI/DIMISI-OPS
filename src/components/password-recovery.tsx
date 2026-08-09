@@ -27,6 +27,8 @@ import {
   verifyRecoveryOtp,
 } from "@/lib/recovery-otp";
 
+import { authService } from "@/auth/services/auth.service";
+
 export type RecoveryStep = "email" | "otp" | "reset" | "done";
 
 const STEPS: { id: RecoveryStep; label: string }[] = [
@@ -105,6 +107,7 @@ export function PasswordRecovery({
   const [email, setEmail] = useState(lockedEmail ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetToken, setResetToken] = useState<string>("");
 
   const [code, setCode] = useState("");
   const [otpError, setOtpError] = useState("");
@@ -132,17 +135,25 @@ export function PasswordRecovery({
     if (!validEmail(target)) return setError("Enter a valid registered email address.");
     setBusy(true);
     logRecovery("Password Reset Requested", target, "Recovery started from the password wizard.", "success", actor);
-    await sendRecoveryOtp(target);
-    logRecovery("OTP Sent", target, "A 6-digit recovery code was emailed.", "success", actor);
-    setBusy(false);
-    setEmail(target);
-    setCode("");
-    setOtpError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    setStep("otp");
-    toast.success("Verification code sent", { description: `We emailed a 6-digit code to ${target}.` });
+
+    try {
+      await authService.forgetPassword({ email: target });
+      logRecovery("OTP Sent", target, "A 6-digit recovery code was emailed.", "success", actor);
+      setEmail(target);
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      setStep("otp");
+      toast.success("Verification code sent", { description: `We emailed a 6-digit code to ${target}.` });
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || "Failed to send recovery code.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---------------- step 2: OTP ---------------- */
@@ -150,43 +161,53 @@ export function PasswordRecovery({
     if (busy || locked || value.length !== OTP_LENGTH) return;
     setBusy(true);
     setOtpError("");
-    const res = await verifyRecoveryOtp(email, value);
-    setBusy(false);
-    if (res.ok) {
-      logRecovery("OTP Verified", email, "Recovery code verified successfully.", "success", actor);
-      toast.success("Identity verified");
-      setStep("reset");
-      return;
-    }
-    setCode("");
-    setAttemptsLeft(res.attemptsLeft);
-    if (res.reason === "locked") {
-      setLocked(true);
-      setOtpError("Too many incorrect attempts. Please request a new OTP.");
-      logRecovery("Too Many OTP Attempts", email, "Recovery locked after 5 incorrect codes.", "failed", actor);
-    } else if (res.reason === "expired" || res.reason === "no_code") {
-      setOtpError("This verification code has expired. Please request a new one.");
-      logRecovery("Password Reset Failed", email, "Recovery OTP expired.", "failed", actor);
-    } else {
-      setOtpError(
-        `Incorrect verification code. ${res.attemptsLeft} attempt${res.attemptsLeft === 1 ? "" : "s"} remaining.`,
-      );
-      logRecovery("Password Reset Failed", email, "Incorrect recovery OTP entered.", "failed", actor);
+
+    try {
+      const res = await authService.verifyResetOtp({ email, otp: value });
+      if (res?.resetToken) {
+        setResetToken(res.resetToken);
+        logRecovery("OTP Verified", email, "Recovery code verified successfully.", "success", actor);
+        toast.success("Identity verified");
+        setStep("reset");
+        return;
+      }
+    } catch (err: any) {
+      setCode("");
+      const msg = err?.message || err?.response?.data?.message || "Incorrect verification code.";
+      setOtpError(msg);
+
+      if (msg.toLowerCase().includes("too many") || msg.toLowerCase().includes("locked")) {
+        setLocked(true);
+        logRecovery("Too Many OTP Attempts", email, "Recovery locked after 5 incorrect codes.", "failed", actor);
+      } else if (msg.toLowerCase().includes("expired")) {
+        logRecovery("Password Reset Failed", email, "Recovery OTP expired.", "failed", actor);
+      } else {
+        logRecovery("Password Reset Failed", email, "Incorrect recovery OTP entered.", "failed", actor);
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   const resend = async () => {
     if (seconds > 0 || resending) return;
     setResending(true);
-    await sendRecoveryOtp(email);
-    logRecovery("OTP Sent", email, "A new recovery code was emailed; the previous code is now invalid.", "success", actor);
-    setResending(false);
-    setCode("");
-    setOtpError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    toast.success("A new verification code has been sent to your email.");
+    try {
+      await authService.resendOtp({ email, type: "forget-password" });
+      logRecovery("OTP Sent", email, "A new recovery code was emailed; the previous code is now invalid.", "success", actor);
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || "Failed to resend code.";
+      setOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setResending(false);
+    }
   };
 
   /* ---------------- step 3: new password ---------------- */
@@ -194,20 +215,25 @@ export function PasswordRecovery({
     setError("");
     if (!isStrongPassword(next))
       return setError("New password does not meet all the requirements below.");
-    if (next === currentPasswordFor(email))
-      return setError("Your new password must be different from your current password.");
     if (next !== confirm) return setError("New password and confirmation do not match.");
 
     setBusy(true);
-    updatePassword(email, next);
-    clearRecoveryOtp(email);
-    await sendPasswordResetEmail(email);
-    setBusy(false);
-    logRecovery("Password Reset Successful", email, "Password updated after email OTP verification.", "success", actor);
-    setStep("done");
-    toast.success("Password reset successful", {
-      description: "Please sign in again with your new password.",
-    });
+    try {
+      await authService.resetPassword({ resetToken, password: next, confirmPassword: confirm });
+      updatePassword(email, next);
+      clearRecoveryOtp(email);
+      logRecovery("Password Reset Successful", email, "Password updated after email OTP verification.", "success", actor);
+      setStep("done");
+      toast.success("Password reset successful", {
+        description: "Please sign in again with your new password.",
+      });
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || "Failed to reset password.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const back = () => {
