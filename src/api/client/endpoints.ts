@@ -15,4 +15,19 @@ export const API_ENDPOINTS = {
     verifyResetOtp: "/auth/verify-reset-otp",
     resetPassword: "/auth/reset-password",
   },
+  departments: {
+    list: "/departments",
+    detail: (id: string) => `/departments/${id}`,
+    create: "/departments",
+    update: (id: string) => `/departments/${id}`,
+    delete: (id: string) => `/departments/${id}`,
+  },
+  designations: {
+    list: "/designations",
+    detail: (id: string) => `/designations/${id}`,
+    byDepartment: (departmentId: string) => `/designations/department/${departmentId}`,
+    create: "/designations",
+    update: (id: string) => `/designations/${id}`,
+    delete: (id: string) => `/designations/${id}`,
+  },
 } as const;
