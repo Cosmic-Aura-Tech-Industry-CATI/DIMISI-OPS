@@ -1,12 +1,24 @@
 import { useState } from "react";
-import { Check, Eye, EyeOff, X } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { passwordRules, passwordScore, strengthLabel } from "@/lib/password";
+import {
+  useDepartmentsQuery,
+  useDesignationsByDepartmentQuery,
+  type Department,
+  type Designation,
+} from "@/features/departments";
 
-export { useDepartments, designationsFor } from "@/lib/department-store";
-
+export { useDepartmentsQuery, useDesignationsByDepartmentQuery };
 
 export function Field({
   label,
@@ -118,6 +130,113 @@ export function PasswordStrength({ value }: { value: string }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Connected Department & Designation Cascading Select Dropdowns
+ * Handles dynamic fetching of designations when department changes,
+ * resets designation on department switch, and displays loading & empty states.
+ */
+export function DepartmentDesignationSelects({
+  departmentId,
+  designationId,
+  onDepartmentChange,
+  onDesignationChange,
+  departmentError,
+  designationError,
+  disabled,
+}: {
+  departmentId: string;
+  designationId: string;
+  onDepartmentChange: (deptId: string, deptObj?: Department) => void;
+  onDesignationChange: (desigId: string, desigObj?: Designation) => void;
+  departmentError?: string;
+  designationError?: string;
+  disabled?: boolean;
+}) {
+  const { data: departments = [], isLoading: isLoadingDepts } = useDepartmentsQuery();
+  const {
+    data: designations = [],
+    isLoading: isLoadingDesigs,
+    isFetching: isFetchingDesigs,
+  } = useDesignationsByDepartmentQuery(departmentId);
+
+  const handleDeptSelect = (deptId: string) => {
+    const selectedDept = departments.find((d) => d._id === deptId);
+    onDepartmentChange(deptId, selectedDept);
+    // Reset designation when department changes
+    onDesignationChange("");
+  };
+
+  const handleDesigSelect = (desigId: string) => {
+    const selectedDesig = designations.find((d) => d._id === desigId);
+    onDesignationChange(desigId, selectedDesig);
+  };
+
+  const isDesigLoading = isLoadingDesigs || isFetchingDesigs;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Department" required error={departmentError}>
+        <Select
+          value={departmentId}
+          onValueChange={handleDeptSelect}
+          disabled={disabled || isLoadingDepts}
+        >
+          <SelectTrigger>
+            <SelectValue
+              placeholder={isLoadingDepts ? "Loading departments..." : "Select department"}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {departments.map((dept) => (
+              <SelectItem key={dept._id} value={dept._id}>
+                {dept.name} ({dept.code})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field
+        label="Designation"
+        required
+        error={designationError}
+        hint={!departmentId ? "Select a department first" : undefined}
+      >
+        <Select
+          value={designationId}
+          onValueChange={handleDesigSelect}
+          disabled={disabled || !departmentId || isDesigLoading || designations.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue
+              placeholder={
+                !departmentId ? (
+                  "Select department first"
+                ) : isDesigLoading ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading designations...
+                  </span>
+                ) : designations.length === 0 ? (
+                  "No designations found"
+                ) : (
+                  "Select designation"
+                )
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {designations.map((desig) => (
+              <SelectItem key={desig._id} value={desig._id}>
+                {desig.title || desig.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
     </div>
   );
 }
