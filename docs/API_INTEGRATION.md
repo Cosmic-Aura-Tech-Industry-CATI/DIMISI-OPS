@@ -293,7 +293,6 @@ Legend — **Status:** `Pending` (mock only) · `Partial` · `Done`.
 | `src/routes/admin.settings.tsx` | Admin settings | `/settings/preferences` | GET/PATCH | Low | Settings | Pending |
 | `src/routes/employee.settings.tsx` | Employee settings | `/settings/preferences` | GET/PATCH | Low | Settings | Pending |
 | `src/routes/admin.index.tsx` | Admin dashboard | `/reports/overview` | GET | High | Reports | Pending |
-| `src/routes/employee.index.tsx` | Employee dashboard | `/employees/:id/statistics` | GET | High | Employees | Pending |
 
 ---
 
