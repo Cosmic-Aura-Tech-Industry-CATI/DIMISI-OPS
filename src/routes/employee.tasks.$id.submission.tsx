@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
-import { useAllTasks } from "@/lib/task-store";
+import { useTaskQuery } from "@/features/tasks";
 import {
   downloadSubmissionFile,
   formatFileSize,
@@ -54,8 +54,16 @@ const fmt = (d?: string) =>
 
 function SubmissionDetailsPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submission" });
-  const task = useAllTasks().find((t) => t.id === id);
+  const { data: task, isLoading } = useTaskQuery(id);
   const submission = useSubmission(id);
+
+  if (isLoading) {
+    return (
+      <div className="glass flex flex-col items-center justify-center rounded-2xl py-20 text-muted-foreground">
+        <p className="text-sm">Loading submission...</p>
+      </div>
+    );
+  }
 
   if (!task) {
     return (

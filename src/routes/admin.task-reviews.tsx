@@ -42,9 +42,8 @@ import {
 } from "@/components/ui/dialog";
 import { employees, admins, type Task } from "@/lib/mock-data";
 import { logAudit } from "@/lib/audit-log";
-import { submitReview, useReviewMap } from "@/lib/review-store";
-import { useAllTasks } from "@/lib/task-store";
-import { useProjects } from "@/lib/project-store";
+import { useProjectsQuery } from "@/features/projects";
+import { useTasksQuery, useReviewTask } from "@/features/tasks";
 import {
   applySubmissions,
   downloadSubmissionFile,
@@ -97,13 +96,26 @@ function ReviewCenter() {
   const [action, setAction] = useState<{ type: ReviewAction; task: Task } | null>(null);
   const [remarks, setRemarks] = useState("");
 
-  const reviewed = useReviewMap();
   const subs = useSubmissionMap();
-  const projects = useProjects();
-  const allTasks = useAllTasks();
+  const { data: projects = [] } = useProjectsQuery();
+  const { data: allTasks = [], isLoading } = useTasksQuery();
+  const reviewMutation = useReviewTask({
+    onSuccess: (updated, variables) => {
+      const label = variables.isApproved ? "Submission approved" : "Submission rejected";
+      toast.success(label, { description: updated.title });
+      setAction(null);
+      setRemarks("");
+    },
+    onError: (err) => {
+      toast.error("Failed to submit review", {
+        description: err.message || "Please try again.",
+      });
+    },
+  });
+
   const submissions = useMemo(
-    () => applySubmissions(allTasks, subs).filter((t) => t.reviewState === "in_review" && !reviewed[t.id]),
-    [allTasks, subs, reviewed],
+    () => applySubmissions(allTasks, subs).filter((t) => t.reviewState === "in_review" || (t.status as string) === "In Review"),
+    [allTasks, subs],
   );
 
   const filtered = submissions.filter((t) => {
@@ -118,10 +130,7 @@ function ReviewCenter() {
 
   const handleAction = () => {
     if (!action) return;
-    const label =
-      action.type === "approve" ? "Submission approved"
-      : action.type === "reject" ? "Submission rejected"
-      : "Remarks sent to employee";
+    const isApproved = action.type === "approve";
     logAudit({
       category: "task",
       action:
@@ -133,15 +142,12 @@ function ReviewCenter() {
       details: remarks.trim() || (action.type === "approve" ? `Submission approved — ${action.task.points} points awarded.` : "Reviewed submission."),
       status: action.type === "reject" ? "warning" : "success",
     });
-    submitReview({
-      task: action.task,
-      decision: action.type === "approve" ? "approved" : action.type === "reject" ? "rejected" : "remarks",
-      remarks,
-      reviewer: admins[0]?.name ?? "Admin",
+
+    reviewMutation.mutate({
+      id: action.task.id || action.task._id || "",
+      isApproved,
+      feedback: remarks.trim() || undefined,
     });
-    toast.success(label, { description: action.task.title });
-    setAction(null);
-    setRemarks("");
   };
 
   return (
@@ -196,7 +202,7 @@ function ReviewCenter() {
               task={task}
               index={i}
               submission={subs[task.id]}
-              projectName={task.projectId ? projects.find((p) => p.id === task.projectId)?.name : undefined}
+              projectName={task.projectId ? projects.find((p) => p.id === task.projectId || p._id === task.projectId)?.name : undefined}
               onAction={(type) => setAction({ type, task })}
             />
           ))}
@@ -273,9 +279,22 @@ function ReviewCard({
   const submittedOn = submission?.submittedAt
     ? new Date(submission.submittedAt)
     : new Date(new Date(task.dueDate).getTime() - 86400000);
-  const proofs = mockProofs[task.id] ?? [{ name: "submission.pdf", size: "560 KB", type: "pdf" as const }];
+  const proofs =
+    task.attachments && task.attachments.length > 0
+      ? task.attachments.map((a) => ({
+          name: a.name,
+          size: a.size,
+          type: (a.name.endsWith(".png") || a.name.endsWith(".jpg") || a.name.endsWith(".jpeg") ? "image" : a.name.endsWith(".pdf") ? "pdf" : "doc") as "image" | "pdf" | "doc",
+        }))
+      : submission?.files && submission.files.length > 0
+        ? submission.files.map((f) => ({
+            name: f.name,
+            size: formatFileSize(f.size),
+            type: (f.type.startsWith("image/") ? "image" : f.type.includes("pdf") ? "pdf" : "doc") as "image" | "pdf" | "doc",
+          }))
+        : [];
   const note =
-    submission?.issues?.trim() || mockNotes[task.id] || task.notes || "Submitted for review — see attached proof.";
+    submission?.issues?.trim() || task.notes || "Submitted for review — see details.";
 
   const deadlineTone =
     days < 0 ? "text-destructive"

@@ -13,7 +13,8 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { TaskCardGrid } from "@/components/task-card";
 import { currentEmployee, type TaskPriority } from "@/lib/mock-data";
-import { useAllTasks } from "@/lib/task-store";
+import { useTasksQuery } from "@/features/tasks";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/employee/tasks")({
   head: () => ({
@@ -30,18 +31,25 @@ export const Route = createFileRoute("/employee/tasks")({
 function AssignedTasksPage() {
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<"all" | TaskPriority>("all");
-  const tasks = useAllTasks();
+  const auth = useAuth();
+  const { data: tasks = [] } = useTasksQuery();
+  const currentUserId = auth.user?.id || auth.user?._id || currentEmployee.id;
 
   const mine = useMemo(() => {
     return tasks.filter((t) => {
-      if (t.assigneeId !== currentEmployee.id) return false;
+      const isMine =
+        t.assigneeId === currentUserId ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email);
+
+      if (!isMine && tasks.length > 0 && t.assigneeId) return false;
       if (t.status === "completed" || t.reviewState) return false;
       if (priority !== "all" && t.priority !== priority) return false;
       const q = query.trim().toLowerCase();
       if (!q) return true;
       return t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
     });
-  }, [tasks, query, priority]);
+  }, [tasks, query, priority, currentUserId, auth.user]);
 
   return (
     <>

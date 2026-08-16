@@ -7,7 +7,7 @@ export type { Project } from "@/lib/project-store";
 /** Static seed list — prefer useProjects() / useActiveProjects() in components. */
 export const projects: Project[] = seedProjects;
 
-export const projectById = (id?: string) => allProjects().find((p) => p.id === id);
+export const projectById = (id?: string) => allProjects().find((p) => p.id === id || p._id === id);
 export const projectName = (id?: string) => projectById(id)?.name ?? "—";
 export const projectCode = (id?: string) => projectById(id)?.code ?? "—";
 

@@ -3,19 +3,35 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { TaskForm, emptyTaskValues } from "@/components/task-form";
-import { employees } from "@/lib/mock-data";
+import { useCreateTask } from "@/features/tasks";
 import { projectName } from "@/lib/projects";
-import { createTask } from "@/lib/task-store";
-import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/tasks/new")({
   head: () => ({ meta: [{ title: "New task — Poll" }] }),
   component: NewTaskPage,
-});
+  });
 
 function NewTaskPage() {
   const navigate = useNavigate();
-  const auth = useAuth();
+  const createTask = useCreateTask({
+    onSuccess: (task, variables) => {
+      const isDirect = typeof variables === "object" && !(variables instanceof FormData) && variables.taskType === "direct";
+      const isProject = typeof variables === "object" && !(variables instanceof FormData) && variables.taskType === "project";
+      const where = isDirect
+        ? `Assigned to ${task.assignee || "employee"}.`
+        : isProject
+          ? `Published to ${task.projectName || projectName(task.projectId)} — employees can pick it up.`
+          : "Published to Universal Tasks — employees can pick it up.";
+      toast.success("Task created", { description: `${task.title} · ${where}` });
+      navigate({ to: "/admin/tasks" });
+    },
+    onError: (err) => {
+      toast.error("Failed to create task", {
+        description: err.message || "Please check the entered values and try again.",
+      });
+    },
+  });
+
   return (
     <>
       <div>
@@ -27,33 +43,25 @@ function NewTaskPage() {
       <TaskForm
         initial={emptyTaskValues()}
         submitLabel="Create task"
+        isSubmitting={createTask.isPending}
+        apiError={createTask.error?.message}
         onCancel={() => navigate({ to: "/admin/tasks" })}
         onSubmit={(v) => {
-          const assignee = employees.find((e) => e.id === v.assigneeId);
-          createTask({
+          const files = v.attachments.map((a) => a.file).filter((f): f is File => f instanceof File);
+          createTask.mutate({
             title: v.title,
             description: v.description,
             category: v.category,
             priority: v.priority,
+            taskType: v.taskType,
             points: v.points,
             dueDate: v.dueDate,
             notes: v.notes || undefined,
-            attachments: v.attachments,
-            taskType: v.taskType,
-            projectId: v.projectId || undefined,
             estimatedTime: v.estimatedTime || undefined,
-            assigneeId: v.assigneeId,
-            assigneeName: assignee?.name,
-            createdBy: auth.user?.name ?? "Admin",
+            projectId: v.taskType === "project" ? v.projectId : undefined,
+            assigneeId: v.taskType === "direct" ? v.assigneeId : undefined,
+            attachments: files,
           });
-          const where =
-            v.taskType === "direct"
-              ? `Assigned to ${assignee?.name ?? "employee"}.`
-              : v.taskType === "project"
-                ? `Published to ${projectName(v.projectId)} — employees can pick it up.`
-                : "Published to Universal Tasks — employees can pick it up.";
-          toast.success("Task created", { description: `${v.title} · ${where}` });
-          navigate({ to: "/admin/tasks" });
         }}
       />
     </>

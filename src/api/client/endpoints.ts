@@ -30,4 +30,23 @@ export const API_ENDPOINTS = {
     update: (id: string) => `/designations/${id}`,
     delete: (id: string) => `/designations/${id}`,
   },
+  projects: {
+    list: "/projects",
+    detail: (id: string) => `/projects/${id}`,
+    create: "/projects",
+    update: (id: string) => `/projects/${id}`,
+    delete: (id: string) => `/projects/${id}`,
+  },
+  tasks: {
+    list: "/tasks",
+    detail: (id: string) => `/tasks/${id}`,
+    create: "/tasks",
+    update: (id: string) => `/tasks/${id}`,
+    delete: (id: string) => `/tasks/${id}`,
+    request: (id: string) => `/tasks/${id}/request`,
+    assign: (id: string) => `/tasks/${id}/assign`,
+    start: (id: string) => `/tasks/${id}/start`,
+    submit: (id: string) => `/tasks/${id}/submit`,
+    review: (id: string) => `/tasks/${id}/review`,
+  },
 } as const;

@@ -27,29 +27,49 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { admins, employees, tasks } from "@/lib/mock-data";
+import { admins, employees } from "@/lib/mock-data";
+import { useTaskQuery, useDeleteTask } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
   component: TaskDetailPage,
 });
 
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0")}`;
+const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0") || id.slice(-4)}`;
 
 function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
-  const task = tasks.find((t) => t.id === id);
+  const { data: task, isLoading } = useTaskQuery(id);
+  const deleteTask = useDeleteTask({
+    onSuccess: () => {
+      toast.success("Task deleted");
+      navigate({ to: "/admin/tasks" });
+    },
+    onError: (err) => {
+      toast.error("Failed to delete task", {
+        description: err.message || "An error occurred while deleting the task.",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="glass flex flex-col items-center justify-center rounded-2xl py-20 text-muted-foreground">
+        <p className="text-sm">Loading task details...</p>
+      </div>
+    );
+  }
 
   if (!task) {
     return <EmptyState icon={FileQuestion} title="Task not found" description="This task may have been deleted."
       action={<Button asChild><Link to="/admin/tasks">Back to tasks</Link></Button>} />;
   }
 
-  const assignee = employees.find((e) => e.id === task.assigneeId);
-  const creator = task.createdBy ?? admins[+task.id.replace(/\D/g, "") % admins.length]?.name ?? "Shikhar Dixit";
-  const daysLeft = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
+  const assignee = employees.find((e) => e.id === task.assigneeId) || (task.assignee ? { name: task.assignee, avatar: task.assignee.slice(0, 2).toUpperCase() } : undefined);
+  const creator = task.createdBy || "Admin";
+  const daysLeft = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
 
   return (
     <>
@@ -158,7 +178,10 @@ function TaskDetailPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { toast.success("Task deleted"); navigate({ to: "/admin/tasks" }); }}
+              disabled={deleteTask.isPending}
+              onClick={() => {
+                deleteTask.mutate(task.id || task._id);
+              }}
             >
               <Trash2 className="mr-1.5 h-4 w-4" /> Delete
             </AlertDialogAction>

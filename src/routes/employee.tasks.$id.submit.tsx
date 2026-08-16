@@ -33,10 +33,9 @@ import {
 import { PriorityBadge } from "@/components/status-badge";
 import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
 import { currentEmployee, admins, type Task } from "@/lib/mock-data";
-import { useAllTasks, taskTypeLabel } from "@/lib/task-store";
-import { useProjects } from "@/lib/project-store";
-import { clearReview, useReviewMap } from "@/lib/review-store";
-import { saveDraft, submitForReview, useSubmission } from "@/lib/submission-store";
+import { useTaskQuery, useSubmitTaskForReview } from "@/features/tasks";
+import { useProjectsQuery } from "@/features/projects";
+import { saveDraft, useSubmission } from "@/lib/submission-store";
 
 export const Route = createFileRoute("/employee/tasks/$id/submit")({
   head: () => ({
@@ -49,6 +48,12 @@ export const Route = createFileRoute("/employee/tasks/$id/submit")({
   }),
   component: SubmitProofPage,
 });
+
+const taskTypeLabel: Record<string, string> = {
+  universal: "Universal",
+  project: "Project",
+  direct: "Direct",
+};
 
 const statusLabel: Record<Task["status"], string> = {
   pending: "Pending",
@@ -65,10 +70,8 @@ const fmtDate = (v?: string) =>
 function SubmitProofPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submit" });
   const navigate = useNavigate();
-  const allTasks = useAllTasks();
-  const projects = useProjects();
-  const reviewMap = useReviewMap();
-  const task = allTasks.find((t) => t.id === id);
+  const { data: task, isLoading } = useTaskQuery(id);
+  const { data: projects = [] } = useProjectsQuery();
   const existing = useSubmission(id);
 
   const [files, setFiles] = useState<ProofFile[]>(existing?.files ?? []);
@@ -79,7 +82,37 @@ function SubmitProofPage() {
     verified: existing?.checklist.verified ?? false,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+
+  const submitMutation = useSubmitTaskForReview({
+    onSuccess: (updated) => {
+      saveDraft({
+        taskId: updated.id || id,
+        employeeId: currentEmployee.id,
+        employeeName: currentEmployee.name,
+        employeeCode: currentEmployee.code,
+        issues: issues.trim(),
+        files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
+        checklist: checks,
+      });
+      toast.success("Task submitted successfully", {
+        description: `${updated.title} is now in review with admins.`,
+      });
+      navigate({ to: "/employee/pending-review" });
+    },
+    onError: (err) => {
+      toast.error("Failed to submit task", {
+        description: err.message || "An error occurred while submitting the task.",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="glass flex flex-col items-center justify-center rounded-2xl py-20 text-muted-foreground">
+        <p className="text-sm">Loading task...</p>
+      </div>
+    );
+  }
 
   if (!task) {
     return (
@@ -92,9 +125,8 @@ function SubmitProofPage() {
     );
   }
 
-  const rejection = reviewMap[task.id]?.decision === "rejected" ? reviewMap[task.id] : undefined;
-  const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined;
-  const assignedBy = task.createdBy ?? admins[0]?.name ?? "Dimisi Directors";
+  const project = task.projectId ? projects.find((p) => p.id === task.projectId || p._id === task.projectId) : undefined;
+  const assignedBy = task.createdBy || "Admin";
   const currentStatus = task.reviewState === "in_review" ? "Pending Review" : statusLabel[task.status];
 
   const packageInput = () => ({
@@ -108,7 +140,7 @@ function SubmitProofPage() {
   });
 
   const allChecked = checks.completed && checks.proof && checks.verified;
-  const canSubmit = files.length > 0 && allChecked && !submitting;
+  const canSubmit = allChecked && !submitMutation.isPending;
 
   const handleSaveDraft = () => {
     saveDraft(packageInput());
@@ -116,21 +148,11 @@ function SubmitProofPage() {
   };
 
   const handleSubmit = () => {
-    setSubmitting(true);
-    setTimeout(() => {
-      submitForReview(packageInput());
-      clearReview(task.id);
-      pushAdminNotif({
-        type: "submission",
-        title: "New task submission",
-        message: `${currentEmployee.name} submitted proof for “${task.title}”.`,
-        taskId: task.id,
-      });
-      setSubmitting(false);
-      setConfirmOpen(false);
-      toast.success("Task submitted successfully and is awaiting admin review.");
-      navigate({ to: "/employee/pending-review" });
-    }, 700);
+    const noteText = issues.trim() || "Task completed and submitted for review.";
+    submitMutation.mutate({
+      id: task.id || id,
+      notes: noteText,
+    });
   };
 
   const info: { label: string; value: React.ReactNode; icon?: typeof Trophy }[] = [
@@ -162,10 +184,10 @@ function SubmitProofPage() {
         subtitle="Complete your task submission before sending it for admin review."
       />
 
-      {rejection && (
+      {task.rejectionReason && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-destructive">Previous rejection</p>
-          <p className="mt-1 text-sm text-destructive">{rejection.remarks || "Reviewer requested changes."}</p>
+          <p className="mt-1 text-sm text-destructive">{task.rejectionReason}</p>
         </div>
       )}
 
@@ -339,8 +361,8 @@ function SubmitProofPage() {
             <Button variant="outline" className="rounded-md" onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button className="rounded-md shadow-glow" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…</> : <><Send className="mr-1.5 h-4 w-4" /> Submit</>}
+            <Button className="rounded-md shadow-glow" disabled={submitMutation.isPending} onClick={handleSubmit}>
+              {submitMutation.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…</> : <><Send className="mr-1.5 h-4 w-4" /> Submit</>}
             </Button>
           </DialogFooter>
         </DialogContent>

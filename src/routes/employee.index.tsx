@@ -34,7 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { activityLogs, currentEmployee, performanceTrend } from "@/lib/mock-data";
-import { useAllTasks } from "@/lib/task-store";
+import { useTasksQuery } from "@/features/tasks";
+import { useAuth } from "@/lib/auth";
 import { AvailableTasks } from "@/components/available-tasks";
 
 export const Route = createFileRoute("/employee/")({
@@ -56,15 +57,24 @@ const statusTone: Record<string, string> = {
 };
 
 function EmployeeOverview() {
-  const tasks = useAllTasks();
-  const mine = tasks.filter((t) => t.assigneeId === currentEmployee.id);
-  const completed = mine.filter((t) => t.status === "completed");
-  const pending = mine.filter((t) => t.status === "pending" || t.status === "in_progress");
+  const auth = useAuth();
+  const { data: tasks = [] } = useTasksQuery();
+  const currentUserId = auth.user?.id || auth.user?._id || currentEmployee.id;
+
+  const mine = tasks.filter((t) => {
+    return (
+      t.assigneeId === currentUserId ||
+      (auth.user?.name && t.assignee === auth.user.name) ||
+      (auth.user?.email && t.assignee === auth.user.email)
+    );
+  });
+  const completed = mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
+  const pending = mine.filter((t) => t.status === "pending" || t.status === "in_progress" || (t.status as string) === "In Progress" || (t.status as string) === "Assigned");
   const today = mine
-    .filter((t) => t.status !== "completed")
+    .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed")
     .slice(0, 3);
   const deadlines = [...mine]
-    .filter((t) => t.status !== "completed")
+    .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed" && t.dueDate)
     .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
     .slice(0, 4);
 
