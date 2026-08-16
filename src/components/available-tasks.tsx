@@ -20,11 +20,25 @@ import { IdBadge } from "@/components/id-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import type { Task } from "@/lib/mock-data";
 import { projectStats } from "@/lib/projects";
-import { useActiveProjects } from "@/lib/project-store";
-import { pickTask, useAllTasks, useProjectPool, useUniversalPool } from "@/lib/task-store";
+import { useProjectsQuery } from "@/features/projects";
+import { useTasksQuery, useRequestTask } from "@/features/tasks";
 
-function PoolCard({ task, index = 0, showCreatedBy = true }: { task: Task; index?: number; showCreatedBy?: boolean }) {
+function PoolCard({
+  task,
+  index = 0,
+  showCreatedBy = true,
+  onRequest,
+  isRequesting,
+}: {
+  task: Task;
+  index?: number;
+  showCreatedBy?: boolean;
+  onRequest?: (task: Task) => void;
+  isRequesting?: boolean;
+}) {
   const [detailOpen, setDetailOpen] = useState(false);
+  const alreadyRequested = Boolean(task.isRequestedByMe);
+
   return (
     <article
       className="rounded-md border border-border/60 bg-card/40 p-4 transition-all hover:border-primary/40 hover:bg-secondary/30 animate-in fade-in slide-in-from-bottom-1"
@@ -35,6 +49,11 @@ function PoolCard({ task, index = 0, showCreatedBy = true }: { task: Task; index
         <span className="rounded-sm bg-secondary/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           {task.category}
         </span>
+        {alreadyRequested && (
+          <span className="rounded-sm bg-info/15 px-2 py-0.5 text-[10px] font-medium text-info">
+            Requested
+          </span>
+        )}
       </div>
       <h4 className="mt-2 font-display text-sm font-semibold leading-snug">{task.title}</h4>
       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
@@ -47,7 +66,7 @@ function PoolCard({ task, index = 0, showCreatedBy = true }: { task: Task; index
         <div>
           <dt className="flex items-center gap-1 text-muted-foreground"><CalendarClock className="h-3 w-3" /> Deadline</dt>
           <dd className="mt-0.5 font-medium">
-            {new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            {task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}
           </dd>
         </div>
         {task.estimatedTime && (
@@ -76,18 +95,11 @@ function PoolCard({ task, index = 0, showCreatedBy = true }: { task: Task; index
         <Button
           size="sm"
           className="flex-1 rounded-md shadow-glow"
-          onClick={() => {
-            const ok = pickTask(task.id);
-            if (ok) {
-              toast.success("Task successfully assigned to you.", {
-                description: `${task.title} now appears under Assigned tasks.`,
-              });
-            } else {
-              toast.error("This task has already been assigned to another employee.");
-            }
-          }}
+          disabled={alreadyRequested || isRequesting}
+          onClick={() => onRequest?.(task)}
         >
-          <Hand className="mr-1.5 h-3.5 w-3.5" /> Pick task
+          <Hand className="mr-1.5 h-3.5 w-3.5" />
+          {alreadyRequested ? "Requested" : "Request task"}
         </Button>
       </div>
 
@@ -97,11 +109,30 @@ function PoolCard({ task, index = 0, showCreatedBy = true }: { task: Task; index
 }
 
 export function AvailableTasks() {
-  const universal = useUniversalPool();
-  const projectPool = useProjectPool();
   const [openProject, setOpenProject] = useState<string | null>(null);
-  const projects = useActiveProjects();
-  const allTasks = useAllTasks();
+  const { data: allProjectList = [] } = useProjectsQuery();
+  const { data: allTasks = [] } = useTasksQuery();
+  const requestTask = useRequestTask({
+    onSuccess: () => {
+      toast.success("Task requested successfully", {
+        description: "Your request has been submitted. Awaiting admin assignment.",
+      });
+    },
+    onError: (err) => {
+      toast.error("Failed to request task", {
+        description: err.message || "An error occurred.",
+      });
+    },
+  });
+
+  const projects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
+
+  const universal = allTasks.filter(
+    (t) => (t.taskType === "universal" || (t.taskType as string) === "Universal") && (t.status === "available" || (t.status as string) === "Open") && !t.assigneeId,
+  );
+  const projectPool = allTasks.filter(
+    (t) => (t.taskType === "project" || (t.taskType as string) === "Project") && (t.status === "available" || (t.status as string) === "Open") && !t.assigneeId,
+  );
 
   const openProjectTasks = projectPool.filter((t) => t.projectId === openProject);
 
@@ -126,7 +157,15 @@ export function AvailableTasks() {
             {universal.length === 0 ? (
               <EmptyState icon={Globe} title="No universal tasks" description="New open tasks will appear here." />
             ) : (
-              universal.map((t, i) => <PoolCard key={t.id} task={t} index={i} />)
+              universal.map((t, i) => (
+                <PoolCard
+                  key={t.id}
+                  task={t}
+                  index={i}
+                  onRequest={(t) => requestTask.mutate(t.id || t._id || "")}
+                  isRequesting={requestTask.isPending}
+                />
+              ))
             )}
           </div>
         </div>
@@ -151,13 +190,14 @@ export function AvailableTasks() {
           <div className="mt-4 space-y-3">
             {!openProject &&
               projects.map((p) => {
-                const stats = projectStats(allTasks, p.id);
-                const count = projectPool.filter((t) => t.projectId === p.id).length;
+                const targetId = p._id || p.id;
+                const stats = projectStats(allTasks, targetId);
+                const count = projectPool.filter((t) => t.projectId === targetId || t.projectId === p.id).length;
                 return (
                   <button
-                    key={p.id}
+                    key={targetId}
                     type="button"
-                    onClick={() => setOpenProject(p.id)}
+                    onClick={() => setOpenProject(targetId)}
                     className="flex w-full items-center gap-3 rounded-md border border-border/60 bg-card/40 p-4 text-left transition-all hover:border-primary/40 hover:bg-secondary/30"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
@@ -190,7 +230,16 @@ export function AvailableTasks() {
               (openProjectTasks.length === 0 ? (
                 <EmptyState icon={FolderKanban} title="No open tasks" description="Every task in this project is taken." />
               ) : (
-                openProjectTasks.map((t, i) => <PoolCard key={t.id} task={t} index={i} showCreatedBy={false} />)
+                openProjectTasks.map((t, i) => (
+                  <PoolCard
+                    key={t.id}
+                    task={t}
+                    index={i}
+                    showCreatedBy={false}
+                    onRequest={(t) => requestTask.mutate(t.id || t._id || "")}
+                    isRequesting={requestTask.isPending}
+                  />
+                ))
               ))}
           </div>
         </div>

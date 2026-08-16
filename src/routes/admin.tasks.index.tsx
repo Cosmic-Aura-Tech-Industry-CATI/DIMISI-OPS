@@ -1,15 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowUpDown,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Eye,
   ListTodo,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
+  RotateCw,
   Search,
   Trash2,
   Trophy,
@@ -46,7 +49,7 @@ import {
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { admins, type Task, type TaskPriority, type TaskStatus, type TaskType } from "@/lib/mock-data";
-import { useAllTasks } from "@/lib/task-store";
+import { useTasksQuery, useDeleteTask } from "@/features/tasks";
 import { TaskTypeBadge } from "@/components/status-badge";
 import { projectName } from "@/lib/projects";
 import { IdBadge } from "@/components/id-badge";
@@ -67,13 +70,24 @@ type SortKey = "title" | "priority" | "points" | "dueDate";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 8;
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0")}`;
+const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0") || id.slice(-4)}`;
 const priorityRank: Record<TaskPriority, number> = { low: 0, medium: 1, high: 2 };
-const createdByFor = (t: Task) => t.createdBy ?? admins[+t.id.replace(/\D/g, "") % admins.length]?.name ?? "Elena Voss";
+const createdByFor = (t: Task) => t.createdBy || "Admin";
 
 function TasksPage() {
   const navigate = useNavigate();
-  const tasks = useAllTasks();
+  const { data: tasks = [], isLoading, isError, refetch } = useTasksQuery();
+  const deleteTask = useDeleteTask({
+    onSuccess: () => {
+      toast.success("Task deleted");
+      setPendingDelete(null);
+    },
+    onError: (err) => {
+      toast.error("Failed to delete task", {
+        description: err.message || "An error occurred while deleting the task.",
+      });
+    },
+  });
   const categories = useMemo(() => Array.from(new Set(tasks.map((t) => t.category))).sort(), [tasks]);
 
   const [query, setQuery] = useState("");
@@ -203,11 +217,29 @@ function TasksPage() {
         </div>
       </div>
 
-      <div className="glass overflow-hidden rounded-2xl">
-        <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
-          <span>{filtered.length} results</span>
-          <span>Page {current} of {pages}</span>
+      {isError && (
+        <div className="flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <span>Failed to load tasks from server. Please check your connection.</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void refetch()} className="border-destructive/30 hover:bg-destructive/15">
+            <RotateCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+          </Button>
         </div>
+      )}
+
+      {isLoading ? (
+        <div className="glass flex flex-col items-center justify-center rounded-2xl py-16 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-3 text-sm">Loading tasks from database...</p>
+        </div>
+      ) : (
+        <div className="glass overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
+            <span>{filtered.length} results</span>
+            <span>Page {current} of {pages}</span>
+          </div>
         {/* Mobile: cards instead of horizontal scrolling */}
         <div className="space-y-3 p-3 lg:hidden">
           {slice.length === 0 && (
@@ -380,6 +412,7 @@ function TasksPage() {
           </div>
         </div>
       </div>
+      )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>
@@ -391,7 +424,12 @@ function TasksPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { toast.success("Task deleted"); setPendingDelete(null); }}
+              disabled={deleteTask.isPending}
+              onClick={() => {
+                if (pendingDelete) {
+                  deleteTask.mutate(pendingDelete.id || pendingDelete._id || "");
+                }
+              }}
             >
               <Trash2 className="mr-1.5 h-4 w-4" /> Delete
             </AlertDialogAction>

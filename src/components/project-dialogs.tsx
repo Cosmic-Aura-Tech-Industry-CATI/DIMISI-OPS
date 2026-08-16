@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, FolderPlus, Save, Trash2, TriangleAlert } from "lucide-react";
+import { Archive, FolderPlus, Loader2, Save, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +21,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IdBadge } from "@/components/id-badge";
-import { useAllTasks } from "@/lib/task-store";
+import { useTasksQuery } from "@/features/tasks";
 import { projectStats } from "@/lib/projects";
 import {
-  archiveProject,
-  createProject,
-  deleteProject,
-  isNameTaken,
-  nextProjectCode,
+  useCreateProject,
+  useDeleteProject,
+  useUpdateProject,
   projectColors,
-  updateProject,
   type Project,
-  type ProjectStatus,
-} from "@/lib/project-store";
+  type FrontendProjectStatus as ProjectStatus,
+} from "@/features/projects";
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
@@ -76,6 +73,8 @@ export function CreateProjectDialog({
   onCreated?: (p: Project) => void;
   createdBy?: string;
 }) {
+  const createMutation = useCreateProject();
+
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
@@ -86,19 +85,43 @@ export function CreateProjectDialog({
 
   useEffect(() => {
     if (open) {
-      setName(""); setCode(""); setDescription(""); setManager("");
-      setStatus("active"); setColor(projectColors[0]); setError(undefined);
+      setName("");
+      setCode("");
+      setDescription("");
+      setManager("");
+      setStatus("active");
+      setColor(projectColors[0]);
+      setError(undefined);
     }
   }, [open]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Project name is required");
-    if (isNameTaken(name)) return setError("A project with this name already exists");
-    const project = createProject({ name, code, description, manager, status, color, createdBy });
-    onOpenChange(false);
-    toast.success("Project created", { description: `${project.name} · ${project.code}` });
-    onCreated?.(project);
+
+    try {
+      const newProject = await createMutation.mutateAsync({
+        name: name.trim(),
+        code: code.trim() || undefined,
+        description: description.trim() || undefined,
+        managerId: manager.trim() || undefined,
+        manager: manager.trim() || undefined,
+        status: status,
+        color: color,
+        createdBy: createdBy,
+      });
+
+      onOpenChange(false);
+      toast.success("Project created", {
+        description: `${newProject.name} · ${newProject.code}`,
+      });
+      onCreated?.(newProject);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string; response?: { data?: { message?: string } } };
+      const msg = apiErr?.message || apiErr?.response?.data?.message || "Failed to create project";
+      setError(msg);
+      toast.error("Failed to create project", { description: msg });
+    }
   };
 
   return (
@@ -110,22 +133,54 @@ export function CreateProjectDialog({
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Project name *" error={error}>
-            <Input value={name} onChange={(e) => { setName(e.target.value); setError(undefined); }} placeholder="e.g. Atlas CRM" className="h-11" autoFocus />
+            <Input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(undefined);
+              }}
+              placeholder="e.g. Atlas CRM"
+              className="h-11"
+              autoFocus
+              disabled={createMutation.isPending}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Project code (optional)">
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder={nextProjectCode()} className="h-11 font-mono" />
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="e.g. DMS-001"
+                className="h-11 font-mono"
+                disabled={createMutation.isPending}
+              />
             </Field>
-            <Field label="Project manager (optional)">
-              <Input value={manager} onChange={(e) => setManager(e.target.value)} placeholder="e.g. Aarav Mehta" className="h-11" />
+            <Field label="Project manager ID (optional)">
+              <Input
+                value={manager}
+                onChange={(e) => setManager(e.target.value)}
+                placeholder="Manager User ID"
+                className="h-11"
+                disabled={createMutation.isPending}
+              />
             </Field>
           </div>
           <Field label="Project description">
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What this project covers…" />
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="What this project covers…"
+              disabled={createMutation.isPending}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Project status">
-              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+              <Select
+                value={status}
+                onValueChange={(v) => setStatus(v as typeof status)}
+                disabled={createMutation.isPending}
+              >
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
@@ -138,8 +193,32 @@ export function CreateProjectDialog({
             </Field>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" className="rounded-md shadow-glow"><FolderPlus className="mr-1.5 h-4 w-4" /> Create project</Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-md"
+              onClick={() => onOpenChange(false)}
+              disabled={createMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="rounded-md shadow-glow"
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FolderPlus className="mr-1.5 h-4 w-4" />
+                  Create project
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -157,6 +236,8 @@ export function EditProjectDialog({
   onOpenChange: (v: boolean) => void;
   project?: Project;
 }) {
+  const updateMutation = useUpdateProject();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [manager, setManager] = useState("");
@@ -168,7 +249,11 @@ export function EditProjectDialog({
     if (open && project) {
       setName(project.name);
       setDescription(project.description);
-      setManager(project.manager ?? "");
+      setManager(
+        typeof project.managerId === "string"
+          ? project.managerId
+          : project.managerId?._id || project.manager || ""
+      );
       setStatus(project.status);
       setColor(project.color);
       setError(undefined);
@@ -177,13 +262,33 @@ export function EditProjectDialog({
 
   if (!project) return null;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Project name is required");
-    if (isNameTaken(name, project.id)) return setError("A project with this name already exists");
-    updateProject(project.id, { name: name.trim(), description: description.trim(), manager: manager.trim() || undefined, status, color });
-    onOpenChange(false);
-    toast.success("Project updated", { description: `${name.trim()} · ${project.code}` });
+
+    try {
+      const targetId = project._id || project.id;
+      const updated = await updateMutation.mutateAsync({
+        id: targetId,
+        payload: {
+          name: name.trim(),
+          description: description.trim(),
+          managerId: manager.trim() || null,
+          status: status,
+          color: color,
+        },
+      });
+
+      onOpenChange(false);
+      toast.success("Project updated", {
+        description: `${updated.name} · ${updated.code}`,
+      });
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string; response?: { data?: { message?: string } } };
+      const msg = apiErr?.message || apiErr?.response?.data?.message || "Failed to update project";
+      setError(msg);
+      toast.error("Failed to update project", { description: msg });
+    }
   };
 
   return (
@@ -199,17 +304,41 @@ export function EditProjectDialog({
             <IdBadge id={project.code} />
           </div>
           <Field label="Project name *" error={error}>
-            <Input value={name} onChange={(e) => { setName(e.target.value); setError(undefined); }} className="h-11" autoFocus />
+            <Input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(undefined);
+              }}
+              className="h-11"
+              autoFocus
+              disabled={updateMutation.isPending}
+            />
           </Field>
           <Field label="Project description">
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              disabled={updateMutation.isPending}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Project manager">
-              <Input value={manager} onChange={(e) => setManager(e.target.value)} className="h-11" placeholder="Unassigned" />
+            <Field label="Project manager ID">
+              <Input
+                value={manager}
+                onChange={(e) => setManager(e.target.value)}
+                className="h-11"
+                placeholder="Manager User ID"
+                disabled={updateMutation.isPending}
+              />
             </Field>
             <Field label="Project status">
-              <Select value={status} onValueChange={(v) => setStatus(v as ProjectStatus)}>
+              <Select
+                value={status.toLowerCase()}
+                onValueChange={(v) => setStatus(v as ProjectStatus)}
+                disabled={updateMutation.isPending}
+              >
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
@@ -223,8 +352,32 @@ export function EditProjectDialog({
             <ColorPicker value={color} onChange={setColor} />
           </Field>
           <DialogFooter>
-            <Button type="button" variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" className="rounded-md shadow-glow"><Save className="mr-1.5 h-4 w-4" /> Save changes</Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-md"
+              onClick={() => onOpenChange(false)}
+              disabled={updateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="rounded-md shadow-glow"
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-1.5 h-4 w-4" />
+                  Save changes
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -244,10 +397,49 @@ export function ArchiveProjectDialog({
   project?: Project;
   onRemoved?: (id: string) => void;
 }) {
-  const tasks = useAllTasks();
+  const deleteMutation = useDeleteProject();
+  const { data: tasks = [] } = useTasksQuery();
+
   if (!project) return null;
-  const stats = projectStats(tasks, project.id);
+  const targetId = project._id || project.id;
+  const stats = projectStats(tasks, targetId);
   const blocked = stats.hasActiveWork;
+
+  const handleArchive = async () => {
+    try {
+      await deleteMutation.mutateAsync(targetId);
+      onOpenChange(false);
+      toast.success("Project archived", {
+        description: `${project.name} no longer accepts new tasks.`,
+      });
+      onRemoved?.(targetId);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      toast.error("Failed to archive project", {
+        description: apiErr?.message || "Operation failed",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (blocked) {
+      toast.error("This project contains active tasks and cannot be deleted.");
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync(targetId);
+      onOpenChange(false);
+      toast.success("Project deleted", {
+        description: `${project.name} was removed.`,
+      });
+      onRemoved?.(targetId);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      toast.error("Failed to delete project", {
+        description: apiErr?.message || "Operation failed",
+      });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -274,35 +466,39 @@ export function ArchiveProjectDialog({
         )}
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             variant="outline"
             className="rounded-md"
-            onClick={() => {
-              archiveProject(project.id);
-              onOpenChange(false);
-              toast.success("Project archived", { description: `${project.name} no longer accepts new tasks.` });
-              onRemoved?.(project.id);
-            }}
+            onClick={() => onOpenChange(false)}
+            disabled={deleteMutation.isPending}
           >
-            <Archive className="mr-1.5 h-4 w-4" /> Archive project
+            Cancel
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-md"
+            disabled={deleteMutation.isPending}
+            onClick={handleArchive}
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Archive className="mr-1.5 h-4 w-4" />
+            )}
+            Archive project
           </Button>
           <Button
             variant="destructive"
             className="rounded-md"
-            disabled={blocked}
-            onClick={() => {
-              if (blocked) {
-                toast.error("This project contains active tasks and cannot be deleted.");
-                return;
-              }
-              deleteProject(project.id);
-              onOpenChange(false);
-              toast.success("Project deleted", { description: `${project.name} was removed.` });
-              onRemoved?.(project.id);
-            }}
+            disabled={blocked || deleteMutation.isPending}
+            onClick={handleDelete}
           >
-            <Trash2 className="mr-1.5 h-4 w-4" /> Delete project
+            {deleteMutation.isPending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-1.5 h-4 w-4" />
+            )}
+            Delete project
           </Button>
         </DialogFooter>
       </DialogContent>

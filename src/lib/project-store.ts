@@ -1,131 +1,23 @@
 import { useSyncExternalStore } from "react";
 import { logAudit } from "@/lib/audit-log";
+import type {
+  Project,
+  FrontendProjectStatus as ProjectStatus,
+  ProjectAnalytics,
+} from "@/features/projects";
+import {
+  projectColors,
+  projectStatusLabel,
+  projectStatusStyles,
+} from "@/features/projects";
+
+export type { Project, ProjectStatus, ProjectAnalytics };
+export { projectColors, projectStatusLabel, projectStatusStyles };
 
 /**
- * Frontend-only project catalogue. Seed projects plus admin-created ones,
- * with edits / archive / delete overrides persisted to localStorage.
+ * Seed projects list is empty — real project records are fetched from the database API.
  */
-
-export type ProjectStatus = "active" | "inactive" | "archived";
-
-export interface Project {
-  id: string;
-  /** Standardised, read-only project ID — DMSPRJ001 … */
-  code: string;
-  name: string;
-  description: string;
-  manager?: string;
-  status: ProjectStatus;
-  color?: string;
-  createdAt: string;
-  createdBy: string;
-  templates: string[];
-}
-
-export const projectStatusLabel: Record<ProjectStatus, string> = {
-  active: "Active",
-  inactive: "Inactive",
-  archived: "Archived",
-};
-
-export const projectStatusStyles: Record<ProjectStatus, string> = {
-  active: "bg-success/15 text-success",
-  inactive: "bg-muted text-muted-foreground",
-  archived: "bg-warning/15 text-warning",
-};
-
-export const projectColors = [
-  "#C9A961",
-  "#8FB8A8",
-  "#B98B7A",
-  "#7E93B8",
-  "#A98BB9",
-  "#D9D9D9",
-];
-
-export const seedProjects: Project[] = [
-  {
-    id: "dimisi",
-    code: "DMSPRJ001",
-    name: "Dimisi",
-    description: "Core product platform",
-    manager: "Aarav Mehta",
-    status: "active",
-    color: "#C9A961",
-    createdAt: "2025-01-12",
-    createdBy: "Dimisi Directors",
-    templates: [
-      "Landing Page Development",
-      "Authentication Module",
-      "Dashboard UI",
-      "Employee Management",
-      "Reports Module",
-      "Notification System",
-    ],
-  },
-  {
-    id: "kalesh",
-    code: "DMSPRJ002",
-    name: "Kalesh",
-    description: "Anonymous opinion network",
-    manager: "Ishita Rao",
-    status: "active",
-    color: "#8FB8A8",
-    createdAt: "2025-02-04",
-    createdBy: "Dimisi Directors",
-    templates: [
-      "Opinion Feed",
-      "Anonymous Posting",
-      "Reaction System",
-      "Admin Moderation",
-      "Reporting System",
-      "Analytics",
-    ],
-  },
-  {
-    id: "rudra",
-    code: "DMSPRJ003",
-    name: "Rudra Tours & Travels",
-    description: "Travel booking platform",
-    manager: "Kabir Shah",
-    status: "active",
-    color: "#B98B7A",
-    createdAt: "2025-03-18",
-    createdBy: "Dimisi Directors",
-    templates: [
-      "Booking System",
-      "Destination Page",
-      "Admin Dashboard",
-      "Tour Packages",
-      "Payment Integration",
-      "Reviews",
-    ],
-  },
-  {
-    id: "poll",
-    code: "DMSPRJ004",
-    name: "Poll",
-    description: "Task & performance suite",
-    manager: "Neha Kulkarni",
-    status: "active",
-    color: "#7E93B8",
-    createdAt: "2025-04-27",
-    createdBy: "Dimisi Directors",
-    templates: ["Survey Builder", "Response Analytics", "Team Workspaces", "Export Module"],
-  },
-  {
-    id: "portfolio",
-    code: "DMSPRJ005",
-    name: "Portfolio",
-    description: "Agency showcase site",
-    manager: "Rohan Verma",
-    status: "active",
-    color: "#A98BB9",
-    createdAt: "2025-05-09",
-    createdBy: "Dimisi Directors",
-    templates: ["Case Study Layout", "Motion Hero", "Contact Form", "SEO Optimisation"],
-  },
-];
+export const seedProjects: Project[] = [];
 
 interface ProjectState {
   created: Project[];
@@ -146,7 +38,9 @@ function persist(next: ProjectState) {
   g.__dimisiProjects = next;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {}
+  } catch (_e) {
+    // ignore storage quota errors
+  }
   listeners.forEach((l) => l());
 }
 
@@ -154,14 +48,14 @@ function hydrate() {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as ProjectState;
-      state = { created: parsed.created ?? [], edits: parsed.edits ?? {}, deleted: parsed.deleted ?? [] };
-      g.__dimisiProjects = state;
-      listeners.forEach((l) => l());
-    }
-  } catch {}
+    // Clear any previous mock seed store data
+    localStorage.removeItem(KEY);
+    state = empty;
+    g.__dimisiProjects = empty;
+    listeners.forEach((l) => l());
+  } catch (_e) {
+    // ignore malformed storage payload
+  }
 }
 
 function subscribe(cb: () => void) {
@@ -172,8 +66,8 @@ function subscribe(cb: () => void) {
 
 function compute(s: ProjectState): Project[] {
   return [...seedProjects, ...s.created]
-    .filter((p) => !s.deleted.includes(p.id))
-    .map((p) => ({ ...p, ...(s.edits[p.id] ?? {}) }))
+    .filter((p) => !s.deleted.includes(p.id) && !s.deleted.includes(p._id))
+    .map((p) => ({ ...p, ...(s.edits[p.id] ?? s.edits[p._id] ?? {}) }))
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 
@@ -189,14 +83,14 @@ const getSnapshot = () => {
 const serverList = compute(empty);
 const getServerSnapshot = () => serverList;
 
-/** Every project, including inactive and archived ones. */
+/** Every project, including inactive and archived ones (fallback store). */
 export function useProjects(): Project[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-/** Only projects that can receive new tasks. */
+/** Only projects that can receive new tasks (fallback store). */
 export function useActiveProjects(): Project[] {
-  return useProjects().filter((p) => p.status === "active");
+  return useProjects().filter((p) => (p.status || "").toLowerCase() === "active");
 }
 
 /** Non-reactive read — safe for helpers such as projectName(). */
@@ -218,29 +112,33 @@ export interface NewProjectInput {
   code?: string;
   description?: string;
   manager?: string;
-  status?: Exclude<ProjectStatus, "archived">;
+  status?: Exclude<ProjectStatus, "archived" | "Archived">;
   color?: string;
   createdBy?: string;
 }
 
 export function isNameTaken(name: string, ignoreId?: string) {
   const n = name.trim().toLowerCase();
-  return allProjects().some((p) => p.id !== ignoreId && p.name.trim().toLowerCase() === n);
+  return allProjects().some((p) => p.id !== ignoreId && p._id !== ignoreId && p.name.trim().toLowerCase() === n);
 }
 
 export function createProject(input: NewProjectInput): Project {
   hydrate();
+  const id = `pr-${Date.now()}`;
   const project: Project = {
-    id: `pr-${Date.now()}`,
+    _id: id,
+    id: id,
     code: input.code?.trim() || nextProjectCode(),
     name: input.name.trim(),
     description: input.description?.trim() ?? "",
     manager: input.manager?.trim() || undefined,
     status: input.status ?? "active",
     color: input.color,
+    isActive: true,
     createdAt: new Date().toISOString().slice(0, 10),
     createdBy: input.createdBy ?? "Admin",
     templates: [],
+    analytics: { totalTasks: 0, completedTasks: 0, progressPercentage: 0 },
   };
   persist({ ...state, created: [...state.created, project] });
   logAudit({
@@ -256,7 +154,7 @@ export function createProject(input: NewProjectInput): Project {
 
 export function updateProject(id: string, patch: Partial<Project>, silent = false) {
   hydrate();
-  const before = compute(state).find((p) => p.id === id);
+  const before = compute(state).find((p) => p.id === id || p._id === id);
   persist({ ...state, edits: { ...state.edits, [id]: { ...(state.edits[id] ?? {}), ...patch } } });
   if (!silent) {
     logAudit({
@@ -272,7 +170,7 @@ export function updateProject(id: string, patch: Partial<Project>, silent = fals
 }
 
 export function archiveProject(id: string) {
-  const project = allProjects().find((p) => p.id === id);
+  const project = allProjects().find((p) => p.id === id || p._id === id);
   updateProject(id, { status: "archived" }, true);
   logAudit({
     category: "project",
@@ -290,7 +188,7 @@ export function restoreProject(id: string) {
 
 export function deleteProject(id: string) {
   hydrate();
-  const project = compute(state).find((p) => p.id === id);
+  const project = compute(state).find((p) => p.id === id || p._id === id);
   logAudit({
     category: "project",
     action: "Deleted Project",
@@ -301,7 +199,7 @@ export function deleteProject(id: string) {
   });
   persist({
     ...state,
-    created: state.created.filter((p) => p.id !== id),
+    created: state.created.filter((p) => p.id !== id && p._id !== id),
     deleted: [...state.deleted, id],
   });
 }

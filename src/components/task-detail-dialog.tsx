@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   Clock,
+  ExternalLink,
   FileText,
   Paperclip,
   Tag,
@@ -137,16 +138,28 @@ export function TaskDetailDialog({
                 Attachments
               </p>
               <ul className="space-y-2">
-                {task.attachments.map((a) => (
+                {task.attachments.map((a, i) => (
                   <li
-                    key={a.name}
+                    key={i}
                     className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-card/40 px-3 py-2 text-sm"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{a.name}</span>
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{a.size}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="shrink-0 text-xs text-muted-foreground">{a.size}</span>
+                      {(a as { url?: string }).url && (
+                        <a
+                          href={(a as { url?: string }).url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" /> View
+                        </a>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, CalendarDays, FileUp, FolderKanban, FolderPlus, Globe, Paperclip, Pencil, Save, Target, Timer, Trophy, X } from "lucide-react";
+import { Archive, CalendarDays, FileUp, FolderKanban, FolderPlus, Globe, Loader2, Paperclip, Pencil, Save, Target, Timer, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +13,16 @@ import {
 } from "@/components/ui/select";
 import { employees, type Task, type TaskPriority, type TaskType } from "@/lib/mock-data";
 import { projectById } from "@/lib/projects";
-import { useActiveProjects, useProjects } from "@/lib/project-store";
+import { useProjectsQuery } from "@/features/projects";
 import { ArchiveProjectDialog, CreateProjectDialog, EditProjectDialog } from "@/components/project-dialogs";
 import { cn } from "@/lib/utils";
+
+export interface TaskAttachment {
+  name: string;
+  size: string;
+  file?: File;
+  url?: string;
+}
 
 export interface TaskFormValues {
   title: string;
@@ -26,7 +33,7 @@ export interface TaskFormValues {
   points: number;
   dueDate: string;
   notes: string;
-  attachments: { name: string; size: string }[];
+  attachments: TaskAttachment[];
   taskType: TaskType;
   projectId: string;
   template: string;
@@ -44,12 +51,26 @@ export function emptyTaskValues(): TaskFormValues {
 }
 
 export function taskToValues(t: Task): TaskFormValues {
+  const existingAttachments: TaskAttachment[] = (t.attachments || []).map((a) => ({
+    name: a.name,
+    size: a.size,
+    url: (a as { url?: string }).url,
+  }));
+
   return {
-    title: t.title, description: t.description, category: t.category, priority: t.priority,
-    assigneeId: t.assigneeId, points: t.points, dueDate: t.dueDate,
-    notes: t.notes ?? "", attachments: t.attachments ?? [],
-    taskType: t.taskType ?? "direct", projectId: t.projectId ?? "",
-    template: t.projectId ? t.title : "", estimatedTime: t.estimatedTime ?? "",
+    title: t.title,
+    description: t.description,
+    category: t.category,
+    priority: t.priority,
+    assigneeId: t.assigneeId,
+    points: t.points,
+    dueDate: t.dueDate,
+    notes: t.notes ?? "",
+    attachments: existingAttachments,
+    taskType: t.taskType ?? "direct",
+    projectId: t.projectId ?? "",
+    template: t.projectId ? t.title : "",
+    estimatedTime: t.estimatedTime ?? "",
   };
 }
 
@@ -81,20 +102,24 @@ const categoryOptions: { value: TaskType; icon: typeof Globe; emoji: string; tit
 export function TaskForm({
   initial,
   submitLabel = "Save task",
+  isSubmitting = false,
+  apiError,
   onCancel,
   onSubmit,
 }: {
   initial: TaskFormValues;
   submitLabel?: string;
+  isSubmitting?: boolean;
+  apiError?: string;
   onCancel: () => void;
   onSubmit: (values: TaskFormValues) => void;
 }) {
   const [form, setForm] = useState<TaskFormValues>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
-  const allProjectList = useProjects();
-  const activeProjects = useActiveProjects();
-  const selectedProject = allProjectList.find((p) => p.id === form.projectId);
+  const { data: allProjectList = [] } = useProjectsQuery();
+  const activeProjects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
+  const selectedProject = allProjectList.find((p) => p.id === form.projectId || p._id === form.projectId);
 
   const set = <K extends keyof TaskFormValues>(k: K, v: TaskFormValues[K]) => setForm({ ...form, [k]: v });
 
@@ -112,12 +137,12 @@ export function TaskForm({
     onSubmit(form);
   };
 
-
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    const next = Array.from(files).map((f) => ({
+    const next: TaskAttachment[] = Array.from(files).map((f) => ({
       name: f.name,
       size: f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(0)} KB` : `${(f.size / 1024 / 1024).toFixed(1)} MB`,
+      file: f,
     }));
     set("attachments", [...form.attachments, ...next]);
   };
@@ -125,6 +150,12 @@ export function TaskForm({
   return (
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-3">
       <div className="glass space-y-5 rounded-2xl p-6 lg:col-span-2">
+        {apiError && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+            {apiError}
+          </div>
+        )}
+
         <Field label="Title" error={errors.title}>
           <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Migrate to new analytics SDK" className="h-11" />
         </Field>
@@ -256,15 +287,18 @@ export function TaskForm({
                   {activeProjects.length === 0 ? (
                     <div className="px-2 py-3 text-xs text-muted-foreground">No active projects — add one.</div>
                   ) : (
-                    activeProjects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <span className="inline-flex items-center gap-2">
-                          {p.color && <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color }} />}
-                          {p.name}
-                          <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{p.code}</span>
-                        </span>
-                      </SelectItem>
-                    ))
+                    activeProjects.map((p) => {
+                      const targetId = p._id || p.id;
+                      return (
+                        <SelectItem key={targetId} value={targetId}>
+                          <span className="inline-flex items-center gap-2">
+                            {p.color && <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color }} />}
+                            {p.name}
+                            <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{p.code}</span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })
                   )}
                 </SelectContent>
               </Select>
@@ -274,7 +308,7 @@ export function TaskForm({
             <CreateProjectDialog
               open={dialog === "create"}
               onOpenChange={(v) => setDialog(v ? "create" : null)}
-              onCreated={(p) => setForm((f) => ({ ...f, projectId: p.id, template: "" }))}
+              onCreated={(p) => setForm((f) => ({ ...f, projectId: p._id || p.id, template: "" }))}
             />
             <EditProjectDialog open={dialog === "edit"} onOpenChange={(v) => setDialog(v ? "edit" : null)} project={selectedProject} />
             <ArchiveProjectDialog
@@ -364,8 +398,20 @@ export function TaskForm({
 
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" className="rounded-md" onClick={onCancel}>Cancel</Button>
-          <Button type="submit" className="rounded-md shadow-glow"><Save className="mr-1.5 h-4 w-4" /> {submitLabel}</Button>
+          <Button type="button" variant="outline" className="rounded-md" disabled={isSubmitting} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting} className="rounded-md shadow-glow">
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-1.5 h-4 w-4" /> {submitLabel}
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </form>

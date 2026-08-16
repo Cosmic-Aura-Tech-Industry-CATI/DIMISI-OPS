@@ -7,6 +7,7 @@ export type TaskType = "universal" | "project" | "direct";
 
 export interface Task {
   id: string;
+  _id?: string;
   title: string;
   description: string;
   assignee: string;
@@ -19,19 +20,22 @@ export interface Task {
   category: string;
   createdBy?: string;
   notes?: string;
-  attachments?: { name: string; size: string }[];
+  attachments?: { name: string; size: string; url?: string }[];
   reviewState?: TaskReviewState;
   rejectionReason?: string;
   /** Universal (open to all), Project (open within a project) or Direct (pre-assigned). */
   taskType?: TaskType;
   /** Set when taskType === "project". */
   projectId?: string;
+  projectName?: string;
   /** Human estimate, e.g. "4h" or "2 days". */
   estimatedTime?: string;
   /** ISO timestamp of the moment the task was claimed / assigned. */
   assignedAt?: string;
   /** Standardized Dimisi ID of the assignee (DMSEMPYYNN). */
   assigneeCode?: string;
+  /** Whether the current employee has requested/bid on this task */
+  isRequestedByMe?: boolean;
 }
 
 
@@ -111,35 +115,10 @@ export const employeeAccountFor = (name: string) =>
 export const adminAccountFor = (name: string) =>
   admins.find((a) => a.name === name && a.dualRole);
 
-const taskSeed: Task[] = [
-  { id: "t1", title: "Refactor billing service", description: "Split monolith service into invoice + payments modules.", assignee: "Ava Chen", assigneeId: "u1", status: "in_progress", priority: "high", points: 80, dueDate: "2026-08-04", createdAt: "2026-07-20", category: "Engineering" },
-  { id: "t2", title: "Design onboarding flow v3", description: "Streamline first-run experience to 3 steps.", assignee: "Marcus Reed", assigneeId: "u2", status: "pending", priority: "medium", points: 50, dueDate: "2026-08-10", createdAt: "2026-07-22", category: "Design" },
-  { id: "t3", title: "Q3 pipeline forecast", description: "Prepare regional pipeline forecast deck.", assignee: "Sofia Alvarez", assigneeId: "u5", status: "completed", priority: "high", points: 70, dueDate: "2026-07-25", createdAt: "2026-07-10", category: "Sales" },
-  { id: "t4", title: "Migrate to new analytics SDK", description: "Replace legacy tracker across web + mobile.", assignee: "Priya Nair", assigneeId: "u3", status: "in_progress", priority: "high", points: 90, dueDate: "2026-08-01", createdAt: "2026-07-15", category: "Engineering" },
-  { id: "t5", title: "Launch summer campaign", description: "Ship landing, email drip, and social kit.", assignee: "Liam Foster", assigneeId: "u4", status: "overdue", priority: "medium", points: 60, dueDate: "2026-07-28", createdAt: "2026-07-05", category: "Marketing" },
-  { id: "t6", title: "Customer NPS review", description: "Analyze Q2 NPS results and propose 3 actions.", assignee: "Noah Kim", assigneeId: "u6", status: "pending", priority: "low", points: 30, dueDate: "2026-08-15", createdAt: "2026-07-23", category: "Support" },
-  { id: "t7", title: "Roadmap workshop prep", description: "Draft roadmap themes for the H2 workshop.", assignee: "Zara Ahmed", assigneeId: "u7", status: "completed", priority: "medium", points: 55, dueDate: "2026-07-26", createdAt: "2026-07-14", category: "Product" },
-  { id: "t8", title: "Fix mobile crash on iOS 19", description: "Root-cause and patch the startup crash.", assignee: "Ava Chen", assigneeId: "u1", status: "completed", priority: "high", points: 75, dueDate: "2026-07-24", createdAt: "2026-07-18", category: "Engineering" },
-  { id: "t9", title: "Update brand guidelines", description: "Refresh typography and motion tokens.", assignee: "Marcus Reed", assigneeId: "u2", status: "in_progress", priority: "low", points: 40, dueDate: "2026-08-12", createdAt: "2026-07-21", category: "Design" },
-  { id: "t10", title: "Enterprise SSO rollout", description: "Enable SAML for top 20 accounts.", assignee: "Priya Nair", assigneeId: "u3", status: "pending", priority: "high", points: 100, dueDate: "2026-08-20", createdAt: "2026-07-25", category: "Engineering" },
-  { id: "t11", title: "API rate-limit dashboard", description: "Instrument gateway and ship an internal dashboard.", assignee: "Ava Chen", assigneeId: "u1", status: "completed", priority: "medium", points: 60, dueDate: "2026-07-27", createdAt: "2026-07-16", category: "Engineering", reviewState: "in_review" },
-  { id: "t12", title: "Checkout webhook retries", description: "Add exponential backoff and dead-letter queue.", assignee: "Ava Chen", assigneeId: "u1", status: "completed", priority: "high", points: 85, dueDate: "2026-07-26", createdAt: "2026-07-14", category: "Engineering", reviewState: "in_review" },
-  { id: "t13", title: "Legacy cron cleanup", description: "Remove deprecated cron jobs from billing worker.", assignee: "Ava Chen", assigneeId: "u1", status: "completed", priority: "low", points: 25, dueDate: "2026-07-22", createdAt: "2026-07-10", category: "Engineering", reviewState: "rejected", rejectionReason: "Two jobs still referenced by finance exports — please keep and document them." },
-  { id: "t14", title: "Q2 uptime report", description: "Compile incident summary for stakeholder review.", assignee: "Ava Chen", assigneeId: "u1", status: "completed", priority: "medium", points: 45, dueDate: "2026-07-18", createdAt: "2026-07-05", category: "Engineering", reviewState: "rejected", rejectionReason: "Missing RCA for the June 14 outage. Please add and resubmit." },
-];
+const taskSeed: Task[] = [];
 
 /** Open pool — universal + project tasks nobody has picked yet. */
-const poolSeed: Task[] = [
-  { id: "p1", title: "Refresh internal documentation", description: "Update the onboarding handbook and API notes.", assignee: "", assigneeId: "", status: "available", priority: "low", points: 30, dueDate: "2026-08-14", createdAt: "2026-07-19", category: "Operations", createdBy: "Shikhar Dixit", taskType: "universal", estimatedTime: "3h" },
-  { id: "p2", title: "Regression testing sweep", description: "Run the full manual regression pass on staging.", assignee: "", assigneeId: "", status: "available", priority: "medium", points: 45, dueDate: "2026-08-06", createdAt: "2026-07-21", category: "Support", createdBy: "Swatantra Singh", taskType: "universal", estimatedTime: "1 day" },
-  { id: "p3", title: "Fix sidebar overflow on tablet", description: "Small UI bug — sidebar clips at 820px width.", assignee: "", assigneeId: "", status: "available", priority: "high", points: 35, dueDate: "2026-08-02", createdAt: "2026-07-24", category: "Engineering", createdBy: "Nishkarsh Mishra", taskType: "universal", estimatedTime: "2h" },
-  { id: "p4", title: "Competitor research brief", description: "Summarise five competitor dashboards with screenshots.", assignee: "", assigneeId: "", status: "available", priority: "low", points: 40, dueDate: "2026-08-18", createdAt: "2026-07-26", category: "Marketing", createdBy: "Rhea Kapoor", taskType: "universal", estimatedTime: "4h" },
-  { id: "p5", title: "Dashboard UI", description: "Build the Dimisi analytics dashboard screens.", assignee: "", assigneeId: "", status: "available", priority: "high", points: 90, dueDate: "2026-08-09", createdAt: "2026-07-18", category: "Design", createdBy: "Rhea Kapoor", taskType: "project", projectId: "dimisi", estimatedTime: "3 days" },
-  { id: "p6", title: "Notification System", description: "In-app + email notification pipeline for Dimisi.", assignee: "", assigneeId: "", status: "available", priority: "medium", points: 75, dueDate: "2026-08-16", createdAt: "2026-07-20", category: "Engineering", createdBy: "Julian Park", taskType: "project", projectId: "dimisi", estimatedTime: "2 days" },
-  { id: "p7", title: "Opinion Feed", description: "Infinite feed with ranking for Kalesh.", assignee: "", assigneeId: "", status: "available", priority: "high", points: 85, dueDate: "2026-08-11", createdAt: "2026-07-22", category: "Product", createdBy: "Shikhar Dixit", taskType: "project", projectId: "kalesh", estimatedTime: "3 days" },
-  { id: "p8", title: "Booking System", description: "End-to-end booking flow for Rudra Tours & Travels.", assignee: "", assigneeId: "", status: "available", priority: "high", points: 95, dueDate: "2026-08-21", createdAt: "2026-07-25", category: "Engineering", createdBy: "Swatantra Singh", taskType: "project", projectId: "rudra", estimatedTime: "4 days" },
-  { id: "p9", title: "Case Study Layout", description: "Editorial case study template for the portfolio site.", assignee: "", assigneeId: "", status: "available", priority: "medium", points: 55, dueDate: "2026-08-13", createdAt: "2026-07-23", category: "Design", createdBy: "Rhea Kapoor", taskType: "project", projectId: "portfolio", estimatedTime: "1 day" },
-];
+const poolSeed: Task[] = [];
 
 /** Oldest tasks first. */
 export const tasks: Task[] = [...taskSeed, ...poolSeed]
