@@ -82,15 +82,16 @@ export async function verifyResetOtp(payload: VerifyResetOtpRequest) {
   return res;
 }
 
-/** PATCH /api/v1/auth/reset-password — authorised by the stored reset token. */
-export async function resetPassword({ resetToken, ...payload }: ResetPasswordRequest) {
-  if (resetToken) setResetToken(resetToken);
-  try {
-    return await http.patch<MessageResponse>(auth.resetPassword, payload, { authMode: "reset" });
-  } finally {
-    setResetToken(null);
-  }
+/** PATCH /api/v1/auth/reset-password — updates password using resetToken. */
+export async function resetPassword(payload: ResetPasswordRequest) {
+  const body = {
+    resetToken: payload.resetToken,
+    newPassword: payload.newPassword || payload.password || "",
+  };
+  return http.patch<MessageResponse>(auth.resetPassword, body, { authMode: "none" });
 }
+
+
 
 export const authService = {
   getHealth,
