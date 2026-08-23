@@ -8,12 +8,7 @@ import axios, {
 import { API_BASE_URL, API_TIMEOUT, API_WITH_CREDENTIALS } from "./config";
 import { API_ENDPOINTS } from "./endpoints";
 import { toApiError, type ApiError } from "./errors";
-import {
-  clearTokens,
-  getAccessToken,
-  getResetToken,
-  setAccessToken,
-} from "./token-store";
+import { clearTokens, getAccessToken, getResetToken, setAccessToken } from "./token-store";
 
 /** Which credential a request needs. Defaults to `bearer`. */
 export type AuthMode = "none" | "bearer" | "reset";
@@ -63,22 +58,39 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 }
 
 let refreshPromise: Promise<boolean> | null = null;
+let refreshFailed = false;
+
+export function resetRefreshState() {
+  refreshFailed = false;
+  refreshPromise = null;
+}
 
 /** Refresh the access token using the httpOnly refresh cookie. De-duplicated. */
 export function refreshAccessToken(): Promise<boolean> {
+  if (refreshFailed) return Promise.resolve(false);
   if (refreshPromise) return refreshPromise;
 
-  refreshPromise = apiClient
-    .post<{ status?: string; message?: string }>(
-      API_ENDPOINTS.auth.refresh,
-      undefined,
-      { authMode: "none", _retried: true },
-    )
+  const url = `${API_BASE_URL || ""}${API_ENDPOINTS.auth.refresh}`;
+
+  refreshPromise = axios
+    .post<{ status?: string; message?: string }>(url, undefined, {
+      timeout: API_TIMEOUT,
+      withCredentials: API_WITH_CREDENTIALS,
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+    })
     .then((res) => {
       const ok = res.status === 200 || res.data?.status === "success";
+      if (ok) {
+        refreshFailed = false;
+      } else {
+        refreshFailed = true;
+      }
       return ok;
     })
-    .catch(() => false)
+    .catch(() => {
+      refreshFailed = true;
+      return false;
+    })
     .finally(() => {
       refreshPromise = null;
     });
@@ -96,6 +108,10 @@ apiClient.interceptors.response.use(
     const isAuthEndpoint =
       url.includes("/auth/login") ||
       url.includes("/auth/verify-login") ||
+      url.includes("/auth/forget-password") ||
+      url.includes("/auth/verify-reset-otp") ||
+      url.includes("/auth/reset-password") ||
+      url.includes("/auth/resend-otp") ||
       url.includes("/auth/refresh");
 
     const canRetry = status === 401 && !!config && !config._retried && !isAuthEndpoint;
@@ -114,6 +130,7 @@ apiClient.interceptors.response.use(
     return Promise.reject(toApiError(error));
   },
 );
+
 
 /* -------------------------------- helpers --------------------------------- */
 

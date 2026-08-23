@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) return normalizeUser(JSON.parse(raw));
-    } catch {}
+    } catch { }
     return null;
   });
   const [loading, setLoading] = useState(true);
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (u) localStorage.setItem(KEY, JSON.stringify(u));
       else localStorage.removeItem(KEY);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -161,9 +161,9 @@ export function useAuth() {
     ctx ?? {
       user: null,
       loading: true,
-      signInWith: () => {},
-      setUser: () => {},
-      logout: async () => {},
+      signInWith: () => { },
+      setUser: () => { },
+      logout: async () => { },
     }
   );
 }

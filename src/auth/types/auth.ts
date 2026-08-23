@@ -113,8 +113,10 @@ export interface VerifyResetOtpResponse {
 }
 
 export interface ResetPasswordRequest {
-  password: string;
+  newPassword?: string;
+  password?: string;
   confirmPassword?: string;
-  /** Optional override; the API client attaches the stored reset token by default. */
-  resetToken?: string;
+  resetToken: string;
 }
+
+

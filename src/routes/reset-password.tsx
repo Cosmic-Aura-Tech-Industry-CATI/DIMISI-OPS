@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
 import { toast } from "sonner";
+import { authService } from "@/auth/services/auth.service";
+import { getResetToken } from "@/api/client/token-store";
 
 export const Route = createFileRoute("/reset-password")({
+
   head: () => ({
     meta: [
       { title: "Reset password — Poll" },
@@ -61,17 +64,24 @@ function ResetPasswordPage() {
     { label: "One symbol", ok: /[^A-Za-z0-9]/.test(pw) },
   ];
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ pw: true, confirm: true });
     if (!canSubmit) return;
     setSubmitting(true);
-    setTimeout(() => {
+    try {
+      const token = getResetToken() || "";
+      await authService.resetPassword({ newPassword: pw, resetToken: token });
       setSubmitting(false);
       setDone(true);
       toast.success("Password updated successfully");
-    }, 800);
+    } catch (err: any) {
+      setSubmitting(false);
+      const msg = err?.message || err?.response?.data?.message || "Failed to update password.";
+      toast.error(msg);
+    }
   };
+
 
   if (done) {
     return (

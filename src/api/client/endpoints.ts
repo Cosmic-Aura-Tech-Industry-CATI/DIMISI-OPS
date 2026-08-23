@@ -49,4 +49,28 @@ export const API_ENDPOINTS = {
     submit: (id: string) => `/tasks/${id}/submit`,
     review: (id: string) => `/tasks/${id}/review`,
   },
+  leaderboard: {
+    get: "/leaderboard",
+  },
+  notices: {
+    list: "/notices",
+    detail: (id: string) => `/notices/${id}`,
+    create: "/notices",
+    update: (id: string) => `/notices/${id}`,
+    delete: (id: string) => `/notices/${id}`,
+  },
+  admins: {
+    list: "/admins",
+    stats: "/admins/stats",
+    detail: (id: string) => `/admins/${id}`,
+    update: (id: string) => `/admins/${id}`,
+    revoke: (id: string) => `/admins/${id}/revoke`,
+  },
+  employees: {
+    list: "/employees",
+    detail: (id: string) => `/employees/${id}`,
+    update: (id: string) => `/employees/${id}`,
+    revoke: (id: string) => `/employees/${id}/revoke`,
+  },
 } as const;
+

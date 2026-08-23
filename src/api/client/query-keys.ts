@@ -30,4 +30,27 @@ export const queryKeys = {
     employee: (employeeId?: string) => ["tasks", "employee", employeeId] as const,
     reviews: () => ["tasks", "reviews"] as const,
   },
+  admins: {
+    all: ["admins"] as const,
+    stats: () => ["admins", "stats"] as const,
+    list: (filters?: Record<string, unknown>) => ["admins", "list", filters] as const,
+    detail: (id: string) => ["admins", "detail", id] as const,
+  },
+  employees: {
+    all: ["employees"] as const,
+    list: (filters?: Record<string, unknown>) => ["employees", "list", filters] as const,
+    detail: (id: string) => ["employees", "detail", id] as const,
+  },
+  leaderboard: {
+    all: ["leaderboard"] as const,
+    get: (limit?: number) => ["leaderboard", limit] as const,
+  },
+  notices: {
+    all: ["notices"] as const,
+    list: (filters?: Record<string, unknown>) => ["notices", "list", filters] as const,
+    detail: (id: string) => ["notices", "detail", id] as const,
+  },
 } as const;
+
+
+
