@@ -114,7 +114,6 @@ function EmployeeNoticeBoard() {
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground">
                 <span>Posted by <span className="font-medium text-foreground">{n.createdBy}</span></span>
-                <span>{n.publishDate}</span>
               </div>
             </article>
           ))}

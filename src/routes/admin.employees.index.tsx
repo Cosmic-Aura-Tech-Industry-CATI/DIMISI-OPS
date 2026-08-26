@@ -59,13 +59,7 @@ export const Route = createFileRoute("/admin/employees/")({
   component: EmployeesPage,
 });
 
-const jobTitles = [
-  "Frontend Developer",
-  "Backend Developer",
-  "UI Designer",
-  "QA Tester",
-  "Market Researcher",
-];
+
 
 type SortKey = "name" | "department" | "points" | "joinedAt";
 type SortDir = "asc" | "desc";
@@ -85,7 +79,7 @@ function EmployeesPage() {
 
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
-  const [role, setRole] = useState("all");
+
   const [status, setStatus] = useState("all");
   const [year, setYear] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
@@ -97,7 +91,6 @@ function EmployeesPage() {
     const q = query.trim().toLowerCase();
     const list = all.filter((e) => {
       if (dept !== "all" && e.department !== dept) return false;
-      if (role !== "all" && e.jobTitle !== role) return false;
       if (status !== "all" && e.status !== status) return false;
       if (year !== "all" && String(new Date(e.joinedAt).getFullYear()) !== year) return false;
       if (!q) return true;
@@ -105,8 +98,7 @@ function EmployeesPage() {
         e.name.toLowerCase().includes(q) ||
         e.email.toLowerCase().includes(q) ||
         e.jobTitle.toLowerCase().includes(q) ||
-        e.code.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q)
+        e.code.toLowerCase().includes(q)
       );
     });
 
@@ -118,7 +110,7 @@ function EmployeesPage() {
       else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [all, query, dept, role, status, year, sortKey, sortDir]);
+  }, [all, query, dept, status, year, sortKey, sortDir]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -136,7 +128,6 @@ function EmployeesPage() {
   const clearFilters = () => {
     setQuery("");
     setDept("all");
-    setRole("all");
     setStatus("all");
     setYear("all");
     setPage(1);
@@ -169,23 +160,16 @@ function EmployeesPage() {
           <Input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            placeholder="Search by name, ID, email, department…"
+            placeholder="Search by name, ID, email…"
             className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:flex lg:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center">
           <Select value={dept} onValueChange={(v) => { setDept(v); setPage(1); }}>
             <SelectTrigger className="h-10 rounded-full"><SelectValue placeholder="Department" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All departments</SelectItem>
               {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={role} onValueChange={(v) => { setRole(v); setPage(1); }}>
-            <SelectTrigger className="h-10 rounded-full"><SelectValue placeholder="Role" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              {jobTitles.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>

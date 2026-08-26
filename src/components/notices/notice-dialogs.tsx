@@ -52,7 +52,7 @@ export function ViewNoticeDialog({
                 <span aria-hidden>{noticeTypeMeta[notice.type].icon}</span> {notice.headline}
               </DialogTitle>
               <DialogDescription>
-                {notice.createdBy} · {notice.publishDate}
+                {notice.createdBy}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-wrap gap-2">
@@ -187,14 +187,7 @@ export function EditNoticeDialog({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="e-publish">Publish date</Label>
-                  <Input id="e-publish" type="date" value={current.publishDate} onChange={(e) => set("publishDate", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="e-expiry">Expiry date</Label>
-                  <Input id="e-expiry" type="date" value={current.expiryDate ?? ""} onChange={(e) => set("expiryDate", e.target.value || undefined)} />
-                </div>
+
               </div>
             </div>
             <DialogFooter>

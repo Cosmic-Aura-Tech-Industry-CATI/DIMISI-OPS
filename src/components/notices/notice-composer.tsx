@@ -41,7 +41,7 @@ const blankForm = (): FormState => ({
   headline: "",
   content: "",
   type: "announcement",
-  audience: "Everyone",
+  audience: "All Employees",
   priority: "medium",
   publishDate: today(),
   expiryDate: "",
@@ -153,16 +153,7 @@ export function NoticeComposer() {
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="publish">Publish Date</Label>
-            <Input id="publish" type="date" value={form.publishDate} onChange={(e) => set("publishDate", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="expiry">Expiry Date</Label>
-            <Input id="expiry" type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
-          </div>
-        </div>
+
 
         <div className="lg:col-span-2 space-y-2">
           <Label htmlFor="attachment">Attachment (optional)</Label>

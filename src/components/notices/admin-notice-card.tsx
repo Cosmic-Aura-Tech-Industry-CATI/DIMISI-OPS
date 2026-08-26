@@ -57,11 +57,9 @@ export function AdminNoticeCard({
         <NoticeStatusBadge notice={n} />
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border/50 pt-3 text-xs sm:grid-cols-4">
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border/50 pt-3 text-xs">
         <MetaField label="Created by" value={n.createdBy} />
         <MetaField label="Audience" value={n.audience} />
-        <MetaField label="Published" value={n.publishDate} />
-        <MetaField label="Expires" value={n.expiryDate || "—"} />
       </dl>
 
       <div className="mt-4 flex flex-wrap gap-2">
