@@ -6,7 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-const BACKEND_URL = process.env.VITE_DEV_BACKEND_URL || "http://127.0.0.1:5000";
+const BACKEND_URL = process.env.VITE_DEV_BACKEND_URL || "http://localhost:8080";
 
 export default defineConfig({
   tanstackStart: {
@@ -31,7 +31,7 @@ export default defineConfig({
                   JSON.stringify({
                     status: 502,
                     error: "Bad Gateway",
-                    message: `Backend server is unreachable at ${BACKEND_URL}. Ensure dimisi-ops-backend is running on port 5000.`,
+                    message: `Backend server is unreachable at ${BACKEND_URL}. Ensure dimisi-ops-backend is running on port 8080.`,
                   }),
                 );
               }

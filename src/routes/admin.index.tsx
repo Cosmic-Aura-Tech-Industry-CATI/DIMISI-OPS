@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   CheckCircle2,
   ClipboardList,
@@ -55,8 +55,10 @@ function AdminOverview() {
             <Button variant="outline" className="rounded-md">
               <UserPlus className="mr-1.5 h-4 w-4" /> Invite
             </Button>
-            <Button className="rounded-md shadow-glow">
-              <Plus className="mr-1.5 h-4 w-4" /> New task
+            <Button asChild className="rounded-md shadow-glow">
+              <Link to="/admin/tasks/new">
+                <Plus className="mr-1.5 h-4 w-4" /> New task
+              </Link>
             </Button>
           </>
         }

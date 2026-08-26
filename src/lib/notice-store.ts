@@ -53,7 +53,6 @@ export const noticeTypeMeta: Record<NoticeType, { label: string; icon: string }>
 export const noticeTypes = Object.keys(noticeTypeMeta) as NoticeType[];
 
 export const noticeAudiences = [
-  "Everyone",
   "All Employees",
   "Engineering",
   "Sales",
@@ -90,7 +89,7 @@ const seedNotices: Notice[] = [
     content:
       "Join the leadership team for the Q3 all-hands. We'll cover revenue, product roadmap, and the new performance framework. Attendance is expected for every department.",
     type: "meeting",
-    audience: "Everyone",
+    audience: "All Employees",
     priority: "high",
     publishDate: "2026-07-27",
     status: "published",
