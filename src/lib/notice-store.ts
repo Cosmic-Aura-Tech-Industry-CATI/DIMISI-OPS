@@ -38,7 +38,6 @@ export const noticeTypes: NoticeType[] = [
 ];
 
 export const noticeAudiences = [
-  "Everyone",
   "All Employees",
   "Engineering",
   "Sales",

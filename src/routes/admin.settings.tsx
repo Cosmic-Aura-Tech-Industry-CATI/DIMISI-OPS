@@ -278,13 +278,7 @@ export function NotificationsSection() {
         <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
       </SettingCard>
 
-      <SettingCard title="Channels" description="Where we send urgent alerts.">
-        <div className="space-y-3">
-          <ToggleRow title="Push (browser)" description="Real-time desktop notifications." defaultChecked />
-          <ToggleRow title="Mobile push" description="Sent to the Poll iOS/Android app." defaultChecked />
-          <ToggleRow title="SMS alerts" description="Critical failures and security alerts only." />
-        </div>
-      </SettingCard>
+
     </div>
   );
 }

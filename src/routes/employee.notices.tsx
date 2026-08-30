@@ -85,10 +85,10 @@ function EmployeeNoticeBoard() {
                   : "Leadership";
             const publishedDate = n.createdAt
               ? new Date(n.createdAt).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })
               : "—";
 
             return (

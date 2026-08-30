@@ -51,10 +51,10 @@ export function ViewNoticeDialog({
 
   const formattedDate = notice?.createdAt
     ? new Date(notice.createdAt).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
     : "—";
 
   return (
