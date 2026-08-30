@@ -5,6 +5,10 @@
 
 import type { TaskPriority as MockTaskPriority, TaskStatus as MockTaskStatus, TaskType as MockTaskType, TaskReviewState } from "@/lib/mock-data";
 
+export type TaskPriority = MockTaskPriority;
+export type TaskStatus = MockTaskStatus;
+export type TaskType = MockTaskType;
+
 export type BackendTaskPriority = "Low" | "Medium" | "High" | "Urgent";
 export type BackendTaskType = "Universal" | "Direct" | "Project";
 export type BackendTaskStatus =
@@ -97,6 +101,7 @@ export interface Task {
   projectName?: string;
   projectCode?: string;
   estimatedTime?: string;
+  rawStatus?: BackendTaskStatus;
   isRequestedByMe?: boolean;
   requestsCount?: number;
   requests?: Array<{ employeeId: string; employeeName?: string; employeeCode?: string; requestedAt: string }>;
@@ -334,6 +339,7 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     category: doc.category || "General",
     priority: toFrontendTaskPriority(doc.priority),
     status: frontendStatus,
+    rawStatus: doc.status,
     taskType: toFrontendTaskType(doc.type),
     points: Number(doc.rewardPoints ?? 0),
     dueDate,

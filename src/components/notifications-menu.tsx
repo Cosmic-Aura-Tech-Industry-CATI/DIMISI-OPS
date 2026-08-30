@@ -62,14 +62,20 @@ export function NotificationsMenu() {
 
   const noticeItems: Notif[] = isAdmin
     ? []
-    : notices.map((n) => ({
-        id: `notice-${n.id}`,
-        title: `${noticeTypeMeta[n.type].icon} ${n.headline}`,
-        body: n.content.length > 90 ? `${n.content.slice(0, 90)}…` : n.content,
-        time: n.publishDate,
-        tone: n.priority === "urgent" || n.priority === "high" ? "warning" : "info",
-        unread: !readNotices.includes(n.id),
-      }));
+    : notices.map((n) => {
+        const noticeId = n._id || n.id || "";
+        const icon = noticeTypeMeta[n.type]?.icon || "📢";
+        const headline = n.headline || n.title || "";
+        const timeStr = n.createdAt ? shortTime(n.createdAt) : "Recently";
+        return {
+          id: `notice-${noticeId}`,
+          title: `${icon} ${headline}`,
+          body: n.content.length > 90 ? `${n.content.slice(0, 90)}…` : n.content,
+          time: timeStr,
+          tone: n.priority === "urgent" || n.priority === "high" ? "warning" : "info",
+          unread: !readNotices.includes(noticeId),
+        };
+      });
 
   const adminItems: Notif[] = adminNotifs.filter((n) => withinMonth(n.timestamp)).map((n) => ({
     id: n.id,
@@ -89,7 +95,7 @@ export function NotificationsMenu() {
       return;
     }
     bulkSetReviewNotifState("unread", "read");
-    setReadNotices(notices.map((n) => n.id));
+    setReadNotices(notices.map((n) => n._id || n.id || ""));
   };
 
   return (

@@ -95,6 +95,10 @@ function EmployeeTaskDetail() {
       ? { icon: CheckCircle2, label: "View details", variant: "outline" as const }
       : { icon: Send, label: "Submit for review", variant: "default" as const };
 
+  const isAssignedNotStarted =
+    (task.status === "assigned" || task.status === "pending" || task.rawStatus === "Assigned") &&
+    !task.reviewState;
+
   return (
     <>
       <div>
@@ -107,7 +111,16 @@ function EmployeeTaskDetail() {
         title={task.title}
         subtitle={`${task.category} · ${taskId(task.id)}`}
         actions={
-          primaryAction.variant === "default" ? (
+          isAssignedNotStarted ? (
+            <Button
+              className="rounded-md shadow-glow"
+              disabled={startTask.isPending}
+              onClick={() => startTask.mutate(task.id || task._id || "")}
+            >
+              <PlayCircle className="mr-1.5 h-4 w-4" />
+              {startTask.isPending ? "Starting…" : "Start task"}
+            </Button>
+          ) : primaryAction.variant === "default" ? (
             <Button asChild className="rounded-md shadow-glow">
               <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
                 <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}

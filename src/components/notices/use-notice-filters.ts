@@ -12,15 +12,19 @@ export function useNoticeFilters() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return notices.filter((n: Notice) => {
+      const isPinned = n.status === "pinned" || Boolean(n.pinned);
       const status = noticeStatus(n);
-      if (filter === "pinned" && !n.pinned) return false;
+
+      if (filter === "pinned" && !isPinned) return false;
       if (filter !== "all" && filter !== "pinned" && status !== filter) return false;
       if (!q) return true;
-      return (
-        n.headline.toLowerCase().includes(q) ||
-        n.content.toLowerCase().includes(q) ||
-        noticeTypeMeta[n.type].label.toLowerCase().includes(q)
-      );
+
+      const headlineMatch = (n.headline || n.title || "").toLowerCase().includes(q);
+      const contentMatch = (n.content || "").toLowerCase().includes(q);
+      const typeLabel = noticeTypeMeta[n.type]?.label.toLowerCase() || "";
+      const typeMatch = typeLabel.includes(q);
+
+      return headlineMatch || contentMatch || typeMatch;
     });
   }, [notices, query, filter]);
 
@@ -30,7 +34,7 @@ export function useNoticeFilters() {
       published: notices.filter((n: Notice) => noticeStatus(n) === "published").length,
       draft: notices.filter((n: Notice) => noticeStatus(n) === "draft").length,
       expired: notices.filter((n: Notice) => noticeStatus(n) === "expired").length,
-      pinned: notices.filter((n: Notice) => n.pinned).length,
+      pinned: notices.filter((n: Notice) => n.status === "pinned" || Boolean(n.pinned)).length,
     }),
     [notices],
   );

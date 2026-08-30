@@ -1,15 +1,17 @@
-/** Compatibility helpers around the reactive project store. */
-import type { Task } from "@/lib/mock-data";
-import { allProjects, seedProjects, type Project } from "@/lib/project-store";
+import type { Task } from "@/features/tasks";
+import { seedProjects, type Project } from "@/lib/project-store";
 
 export type { Project } from "@/lib/project-store";
 
 /** Static seed list — prefer useProjects() / useActiveProjects() in components. */
 export const projects: Project[] = seedProjects;
 
-export const projectById = (id?: string) => allProjects().find((p) => p.id === id || p._id === id);
-export const projectName = (id?: string) => projectById(id)?.name ?? "—";
-export const projectCode = (id?: string) => projectById(id)?.code ?? "—";
+export const projectById = (id?: string, list: Project[] = []) =>
+  list.find((p: Project) => p.id === id || p._id === id);
+export const projectName = (id?: string, list: Project[] = []) =>
+  projectById(id, list)?.name ?? "—";
+export const projectCode = (id?: string, list: Project[] = []) =>
+  projectById(id, list)?.code ?? "—";
 
 export interface ProjectStats {
   total: number;

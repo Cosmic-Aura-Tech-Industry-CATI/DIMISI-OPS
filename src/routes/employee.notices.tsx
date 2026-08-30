@@ -31,7 +31,9 @@ function EmployeeNoticeBoard() {
     return notices.filter((n) => {
       if (type !== "all" && n.type !== type) return false;
       if (!q) return true;
-      return n.headline.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
+      const headlineStr = (n.headline || n.title || "").toLowerCase();
+      const contentStr = (n.content || "").toLowerCase();
+      return headlineStr.includes(q) || contentStr.includes(q);
     });
   }, [notices, query, type]);
 
@@ -72,52 +74,82 @@ function EmployeeNoticeBoard() {
         />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
-          {filtered.map((n, i) => (
-            <article
-              key={n.id}
-              style={{ animationDelay: `${i * 30}ms` }}
-              className={cn(
-                "animate-in fade-in slide-in-from-bottom-1 rounded-md border bg-card/40 p-5 transition-colors motion-reduce:animate-none",
-                n.pinned ? "border-primary/50 bg-primary/[0.04]" : "border-border/60 hover:border-primary/30",
-              )}
-            >
-              {n.pinned && (
-                <span className="mb-3 inline-flex items-center gap-1 rounded-sm bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
-                  <Pin className="h-3 w-3" /> Pinned
-                </span>
-              )}
-              <div className="flex items-start gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-border/60 bg-background/50 text-base">
-                  <span aria-hidden>{noticeTypeMeta[n.type].icon}</span>
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-display text-lg font-semibold leading-snug">{n.headline}</h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <NoticeBadges notice={n} />
+          {filtered.map((n, i) => {
+            const isPinned = n.status === "pinned" || Boolean(n.pinned);
+            const noticeId = n._id || n.id || `notice-${i}`;
+            const authorName =
+              typeof n.createdBy === "object" && n.createdBy !== null
+                ? n.createdBy.name || "Leadership"
+                : typeof n.createdBy === "string"
+                  ? n.createdBy
+                  : "Leadership";
+            const publishedDate = n.createdAt
+              ? new Date(n.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })
+              : "—";
+
+            return (
+              <article
+                key={noticeId}
+                style={{ animationDelay: `${i * 30}ms` }}
+                className={cn(
+                  "animate-in fade-in slide-in-from-bottom-1 rounded-md border bg-card/40 p-5 transition-colors motion-reduce:animate-none",
+                  isPinned ? "border-primary/50 bg-primary/[0.04]" : "border-border/60 hover:border-primary/30",
+                )}
+              >
+                {isPinned && (
+                  <span className="mb-3 inline-flex items-center gap-1 rounded-sm bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <Pin className="h-3 w-3" /> Pinned
+                  </span>
+                )}
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-border/60 bg-background/50 text-base">
+                    <span aria-hidden>{noticeTypeMeta[n.type]?.icon || "📢"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-display text-lg font-semibold leading-snug">
+                      {n.headline || n.title}
+                    </h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <NoticeBadges notice={n} />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                {n.content}
-              </p>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {n.content}
+                </p>
 
-              {n.attachment && (
-                <div className="mt-4 flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-xs">
-                  <Paperclip className="h-3.5 w-3.5 text-primary" />
-                  <span className="truncate">{n.attachment.name}</span>
-                  <span className="ml-auto text-muted-foreground">
-                    {(n.attachment.type.split("/")[1] || "file").toUpperCase()}
+                {Array.isArray(n.attachments) && n.attachments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {n.attachments.map((url, idx) => (
+                      <a
+                        key={idx}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-xs hover:border-primary/60 transition-colors"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-primary" />
+                        <span className="truncate">{url.split("/").pop() || `Attachment ${idx + 1}`}</span>
+                        <span className="ml-auto text-muted-foreground">View</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground">
+                  <span>
+                    Posted by <span className="font-medium text-foreground">{authorName}</span>
                   </span>
+                  <span>{publishedDate}</span>
                 </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground">
-                <span>Posted by <span className="font-medium text-foreground">{n.createdBy}</span></span>
-                <span>{n.publishDate}</span>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </>

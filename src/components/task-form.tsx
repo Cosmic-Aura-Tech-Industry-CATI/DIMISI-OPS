@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { employees, type Task, type TaskPriority, type TaskType } from "@/lib/mock-data";
+import { type Task, type TaskPriority, type TaskType } from "@/features/tasks";
+import { useEmployeesQuery } from "@/features/employees";
 import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
 import { ArchiveProjectDialog, CreateProjectDialog, EditProjectDialog } from "@/components/project-dialogs";
@@ -45,7 +46,7 @@ export const taskCategories = ["Engineering", "Design", "Product", "Marketing", 
 export function emptyTaskValues(): TaskFormValues {
   return {
     title: "", description: "", category: "Engineering", priority: "medium",
-    assigneeId: employees[0]?.id ?? "", points: 50, dueDate: "", notes: "", attachments: [],
+    assigneeId: "", points: 50, dueDate: "", notes: "", attachments: [],
     taskType: "universal", projectId: "", template: "", estimatedTime: "",
   };
 }
@@ -118,6 +119,8 @@ export function TaskForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
+  const { data: employeeData } = useEmployeesQuery();
+  const employeeList = employeeData?.employees || [];
   const activeProjects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
   const selectedProject = allProjectList.find((p) => p.id === form.projectId || p._id === form.projectId);
 
@@ -327,7 +330,7 @@ export function TaskForm({
                 >
                   <SelectTrigger className="h-11"><SelectValue placeholder="Select a task template" /></SelectTrigger>
                   <SelectContent>
-                    {(projectById(form.projectId)?.templates ?? []).map((t) => (
+                    {(selectedProject?.templates ?? []).map((t: string) => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
                   </SelectContent>
@@ -342,15 +345,20 @@ export function TaskForm({
             <Select value={form.assigneeId} onValueChange={(v) => set("assigneeId", v)}>
               <SelectTrigger className="h-11"><SelectValue placeholder="Select an employee" /></SelectTrigger>
               <SelectContent>
-                {employees.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">{e.avatar}</span>
-                      {e.name}
-                      <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{e.code}</span>
-                    </span>
-                  </SelectItem>
-                ))}
+                {employeeList.map((e) => {
+                  const targetId = e._id || e.id || "";
+                  const code = e.empId || e.code || "";
+                  const avatar = e.name ? e.name.slice(0, 2).toUpperCase() : "EM";
+                  return (
+                    <SelectItem key={targetId} value={targetId}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">{avatar}</span>
+                        {e.name}
+                        {code && <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{code}</span>}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </Field>
@@ -388,9 +396,9 @@ export function TaskForm({
           <p className="mt-1">{form.title || "Untitled task"}</p>
           <p className="mt-0.5">
             {form.taskType === "direct"
-              ? `${employees.find((e) => e.id === form.assigneeId)?.name ?? "Unassigned"} · ${employees.find((e) => e.id === form.assigneeId)?.code ?? "—"}`
+              ? `${employeeList.find((e) => (e._id || e.id) === form.assigneeId)?.name ?? "Unassigned"} · ${employeeList.find((e) => (e._id || e.id) === form.assigneeId)?.empId ?? "—"}`
               : form.taskType === "project"
-                ? `Open to all · ${projectById(form.projectId)?.name ?? "No project"}`
+                ? `Open to all · ${selectedProject?.name ?? "No project"}`
                 : "Open to all employees"}
             {" · "}{form.priority} priority · {form.points} pts
           </p>
