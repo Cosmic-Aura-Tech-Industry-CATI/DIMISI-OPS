@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeft, Save, ShieldCheck } from "lucide-react";
-import { IdBadge } from "@/components/id-badge";
+import { useState } from "react";
+import { ArrowLeft, Loader2, Save, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { AccountCreatedDialog } from "@/components/account-created-dialog";
 import {
@@ -19,9 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createAdminAccount, emailTaken, nextAdminIdCode, useAccounts } from "@/lib/accounts";
 import { isStrongPassword } from "@/lib/password";
-import { useDepartments } from "@/lib/department-store";
+import { useDepartmentsQuery, useDesignationsByDepartmentQuery } from "@/features/departments";
 import { authService } from "@/auth/services/auth.service";
 import { toast } from "sonner";
 
@@ -47,25 +45,22 @@ const blank = {
   email: "",
   password: "",
   confirm: "",
-  department: "",
-  jobTitle: "",
+  departmentId: "",
+  designationId: "",
   joinedAt: today(),
   phone: "",
-  status: "active" as "active" | "inactive",
 };
 
 function NewAdminPage() {
   const navigate = useNavigate();
-  const accounts = useAccounts();
-  const departments = useDepartments();
+  const { data: departments = [] } = useDepartmentsQuery();
+
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<{ name: string; code: string; email: string } | null>(null);
 
-  const previewId = useMemo(() => nextAdminIdCode(), [accounts]);
-
-  const designations =
-    departments.find((d) => d.name === form.department)?.designations ?? [];
+  const { data: designations = [] } = useDesignationsByDepartmentQuery(form.departmentId);
 
   const set = <K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -75,19 +70,16 @@ function NewAdminPage() {
     if (!form.name.trim()) e.name = "Full name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
-    else if (emailTaken(form.email)) e.email = "This email is already registered";
     if (!form.password) e.password = "Password is required";
     else if (!isStrongPassword(form.password)) e.password = "Password does not meet all requirements";
     if (!form.confirm) e.confirm = "Please confirm the password";
     else if (form.confirm !== form.password) e.confirm = "Passwords do not match";
-    if (!form.department) e.department = "Department is required";
-    if (!form.jobTitle) e.jobTitle = "Designation is required";
+    if (!form.departmentId) e.department = "Department is required";
+    if (!form.designationId) e.jobTitle = "Designation is required";
     if (!form.joinedAt) e.joinedAt = "Joining date is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
-  const [submitting, setSubmitting] = useState(false);
 
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -95,34 +87,29 @@ function NewAdminPage() {
     setSubmitting(true);
 
     try {
-      // Attempt backend creation via POST /auth/create-user
-      await authService.createUser({
-        name: form.name,
-        email: form.email,
+      const res: any = await authService.createUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
         password: form.password,
         role: "admin",
-        department: form.department,
-        designation: form.jobTitle,
-        phone: form.phone,
+        department: form.departmentId,
+        designation: form.designationId,
+        phone: form.phone.trim() || undefined,
+        joinDate: form.joinedAt,
       });
+
+      const user = res?.user || res;
       toast.success("Admin account created successfully");
+      setCreated({
+        name: user?.name || form.name,
+        code: user?.empId || "ADM",
+        email: user?.email || form.email,
+      });
     } catch (err: any) {
-      console.warn("Backend admin creation fallback:", err);
+      toast.error(err?.message || "Failed to create admin account");
     } finally {
       setSubmitting(false);
     }
-
-    const person = createAdminAccount({
-      name: form.name,
-      email: form.email,
-      password: form.password,
-      department: form.department,
-      jobTitle: form.jobTitle,
-      joinedAt: form.joinedAt,
-      phone: form.phone,
-      status: form.status,
-    });
-    setCreated({ name: person.name, code: person.code, email: person.email });
   };
 
   return (
@@ -145,11 +132,8 @@ function NewAdminPage() {
           <div className="min-w-0">
             <p className="card-title font-semibold">New administrator</p>
             <p className="text-xs text-muted-foreground">
-              Admins sign in through the Admin Portal only. Directors DMSDIR01–03 are permanent.
+              Credentials will be registered directly in the database with elevated admin privileges.
             </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Admin ID <IdBadge id={previewId} />
           </div>
         </div>
 
@@ -161,6 +145,7 @@ function NewAdminPage() {
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Shikhar Dixit"
+                disabled={submitting}
               />
             </Field>
             <Field label="Email address" required error={errors.email}>
@@ -169,20 +154,22 @@ function NewAdminPage() {
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
                 placeholder="name@dimisi.com"
+                disabled={submitting}
               />
             </Field>
             <Field label="Department" required error={errors.department}>
               <Select
-                value={form.department}
-                onValueChange={(v) => setForm((f) => ({ ...f, department: v, jobTitle: "" }))}
+                value={form.departmentId}
+                onValueChange={(v) => setForm((f) => ({ ...f, departmentId: v, designationId: "" }))}
+                disabled={submitting}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.name}>
-                      {d.name}
+                    <SelectItem key={d._id} value={d._id}>
+                      {d.name} ({d.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -192,30 +179,31 @@ function NewAdminPage() {
               label="Designation"
               required
               error={errors.jobTitle}
-              hint={!form.department ? "Select a department first" : undefined}
+              hint={!form.departmentId ? "Select a department first" : undefined}
             >
               <Select
-                value={form.jobTitle}
-                onValueChange={(v) => set("jobTitle", v)}
-                disabled={!form.department || designations.length === 0}
+                value={form.designationId}
+                onValueChange={(v) => set("designationId", v)}
+                disabled={!form.departmentId || designations.length === 0 || submitting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={designations.length ? "Select designation" : "No designations"} />
+                  <SelectValue placeholder={designations.length ? "Select designation" : "No designations available"} />
                 </SelectTrigger>
                 <SelectContent>
                   {designations.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
+                    <SelectItem key={d._id} value={d._id}>
+                      {d.title || d.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Phone number" required={false}>
+            <Field label="Phone number" hint="Optional (E.164 format, e.g. +919876543210)">
               <Input
                 value={form.phone}
                 onChange={(e) => set("phone", e.target.value)}
-                placeholder="+91 98765 43210"
+                placeholder="+919876543210"
+                disabled={submitting}
               />
             </Field>
             <Field label="Joining date" required error={errors.joinedAt}>
@@ -223,6 +211,7 @@ function NewAdminPage() {
                 type="date"
                 value={form.joinedAt}
                 onChange={(e) => set("joinedAt", e.target.value)}
+                disabled={submitting}
               />
             </Field>
           </div>
@@ -247,20 +236,6 @@ function NewAdminPage() {
             <Field label="Role">
               <Input value="Admin" readOnly disabled />
             </Field>
-            <Field label="Status">
-              <Select
-                value={form.status}
-                onValueChange={(v) => set("status", v as "active" | "inactive")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
           </div>
         </section>
 
@@ -270,11 +245,20 @@ function NewAdminPage() {
             variant="outline"
             className="rounded-md"
             onClick={() => navigate({ to: "/admin/admins" })}
+            disabled={submitting}
           >
             Cancel
           </Button>
-          <Button type="submit" className="rounded-md">
-            <Save className="mr-1.5 h-4 w-4" /> Create admin
+          <Button type="submit" className="rounded-md" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Creating...
+              </>
+            ) : (
+              <>
+                <Save className="mr-1.5 h-4 w-4" /> Create admin
+              </>
+            )}
           </Button>
         </div>
       </form>

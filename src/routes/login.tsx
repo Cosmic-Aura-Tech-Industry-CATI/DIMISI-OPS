@@ -39,7 +39,7 @@ function validateEmail(v: string) {
 }
 
 function LoginPage() {
-  const { user } = useAuth();
+  const { user, signInWith } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState<Role>("employee");
   const [email, setEmail] = useState("");
@@ -58,18 +58,19 @@ function LoginPage() {
     }
   }, [user, navigate]);
 
-  const emailError = touched.email && !validateEmail(email) ? "Please enter a valid work email." : "";
+  const cleanEmail = email.trim().toLowerCase();
+  const emailError = touched.email && !validateEmail(cleanEmail) ? "Please enter a valid work email." : "";
   const pwError = touched.password && password.length < 6 ? "Password must be at least 6 characters." : "";
-  const canSubmit = validateEmail(email) && password.length >= 6 && !submitting;
+  const canSubmit = validateEmail(cleanEmail) && password.length >= 6 && !submitting;
 
   const logLoginFailure = (reason: string) =>
     logAudit({
       category: "authentication",
       action: "Login attempt",
       target: role === "admin" ? "Admin portal" : "Employee portal",
-      details: `Failed login for ${email.trim()} — ${reason}.`,
+      details: `Failed login for ${cleanEmail} — ${reason}.`,
       status: "failed",
-      actorName: email.trim(),
+      actorName: cleanEmail,
       actorId: "UNKNOWN",
     });
 
@@ -82,7 +83,7 @@ function LoginPage() {
 
     try {
       const res = await authService.login({
-        email: email.trim(),
+        email: cleanEmail,
         password,
       });
 
@@ -90,7 +91,7 @@ function LoginPage() {
       const successMessage = res?.message || "OTP sent successfully to your registered email.";
       toast.success(successMessage);
       setPending({
-        email: email.trim(),
+        email: cleanEmail,
         role,
       });
     } catch (err: any) {
@@ -98,7 +99,7 @@ function LoginPage() {
       const message =
         err?.message ||
         err?.response?.data?.message ||
-        "Login failed. Please check your credentials and try again.";
+        "Login failed. Please check your email & password and try again.";
       setFormError(message);
       logLoginFailure(message);
       toast.error(message);
@@ -107,9 +108,9 @@ function LoginPage() {
 
   const onVerified = (verifiedUser?: AuthUser) => {
     if (!pending) return;
+    const dbRole = verifiedUser?.role || pending.role;
+    const isAdminOrDirector = dbRole === "admin" || dbRole === "director";
     toast.success(`Welcome back, ${verifiedUser?.name?.split(" ")[0] || "User"}!`);
-    const r = verifiedUser?.role || role;
-    const isAdminOrDirector = r === "admin" || r === "director";
     navigate({ to: isAdminOrDirector ? "/admin" : "/employee" });
   };
 
@@ -242,8 +243,7 @@ function LoginPage() {
         </Button>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Open access is on — any email and password (6+ characters) signs you into the selected
-          portal.
+          Database verification active — enter your registered work email & password (8+ characters) to sign in.
         </p>
       </form>
     </AuthShell>

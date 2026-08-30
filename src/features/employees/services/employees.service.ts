@@ -15,11 +15,39 @@ import type {
 
 const { employees: employeeEndpoints } = API_ENDPOINTS;
 
+/**
+ * Strict whitelist filter sanitizer to prevent backend Mongoose CastErrors (HTTP 400 Bad Request).
+ * Only forwards params explicitly handled by backend (status, department ObjectId, 4-digit year, sortOrder, page).
+ */
+function cleanFilters(filters?: EmployeeFilters): Record<string, unknown> | undefined {
+  if (!filters) return undefined;
+  const cleaned: Record<string, unknown> = {};
+
+  if (filters.status === "active" || filters.status === "inactive") {
+    cleaned.status = filters.status;
+  }
+  if (typeof filters.department === "string" && /^[0-9a-fA-F]{24}$/.test(filters.department)) {
+    cleaned.department = filters.department;
+  }
+  if (typeof (filters as any).year === "string" && /^\d{4}$/.test((filters as any).year)) {
+    cleaned.year = (filters as any).year;
+  }
+  if (filters.sortOrder === "asc" || filters.sortOrder === "desc") {
+    cleaned.sortOrder = filters.sortOrder;
+  }
+  if (filters.page !== undefined && filters.page !== null && !isNaN(Number(filters.page))) {
+    cleaned.page = Number(filters.page);
+  }
+
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 /** GET /api/v1/employees — retrieves filtered list of employees. */
 export async function getEmployees(filters?: EmployeeFilters): Promise<EmployeeListResponse> {
+  const params = cleanFilters(filters);
   const res = await http.get<EmployeeListResponse | { employees: AuthUser[] }>(
     employeeEndpoints.list,
-    { params: filters },
+    { params },
   );
   if (res && typeof res === "object" && "employees" in res) {
     return {
@@ -67,4 +95,3 @@ export const employeesService = {
   updateEmployeeDetails,
   revokeEmployeeAccess,
 };
-

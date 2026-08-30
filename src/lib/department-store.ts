@@ -71,7 +71,7 @@ function persist(next: DeptState) {
   g.__dimisiDepts = next;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {}
+  } catch { }
   listeners.forEach((l) => l());
 }
 
@@ -90,7 +90,7 @@ function hydrate() {
       g.__dimisiDepts = state;
       listeners.forEach((l) => l());
     }
-  } catch {}
+  } catch { }
 }
 
 function subscribe(cb: () => void) {

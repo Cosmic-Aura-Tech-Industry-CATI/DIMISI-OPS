@@ -149,7 +149,7 @@ function persist() {
   g.__dimisiNotices = created;
   try {
     localStorage.setItem(KEY, JSON.stringify({ created, removedSeeds, seedEdits } satisfies Persisted));
-  } catch {}
+  } catch { }
   cacheKey = null;
   listeners.forEach((l) => l());
 }
@@ -168,7 +168,7 @@ function hydrate() {
       cacheKey = null;
       listeners.forEach((l) => l());
     }
-  } catch {}
+  } catch { }
 }
 
 function subscribe(cb: () => void) {
