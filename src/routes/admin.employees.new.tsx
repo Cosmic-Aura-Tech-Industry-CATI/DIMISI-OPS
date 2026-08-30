@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeft, Save, UserPlus } from "lucide-react";
-import { IdBadge } from "@/components/id-badge";
+import { useState } from "react";
+import { ArrowLeft, Loader2, Save, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { AccountCreatedDialog } from "@/components/account-created-dialog";
 import {
@@ -20,9 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createEmployeeAccount, emailTaken, nextEmployeeCode, useAccounts } from "@/lib/accounts";
 import { isStrongPassword } from "@/lib/password";
-import { useDepartments } from "@/lib/department-store";
+import { useDepartmentsQuery, useDesignationsByDepartmentQuery } from "@/features/departments";
 import { authService } from "@/auth/services/auth.service";
 import { toast } from "sonner";
 
@@ -48,30 +46,23 @@ const blank = {
   email: "",
   password: "",
   confirm: "",
-  department: "",
-  jobTitle: "",
+  departmentId: "",
+  designationId: "",
   joinedAt: today(),
   phone: "",
   about: "",
-  status: "active" as "active" | "inactive",
 };
 
 function NewEmployeePage() {
   const navigate = useNavigate();
-  const accounts = useAccounts();
-  const departments = useDepartments();
+  const { data: departments = [] } = useDepartmentsQuery();
+
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<{ name: string; code: string; email: string } | null>(null);
 
-  const previewId = useMemo(
-    () => nextEmployeeCode(form.joinedAt),
-    // recompute when store or joining date changes
-    [form.joinedAt, accounts],
-  );
-
-  const designations =
-    departments.find((d) => d.name === form.department)?.designations ?? [];
+  const { data: designations = [] } = useDesignationsByDepartmentQuery(form.departmentId);
 
   const set = <K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -81,19 +72,16 @@ function NewEmployeePage() {
     if (!form.name.trim()) e.name = "Full name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
-    else if (emailTaken(form.email)) e.email = "This email is already registered";
     if (!form.password) e.password = "Password is required";
     else if (!isStrongPassword(form.password)) e.password = "Password does not meet all requirements";
     if (!form.confirm) e.confirm = "Please confirm the password";
     else if (form.confirm !== form.password) e.confirm = "Passwords do not match";
-    if (!form.department) e.department = "Department is required";
-    if (!form.jobTitle) e.jobTitle = "Designation is required";
+    if (!form.departmentId) e.department = "Department is required";
+    if (!form.designationId) e.jobTitle = "Designation is required";
     if (!form.joinedAt) e.joinedAt = "Joining date is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
-  const [submitting, setSubmitting] = useState(false);
 
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -101,35 +89,29 @@ function NewEmployeePage() {
     setSubmitting(true);
 
     try {
-      // Attempt backend creation via POST /auth/create-user
-      await authService.createUser({
-        name: form.name,
-        email: form.email,
+      const res: any = await authService.createUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
         password: form.password,
         role: "employee",
-        department: form.department,
-        designation: form.jobTitle,
-        phone: form.phone,
+        department: form.departmentId,
+        designation: form.designationId,
+        phone: form.phone.trim() || undefined,
+        joinDate: form.joinedAt,
       });
+
+      const user = res?.user || res;
       toast.success("Employee account created successfully");
+      setCreated({
+        name: user?.name || form.name,
+        code: user?.empId || "EMP",
+        email: user?.email || form.email,
+      });
     } catch (err: any) {
-      console.warn("Backend user creation fallback:", err);
+      toast.error(err?.message || "Failed to create employee account");
     } finally {
       setSubmitting(false);
     }
-
-    const person = createEmployeeAccount({
-      name: form.name,
-      email: form.email,
-      password: form.password,
-      department: form.department,
-      jobTitle: form.jobTitle,
-      joinedAt: form.joinedAt,
-      phone: form.phone,
-      about: form.about,
-      status: form.status,
-    });
-    setCreated({ name: person.name, code: person.code, email: person.email });
   };
 
   return (
@@ -152,11 +134,8 @@ function NewEmployeePage() {
           <div className="min-w-0">
             <p className="card-title font-semibold">New employee</p>
             <p className="text-xs text-muted-foreground">
-              These credentials are used to sign in to the Employee Portal.
+              These credentials will be registered directly in the database.
             </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Employee ID <IdBadge id={previewId} />
           </div>
         </div>
 
@@ -168,6 +147,7 @@ function NewEmployeePage() {
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Ava Chen"
+                disabled={submitting}
               />
             </Field>
             <Field label="Email address" required error={errors.email}>
@@ -176,20 +156,22 @@ function NewEmployeePage() {
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
                 placeholder="ava@dimisi.com"
+                disabled={submitting}
               />
             </Field>
             <Field label="Department" required error={errors.department}>
               <Select
-                value={form.department}
-                onValueChange={(v) => setForm((f) => ({ ...f, department: v, jobTitle: "" }))}
+                value={form.departmentId}
+                onValueChange={(v) => setForm((f) => ({ ...f, departmentId: v, designationId: "" }))}
+                disabled={submitting}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.name}>
-                      {d.name}
+                    <SelectItem key={d._id} value={d._id}>
+                      {d.name} ({d.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -199,20 +181,20 @@ function NewEmployeePage() {
               label="Designation"
               required
               error={errors.jobTitle}
-              hint={!form.department ? "Select a department first" : undefined}
+              hint={!form.departmentId ? "Select a department first" : undefined}
             >
               <Select
-                value={form.jobTitle}
-                onValueChange={(v) => set("jobTitle", v)}
-                disabled={!form.department || designations.length === 0}
+                value={form.designationId}
+                onValueChange={(v) => set("designationId", v)}
+                disabled={!form.departmentId || designations.length === 0 || submitting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={designations.length ? "Select designation" : "No designations"} />
+                  <SelectValue placeholder={designations.length ? "Select designation" : "No designations available"} />
                 </SelectTrigger>
                 <SelectContent>
                   {designations.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
+                    <SelectItem key={d._id} value={d._id}>
+                      {d.title || d.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -223,24 +205,18 @@ function NewEmployeePage() {
                 type="date"
                 value={form.joinedAt}
                 onChange={(e) => set("joinedAt", e.target.value)}
+                disabled={submitting}
               />
             </Field>
-            <Field label="Phone number" hint="Optional">
+            <Field label="Phone number" hint="Optional (E.164 format, e.g. +919876543210)">
               <Input
                 value={form.phone}
                 onChange={(e) => set("phone", e.target.value)}
-                placeholder="+91 98765 43210"
+                placeholder="+919876543210"
+                disabled={submitting}
               />
             </Field>
           </div>
-          <Field label="About employee" hint="Optional">
-            <Textarea
-              rows={3}
-              value={form.about}
-              onChange={(e) => set("about", e.target.value)}
-              placeholder="Short bio, specialisms, or notes."
-            />
-          </Field>
         </section>
 
         <section className="space-y-4">
@@ -256,40 +232,26 @@ function NewEmployeePage() {
           <PasswordStrength value={form.password} />
         </section>
 
-        <section className="space-y-4">
-          <SectionTitle>Account information</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Role">
-              <Input value="Employee" readOnly disabled />
-            </Field>
-            <Field label="Status">
-              <Select
-                value={form.status}
-                onValueChange={(v) => set("status", v as "active" | "inactive")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-        </section>
-
         <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-4 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="outline"
             className="rounded-md"
             onClick={() => navigate({ to: "/admin/employees" })}
+            disabled={submitting}
           >
             Cancel
           </Button>
-          <Button type="submit" className="rounded-md">
-            <Save className="mr-1.5 h-4 w-4" /> Create employee
+          <Button type="submit" className="rounded-md" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Creating...
+              </>
+            ) : (
+              <>
+                <Save className="mr-1.5 h-4 w-4" /> Create employee
+              </>
+            )}
           </Button>
         </div>
       </form>

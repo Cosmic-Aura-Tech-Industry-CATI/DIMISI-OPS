@@ -79,6 +79,7 @@ export interface CreateUserRequest {
   designation?: string;
   department?: string;
   phone?: string;
+  joinDate?: string;
 }
 
 export interface CreateUserResponse {
