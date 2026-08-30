@@ -94,18 +94,18 @@ export function AdminNoticeCard({
 
   const publishedDate = n.createdAt
     ? new Date(n.createdAt).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
     : "—";
 
   const expiryDate = n.expiryDate
     ? new Date(n.expiryDate).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
     : "—";
 
   return (

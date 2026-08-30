@@ -142,8 +142,7 @@ function EmployeesPage() {
         e.name.toLowerCase().includes(q) ||
         e.email.toLowerCase().includes(q) ||
         e.jobTitle.toLowerCase().includes(q) ||
-        e.code.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q)
+        e.code.toLowerCase().includes(q)
       );
     });
 
@@ -178,7 +177,8 @@ function EmployeesPage() {
     setPage(1);
   };
 
-  const handleRevoke = () => {
+  const handleRevoke = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!pendingDelete) return;
     revokeMutation.mutate(pendingDelete.id, {
       onSuccess: () => {
@@ -352,9 +352,8 @@ function EmployeesPage() {
                       {e.jobTitle}
                     </Badge>
                     <span
-                      className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${
-                        e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
                       {e.status}
@@ -462,9 +461,8 @@ function EmployeesPage() {
                     <td className="px-5 py-3.5 font-semibold">{e.points.toLocaleString()}</td>
                     <td className="px-5 py-3.5">
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
-                        }`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                          }`}
                       >
                         <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
                         {e.status}
@@ -604,15 +602,13 @@ function SortButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground ${
-        active ? "text-foreground" : ""
-      }`}
+      className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground ${active ? "text-foreground" : ""
+        }`}
     >
       {label}
       <ArrowUpDown
-        className={`h-3 w-3 transition-transform ${
-          active && dir === "desc" ? "rotate-180" : ""
-        } ${active ? "text-primary" : "opacity-50"}`}
+        className={`h-3 w-3 transition-transform ${active && dir === "desc" ? "rotate-180" : ""
+          } ${active ? "text-primary" : "opacity-50"}`}
       />
     </button>
   );

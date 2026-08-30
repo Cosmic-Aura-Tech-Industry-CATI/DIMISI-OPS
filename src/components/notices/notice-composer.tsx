@@ -39,7 +39,7 @@ const blankForm = (): FormState => ({
   headline: "",
   content: "",
   type: "announcement",
-  audience: "Everyone",
+  audience: "All Employees",
   priority: "medium",
   publishDate: today(),
   expiryDate: "",
