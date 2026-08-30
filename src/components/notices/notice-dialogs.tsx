@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,17 +22,17 @@ import {
 } from "@/components/ui/dialog";
 import { NoticeBadges, NoticeStatusBadge } from "@/components/notice-badges";
 import {
-  deleteNotice,
   noticeAudiences,
   noticePriorities,
   noticePriorityMeta,
   noticeTypeMeta,
   noticeTypes,
-  updateNotice,
   type Notice,
   type NoticePriority,
+  type NoticeStatus,
   type NoticeType,
 } from "@/lib/notice-store";
+import { useDeleteNotice, useUpdateNotice } from "@/features/notices/hooks/use-notices-api";
 
 /** Read-only preview of a notice exactly as employees see it. */
 export function ViewNoticeDialog({
@@ -42,6 +42,21 @@ export function ViewNoticeDialog({
   notice: Notice | null;
   onClose: () => void;
 }) {
+  const createdByName =
+    typeof notice?.createdBy === "object" && notice?.createdBy !== null
+      ? notice.createdBy.name || "Admin"
+      : typeof notice?.createdBy === "string"
+        ? notice.createdBy
+        : "Admin";
+
+  const formattedDate = notice?.createdAt
+    ? new Date(notice.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
+
   return (
     <Dialog open={!!notice} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
@@ -49,10 +64,11 @@ export function ViewNoticeDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <span aria-hidden>{noticeTypeMeta[notice.type].icon}</span> {notice.headline}
+                <span aria-hidden>{noticeTypeMeta[notice.type]?.icon || "📢"}</span>{" "}
+                {notice.headline || notice.title}
               </DialogTitle>
               <DialogDescription>
-                {notice.createdBy} · {notice.publishDate}
+                {createdByName} · {formattedDate}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-wrap gap-2">
@@ -60,10 +76,25 @@ export function ViewNoticeDialog({
               <NoticeStatusBadge notice={notice} />
             </div>
             <p className="whitespace-pre-wrap text-sm text-muted-foreground">{notice.content}</p>
-            {notice.attachment && (
-              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-xs">
-                <Paperclip className="h-3.5 w-3.5 text-primary" />
-                <span className="truncate">{notice.attachment.name}</span>
+            {Array.isArray(notice.attachments) && notice.attachments.length > 0 && (
+              <div className="space-y-1.5 pt-2">
+                <p className="text-xs font-semibold text-foreground">Attachments</p>
+                <div className="flex flex-wrap gap-2">
+                  {notice.attachments.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-xs hover:border-primary/60"
+                    >
+                      <Paperclip className="h-3.5 w-3.5 text-primary" />
+                      <span className="max-w-[200px] truncate">
+                        {url.split("/").pop() || `Attachment ${i + 1}`}
+                      </span>
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </>
@@ -81,25 +112,43 @@ export function DeleteNoticeDialog({
   notice: Notice | null;
   onClose: () => void;
 }) {
+  const deleteNoticeMutation = useDeleteNotice();
+
+  const handleDelete = () => {
+    if (!notice) return;
+    const noticeId = notice._id || notice.id || "";
+    deleteNoticeMutation.mutate(noticeId, {
+      onSuccess: () => {
+        onClose();
+        toast.success("Notice deleted permanently");
+      },
+      onError: (err) => {
+        toast.error("Failed to delete notice", { description: err.message });
+      },
+    });
+  };
+
   return (
     <Dialog open={!!notice} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Delete notice</DialogTitle>
           <DialogDescription>
-            “{notice?.headline}” will be removed from every notice board. This cannot be undone.
+            “{notice?.headline || notice?.title}” will be removed from every notice board. This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose} disabled={deleteNoticeMutation.isPending}>
+            Cancel
+          </Button>
           <Button
             variant="destructive"
-            onClick={() => {
-              if (notice) deleteNotice(notice.id);
-              onClose();
-              toast.success("Notice deleted");
-            }}
+            onClick={handleDelete}
+            disabled={deleteNoticeMutation.isPending}
           >
+            {deleteNoticeMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
             Delete notice
           </Button>
         </DialogFooter>
@@ -116,21 +165,72 @@ export function EditNoticeDialog({
   notice: Notice | null;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState<Notice | null>(notice);
-  const current = draft?.id === notice?.id ? draft : notice;
+  const [headline, setHeadline] = useState(notice?.headline || notice?.title || "");
+  const [content, setContent] = useState(notice?.content || "");
+  const [type, setType] = useState<NoticeType>(notice?.type || "announcement");
+  const [priority, setPriority] = useState<NoticePriority>(notice?.priority || "medium");
+  const [status, setStatus] = useState<NoticeStatus>(notice?.status || "published");
+  const [targetAll, setTargetAll] = useState<boolean>(notice?.targetAll ?? true);
+  const [expiryDate, setExpiryDate] = useState<string>(
+    notice?.expiryDate ? new Date(notice.expiryDate).toISOString().slice(0, 10) : "",
+  );
+  const [newAttachment, setNewAttachment] = useState<File | undefined>();
+  const [existingAttachments, setExistingAttachments] = useState<string[]>(
+    notice?.attachments || [],
+  );
 
-  if (notice && (!draft || draft.id !== notice.id)) {
-    // keep local draft in sync when a different notice is opened
-    setDraft(notice);
-  }
+  const updateNoticeMutation = useUpdateNotice();
 
-  const set = <K extends keyof Notice>(key: K, value: Notice[K]) =>
-    setDraft((d) => (d ? { ...d, [key]: value } : d));
+  // Keep state synced when notice changes
+  const prevId = notice?._id || notice?.id;
+  useState(() => {
+    if (notice) {
+      setHeadline(notice.headline || notice.title || "");
+      setContent(notice.content || "");
+      setType(notice.type || "announcement");
+      setPriority(notice.priority || "medium");
+      setStatus(notice.status || "published");
+      setTargetAll(notice.targetAll ?? true);
+      setExpiryDate(notice.expiryDate ? new Date(notice.expiryDate).toISOString().slice(0, 10) : "");
+      setExistingAttachments(notice.attachments || []);
+    }
+  });
+
+  const handleSave = () => {
+    if (!notice) return;
+    const noticeId = notice._id || notice.id || "";
+
+    updateNoticeMutation.mutate(
+      {
+        id: noticeId,
+        input: {
+          headline: headline.trim(),
+          content: content.trim(),
+          type,
+          priority,
+          status,
+          targetAll,
+          expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+          existingAttachments,
+          attachments: newAttachment ? [newAttachment] : undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          onClose();
+          toast.success("Notice updated");
+        },
+        onError: (err) => {
+          toast.error("Failed to update notice", { description: err.message });
+        },
+      },
+    );
+  };
 
   return (
     <Dialog open={!!notice} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
-        {current && (
+        {notice && (
           <>
             <DialogHeader>
               <DialogTitle>Edit notice</DialogTitle>
@@ -139,74 +239,128 @@ export function EditNoticeDialog({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="e-headline">Headline</Label>
-                <Input id="e-headline" value={current.headline} onChange={(e) => set("headline", e.target.value)} />
+                <Input
+                  id="e-headline"
+                  value={headline}
+                  onChange={(e) => setHeadline(e.target.value)}
+                  disabled={updateNoticeMutation.isPending}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="e-content">Content</Label>
-                <Textarea id="e-content" rows={5} value={current.content} onChange={(e) => set("content", e.target.value)} />
+                <Textarea
+                  id="e-content"
+                  rows={5}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  disabled={updateNoticeMutation.isPending}
+                />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Type</Label>
-                  <Select value={current.type} onValueChange={(v) => set("type", v as NoticeType)}>
+                  <Select
+                    value={type}
+                    onValueChange={(v) => setType(v as NoticeType)}
+                    disabled={updateNoticeMutation.isPending}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {noticeTypes.map((t) => (
-                        <SelectItem key={t} value={t}>{noticeTypeMeta[t].icon} {noticeTypeMeta[t].label}</SelectItem>
+                        <SelectItem key={t} value={t}>
+                          {noticeTypeMeta[t]?.icon} {noticeTypeMeta[t]?.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Priority</Label>
-                  <Select value={current.priority} onValueChange={(v) => set("priority", v as NoticePriority)}>
+                  <Select
+                    value={priority}
+                    onValueChange={(v) => setPriority(v as NoticePriority)}
+                    disabled={updateNoticeMutation.isPending}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {noticePriorities.map((p) => (
-                        <SelectItem key={p} value={p}>{noticePriorityMeta[p].label}</SelectItem>
+                        <SelectItem key={p} value={p}>{noticePriorityMeta[p]?.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Audience</Label>
-                  <Select value={current.audience} onValueChange={(v) => set("audience", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {noticeAudiences.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={current.status} onValueChange={(v) => set("status", v as Notice["status"])}>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => setStatus(v as NoticeStatus)}
+                    disabled={updateNoticeMutation.isPending}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="pinned">Pinned</SelectItem>
                       <SelectItem value="draft">Draft</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="e-publish">Publish date</Label>
-                  <Input id="e-publish" type="date" value={current.publishDate} onChange={(e) => set("publishDate", e.target.value)} />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="e-expiry">Expiry date</Label>
-                  <Input id="e-expiry" type="date" value={current.expiryDate ?? ""} onChange={(e) => set("expiryDate", e.target.value || undefined)} />
+                  <Input
+                    id="e-expiry"
+                    type="date"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                    disabled={updateNoticeMutation.isPending}
+                  />
                 </div>
+              </div>
+
+              {existingAttachments.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Existing Attachments</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {existingAttachments.map((url, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-xs"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-primary" />
+                        <span className="max-w-[160px] truncate">{url.split("/").pop()}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExistingAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          className="text-muted-foreground hover:text-destructive"
+                          disabled={updateNoticeMutation.isPending}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="e-new-file">Add New Attachment (optional)</Label>
+                <Input
+                  id="e-new-file"
+                  type="file"
+                  disabled={updateNoticeMutation.isPending}
+                  onChange={(e) => setNewAttachment(e.target.files?.[0])}
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button
-                onClick={() => {
-                  const { id, ...patch } = current;
-                  updateNotice(id, patch);
-                  onClose();
-                  toast.success("Notice updated");
-                }}
-              >
+              <Button variant="ghost" onClick={onClose} disabled={updateNoticeMutation.isPending}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={updateNoticeMutation.isPending}>
+                {updateNoticeMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
                 Save changes
               </Button>
             </DialogFooter>

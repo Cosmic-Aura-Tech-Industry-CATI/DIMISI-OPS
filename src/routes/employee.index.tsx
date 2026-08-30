@@ -94,6 +94,10 @@ function EmployeeOverview() {
     { day: "Sun", done: 0, planned: 1 },
   ];
 
+  const userName = auth.user?.name || "Employee";
+  const userAvatar = userName.slice(0, 2).toUpperCase();
+  const userPoints = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? 0;
+
   return (
     <>
       {/* Welcome Card */}
@@ -109,18 +113,17 @@ function EmployeeOverview() {
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-lg font-bold text-primary-foreground shadow-glow">
-              {currentEmployee.avatar}
+              {userAvatar}
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-primary">
                 Welcome back
               </p>
               <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-                Hi, {currentEmployee.name.split(" ")[0]} 👋
+                Hi, {userName.split(" ")[0]} 👋
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                You have <span className="font-medium text-foreground">{pending.length} active tasks</span> and a{" "}
-                <span className="font-medium text-foreground">7-day streak</span>. Keep it going.
+                You have <span className="font-medium text-foreground">{pending.length} active tasks</span> on your plate. Keep it going.
               </p>
             </div>
           </div>
@@ -146,7 +149,7 @@ function EmployeeOverview() {
         <StatCard label="Today's tasks" value={today.length} icon={Target} delta={0} accent="primary" />
         <StatCard label="Pending" value={pending.length} icon={Timer} delta={-2.1} accent="info" />
         <StatCard label="Completed" value={completed.length} icon={CheckCircle2} delta={12.5} accent="success" />
-        <StatCard label="Current points" value={currentEmployee.points.toLocaleString()} icon={Sparkles} delta={6.2} accent="warning" />
+        <StatCard label="Current points" value={userPoints.toLocaleString()} icon={Sparkles} delta={6.2} accent="warning" />
       </div>
 
       {/* Today's Tasks + Upcoming Deadlines */}

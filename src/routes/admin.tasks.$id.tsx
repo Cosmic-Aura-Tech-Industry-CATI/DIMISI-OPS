@@ -130,7 +130,13 @@ function TaskDetailPage() {
               <ul className="mt-3 space-y-2">
                 {task.attachments.map((a, i) => (
                   <li key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm">
-                    <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> {a.name}</span>
+                    {a.url ? (
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 font-medium text-primary hover:underline">
+                        <Paperclip className="h-3.5 w-3.5" /> {a.name}
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> {a.name}</span>
+                    )}
                     <span className="text-xs text-muted-foreground">{a.size}</span>
                   </li>
                 ))}

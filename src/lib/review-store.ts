@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { Task } from "@/lib/mock-data";
+import type { Task } from "@/features/tasks";
 import { pushAdminNotif } from "@/lib/admin-notification-store";
 
 /**

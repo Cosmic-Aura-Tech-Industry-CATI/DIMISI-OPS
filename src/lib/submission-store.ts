@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { Task } from "@/lib/mock-data";
+import type { Task } from "@/features/tasks";
 
 /**
  * Frontend-only submission store. Holds the employee "Task Submission"

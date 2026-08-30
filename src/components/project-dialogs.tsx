@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { IdBadge } from "@/components/id-badge";
 import { useTasksQuery } from "@/features/tasks";
+import { useEmployeesQuery } from "@/features/employees";
 import { projectStats } from "@/lib/projects";
 import {
   useCreateProject,
@@ -74,6 +75,8 @@ export function CreateProjectDialog({
   createdBy?: string;
 }) {
   const createMutation = useCreateProject();
+  const { data: employeeData } = useEmployeesQuery();
+  const employeeList = employeeData?.employees || [];
 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -155,14 +158,25 @@ export function CreateProjectDialog({
                 disabled={createMutation.isPending}
               />
             </Field>
-            <Field label="Project manager ID (optional)">
-              <Input
-                value={manager}
-                onChange={(e) => setManager(e.target.value)}
-                placeholder="Manager User ID"
-                className="h-11"
+            <Field label="Project manager (optional)">
+              <Select
+                value={manager || "none"}
+                onValueChange={(v) => setManager(v === "none" ? "" : v)}
                 disabled={createMutation.isPending}
-              />
+              >
+                <SelectTrigger className="h-11"><SelectValue placeholder="Select manager" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Unassigned)</SelectItem>
+                  {employeeList.map((e) => {
+                    const targetId = e._id || e.id;
+                    return (
+                      <SelectItem key={targetId} value={targetId}>
+                        {e.name} {e.empId || e.code ? `(${e.empId || e.code})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <Field label="Project description">
@@ -237,6 +251,8 @@ export function EditProjectDialog({
   project?: Project;
 }) {
   const updateMutation = useUpdateProject();
+  const { data: employeeData } = useEmployeesQuery();
+  const employeeList = employeeData?.employees || [];
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -324,14 +340,25 @@ export function EditProjectDialog({
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Project manager ID">
-              <Input
-                value={manager}
-                onChange={(e) => setManager(e.target.value)}
-                className="h-11"
-                placeholder="Manager User ID"
+            <Field label="Project manager (optional)">
+              <Select
+                value={manager || "none"}
+                onValueChange={(v) => setManager(v === "none" ? "" : v)}
                 disabled={updateMutation.isPending}
-              />
+              >
+                <SelectTrigger className="h-11"><SelectValue placeholder="Select manager" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Unassigned)</SelectItem>
+                  {employeeList.map((e) => {
+                    const targetId = e._id || e.id;
+                    return (
+                      <SelectItem key={targetId} value={targetId}>
+                        {e.name} {e.empId || e.code ? `(${e.empId || e.code})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Project status">
               <Select

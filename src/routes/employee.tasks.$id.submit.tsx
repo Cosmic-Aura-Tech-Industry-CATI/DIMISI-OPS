@@ -32,10 +32,11 @@ import {
 } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/status-badge";
 import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
-import { currentEmployee, admins, type Task } from "@/lib/mock-data";
-import { useTaskQuery, useSubmitTaskForReview } from "@/features/tasks";
+import { type Task } from "@/features/tasks";
+import { useTaskQuery, useSubmitTaskForReview, useStartTask } from "@/features/tasks";
 import { useProjectsQuery } from "@/features/projects";
 import { saveDraft, useSubmission } from "@/lib/submission-store";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/employee/tasks/$id/submit")({
   head: () => ({
@@ -70,9 +71,14 @@ const fmtDate = (v?: string) =>
 function SubmitProofPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submit" });
   const navigate = useNavigate();
+  const auth = useAuth();
   const { data: task, isLoading } = useTaskQuery(id);
   const { data: projects = [] } = useProjectsQuery();
   const existing = useSubmission(id);
+
+  const currentUserId = auth.user?.id || auth.user?._id || "";
+  const currentUserName = auth.user?.name || "Employee";
+  const currentUserCode = auth.user?.empId || auth.user?.code || "";
 
   const [files, setFiles] = useState<ProofFile[]>(existing?.files ?? []);
   const [issues, setIssues] = useState(existing?.issues ?? "");
@@ -83,13 +89,14 @@ function SubmitProofPage() {
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const startTaskMutation = useStartTask();
   const submitMutation = useSubmitTaskForReview({
     onSuccess: (updated) => {
       saveDraft({
         taskId: updated.id || id,
-        employeeId: currentEmployee.id,
-        employeeName: currentEmployee.name,
-        employeeCode: currentEmployee.code,
+        employeeId: currentUserId,
+        employeeName: currentUserName,
+        employeeCode: currentUserCode,
         issues: issues.trim(),
         files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
         checklist: checks,
@@ -131,26 +138,37 @@ function SubmitProofPage() {
 
   const packageInput = () => ({
     taskId: task.id,
-    employeeId: currentEmployee.id,
-    employeeName: currentEmployee.name,
-    employeeCode: currentEmployee.code,
+    employeeId: currentUserId,
+    employeeName: currentUserName,
+    employeeCode: currentUserCode,
     issues: issues.trim(),
     files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
     checklist: checks,
   });
 
   const allChecked = checks.completed && checks.proof && checks.verified;
-  const canSubmit = allChecked && !submitMutation.isPending;
+  const canSubmit = allChecked && !submitMutation.isPending && !startTaskMutation.isPending;
 
   const handleSaveDraft = () => {
     saveDraft(packageInput());
     toast.success("Draft saved", { description: "Your progress is stored — task remains In Progress." });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!task) return;
     const noteText = issues.trim() || "Task completed and submitted for review.";
+    const targetId = task.id || task._id || id;
+
+    if (task.status === "assigned" || task.status === "pending" || task.rawStatus === "Assigned") {
+      try {
+        await startTaskMutation.mutateAsync(targetId);
+      } catch {
+        // Continue to submit if already started
+      }
+    }
+
     submitMutation.mutate({
-      id: task.id || id,
+      id: targetId,
       notes: noteText,
     });
   };

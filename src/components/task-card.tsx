@@ -3,16 +3,19 @@ import {
   CalendarClock,
   CheckCircle2,
   Eye,
+  PlayCircle,
   RotateCcw,
   Send,
   Trophy,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge } from "@/components/status-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { SubmissionDetailDialog } from "@/components/submission-detail-dialog";
-import type { Task, TaskReviewState } from "@/lib/mock-data";
+import type { TaskReviewState } from "@/lib/mock-data";
+import { type Task, useStartTask } from "@/features/tasks";
 
 type Bucket = "assigned" | "review" | "completed" | "rejected";
 
@@ -138,7 +141,38 @@ function ActionButton({
   task: Task;
   onViewSubmission: () => void;
 }) {
+  const startTask = useStartTask({
+    onSuccess: () => {
+      toast.success("Task started successfully", {
+        description: "Task is now in progress. You can submit your work when ready.",
+      });
+    },
+    onError: (err) => {
+      toast.error("Failed to start task", {
+        description: err.message || "An error occurred while starting the task.",
+      });
+    },
+  });
+
   if (bucket === "assigned") {
+    const isAssignedNotStarted =
+      task.status === "assigned" ||
+      task.status === "pending" ||
+      task.rawStatus === "Assigned";
+
+    if (isAssignedNotStarted) {
+      return (
+        <Button
+          className="w-full rounded-md shadow-glow"
+          disabled={startTask.isPending}
+          onClick={() => startTask.mutate(task.id || task._id || "")}
+        >
+          <PlayCircle className="mr-1.5 h-4 w-4" />
+          {startTask.isPending ? "Starting…" : "Start task"}
+        </Button>
+      );
+    }
+
     return (
       <Button asChild className="w-full rounded-md shadow-glow">
         <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
