@@ -63,7 +63,7 @@ function ReportsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total employees" value={employees.length} icon={Users} delta={8} />
         <StatCard label="Tasks completed" value={kpis.totalCompleted} icon={CheckCircle2} delta={14} accent="success" />
-        <StatCard label="Total reward points" value={kpis.totalPoints.toLocaleString()} icon={Trophy} delta={22} accent="warning" />
+        <StatCard label="Total reward points" value={kpis.totalPoints.toLocaleString()} icon={Trophy} accent="warning" />
       </div>
 
       {/* Overview charts */}
