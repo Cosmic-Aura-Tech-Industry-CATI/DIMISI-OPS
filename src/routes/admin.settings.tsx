@@ -15,7 +15,7 @@ import {
   Save,
   Check,
   Mail,
-  MessageSquare,
+  Clock,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/audit-log";
+import { useAuth } from "@/lib/auth";
 import { ChangePasswordCard } from "@/components/change-password-card";
 
 
@@ -81,14 +82,16 @@ export function SettingCard({
   description,
   actions,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="glass rounded-2xl p-6">
+    <div className={cn("glass rounded-2xl p-6", className)}>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-base font-semibold">{title}</h3>
@@ -137,11 +140,12 @@ function saveToast(label: string) {
 }
 
 
-
-
 /* ---------------- Security ---------------- */
 
 function SecuritySection() {
+  const { user } = useAuth();
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
@@ -152,11 +156,13 @@ function SecuritySection() {
         )}
       />
 
-
-      <SettingCard title="Two-factor authentication" description="Add an extra layer of protection to your account.">
+      <SettingCard
+        title="Two-factor authentication"
+        description="Add an extra layer of protection to your account."
+        actions={<Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
+      >
         <div className="space-y-3">
           <ToggleRow title="Authenticator app" description="Use apps like 1Password or Authy." icon={Smartphone} defaultChecked />
-          <ToggleRow title="SMS backup codes" description="Receive one-time codes via SMS." icon={MessageSquare} />
           <ToggleRow title="Email verification" description="Confirm sign-ins from new devices via email." icon={Mail} defaultChecked />
         </div>
       </SettingCard>
@@ -185,13 +191,17 @@ function SecuritySection() {
         </ul>
       </SettingCard>
 
-      <SettingCard title="Access & privacy" description="Workspace-level access controls.">
-        <div className="space-y-3">
-          <ToggleRow title="Require 2FA for all admins" description="Force every admin to enable two-factor sign-in." defaultChecked />
-          <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
-          <ToggleRow title="Restrict by IP range" description="Only allow sign-ins from approved networks." />
-        </div>
-      </SettingCard>
+      {isDirector && (
+        <SettingCard
+          title="Access & privacy"
+          description="Workspace-level access controls."
+          actions={<Button className="rounded-md" onClick={saveToast("Access & privacy")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
+        >
+          <div className="space-y-3">
+            <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
+          </div>
+        </SettingCard>
+      )}
     </div>
   );
 }
@@ -245,40 +255,67 @@ export function ThemeSection() {
 
 export function NotificationsSection() {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <SettingCard title="Email notifications" description="What we email you about.">
-        <div className="space-y-3">
-          <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
-          <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
-          <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
-          <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} />
-        </div>
-      </SettingCard>
-
-      <SettingCard title="In-app notifications" description="What shows in your notification tray.">
-        <div className="space-y-3">
-          <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
-          <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
-          <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
-          <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked />
-        </div>
-      </SettingCard>
-
-      <SettingCard title="Delivery schedule" description="Quiet hours and preferred delivery windows.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Quiet hours start</Label>
-            <Input type="time" defaultValue="22:00" />
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SettingCard
+          title="Email notifications"
+          description="What we email you about."
+          actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
+        >
+          <div className="space-y-3">
+            <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
+            <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
+            <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
+            <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Quiet hours end</Label>
-            <Input type="time" defaultValue="07:00" />
+        </SettingCard>
+
+        <SettingCard
+          title="In-app notifications"
+          description="What shows in your notification tray."
+          actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
+        >
+          <div className="space-y-3">
+            <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
+            <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
+            <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
+            <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked />
+          </div>
+        </SettingCard>
+      </div>
+
+      <SettingCard
+        title="Delivery schedule"
+        description="Quiet hours and preferred delivery windows."
+        actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
+      >
+        <div className="space-y-4">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-2.5 rounded-xl border border-border/60 bg-card/40 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4 text-primary" />
+                <Label htmlFor="quiet-start" className="cursor-pointer font-medium">Quiet hours start</Label>
+              </div>
+              <Input id="quiet-start" type="time" defaultValue="22:00" className="h-10 bg-background/50" />
+              <p className="text-xs text-muted-foreground">Notifications paused from this time</p>
+            </div>
+
+            <div className="space-y-2.5 rounded-xl border border-border/60 bg-card/40 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4 text-primary" />
+                <Label htmlFor="quiet-end" className="cursor-pointer font-medium">Quiet hours end</Label>
+              </div>
+              <Input id="quiet-end" type="time" defaultValue="07:00" className="h-10 bg-background/50" />
+              <p className="text-xs text-muted-foreground">Normal delivery resumes after this time</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/40 p-3.5 text-xs text-muted-foreground">
+            <Bell className="h-4 w-4 shrink-0 text-primary" />
+            <span>Non-urgent notifications will be batched during this window. High-priority alerts will still arrive immediately.</span>
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
       </SettingCard>
-
-
     </div>
   );
 }
@@ -324,7 +361,6 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
                 </SelectContent>
               </Select>
             </div>
-            <Field label="Location" defaultValue="San Francisco, US" />
             <div className="sm:col-span-2 space-y-1.5">
               <Label>Bio</Label>
               <Textarea rows={3} placeholder="Say a few words about yourself…" defaultValue="Building calm, well-crafted internal tools that people actually enjoy using." />
