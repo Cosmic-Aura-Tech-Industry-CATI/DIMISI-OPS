@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Trophy, TrendingUp, Users } from "lucide-react";
+import { CheckCircle2, Trophy, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -60,10 +60,9 @@ function ReportsPage() {
       />
 
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total employees" value={employees.length} icon={Users} delta={8} />
         <StatCard label="Tasks completed" value={kpis.totalCompleted} icon={CheckCircle2} delta={14} accent="success" />
-        <StatCard label="Avg completion rate" value={`${kpis.avgRate}%`} icon={TrendingUp} delta={5} accent="info" />
         <StatCard label="Total reward points" value={kpis.totalPoints.toLocaleString()} icon={Trophy} delta={22} accent="warning" />
       </div>
 

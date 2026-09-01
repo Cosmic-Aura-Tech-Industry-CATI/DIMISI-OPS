@@ -117,14 +117,8 @@ function EmployeesPage() {
     [all],
   );
 
-  const jobTitles = useMemo(
-    () => Array.from(new Set(all.map((e) => e.jobTitle))).sort(),
-    [all],
-  );
-
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
-  const [role, setRole] = useState("all");
   const [status, setStatus] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -135,7 +129,6 @@ function EmployeesPage() {
     const q = query.trim().toLowerCase();
     const list = all.filter((e) => {
       if (dept !== "all" && e.department !== dept) return false;
-      if (role !== "all" && e.jobTitle !== role) return false;
       if (status !== "all" && e.status !== status) return false;
       if (!q) return true;
       return (
@@ -154,7 +147,7 @@ function EmployeesPage() {
       else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [all, query, dept, role, status, sortKey, sortDir]);
+  }, [all, query, dept, status, sortKey, sortDir]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -172,7 +165,6 @@ function EmployeesPage() {
   const clearFilters = () => {
     setQuery("");
     setDept("all");
-    setRole("all");
     setStatus("all");
     setPage(1);
   };
@@ -226,11 +218,11 @@ function EmployeesPage() {
               setQuery(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by name, ID, email, department…"
+            placeholder="Search by name, ID, email…"
             className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
           <Select
             value={dept}
             onValueChange={(v) => {
@@ -246,26 +238,6 @@ function EmployeesPage() {
               {departments.map((d) => (
                 <SelectItem key={d} value={d}>
                   {d}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={role}
-            onValueChange={(v) => {
-              setRole(v);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="h-10 rounded-full">
-              <SelectValue placeholder="Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              {jobTitles.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
                 </SelectItem>
               ))}
             </SelectContent>
