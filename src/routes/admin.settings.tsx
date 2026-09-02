@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
 import {
   Shield,
@@ -23,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
@@ -147,7 +145,11 @@ function SecuritySection() {
   const isDirector = String(user?.role || "").toLowerCase() === "director";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
         wrapper={(p) => (
           <SettingCard title={p.title} description={p.description} actions={p.actions}>
@@ -159,7 +161,6 @@ function SecuritySection() {
       <SettingCard
         title="Two-factor authentication"
         description="Add an extra layer of protection to your account."
-        actions={<Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
       >
         <div className="space-y-3">
           <ToggleRow title="Authenticator app" description="Use apps like 1Password or Authy." icon={Smartphone} defaultChecked />
@@ -195,7 +196,6 @@ function SecuritySection() {
         <SettingCard
           title="Access & privacy"
           description="Workspace-level access controls."
-          actions={<Button className="rounded-md" onClick={saveToast("Access & privacy")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
         >
           <div className="space-y-3">
             <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
@@ -203,6 +203,7 @@ function SecuritySection() {
           </div>
         </SettingCard>
       )}
+      </div>
     </div>
   );
 }
@@ -218,7 +219,7 @@ export function ThemeSection() {
   return (
     <div className="grid gap-6">
       <SettingCard title="Appearance" description="Choose how Poll looks on this device.">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {options.map((o) => {
             const active = theme === o.value;
             const Icon = o.icon;
@@ -257,11 +258,13 @@ export function ThemeSection() {
 export function NotificationsSection() {
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
+      </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <SettingCard
           title="Email notifications"
           description="What we email you about."
-          actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
         >
           <div className="space-y-3">
             <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
@@ -274,7 +277,6 @@ export function NotificationsSection() {
         <SettingCard
           title="In-app notifications"
           description="What shows in your notification tray."
-          actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
         >
           <div className="space-y-3">
             <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
@@ -288,7 +290,6 @@ export function NotificationsSection() {
       <SettingCard
         title="Delivery schedule"
         description="Quiet hours and preferred delivery windows."
-        actions={<Button className="rounded-md" onClick={saveToast("Notifications")}><Save className="mr-1.5 h-4 w-4" />Save</Button>}
       >
         <div className="space-y-4">
           <div className="grid gap-6 sm:grid-cols-2">
@@ -328,7 +329,7 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
     <div className="grid gap-6 lg:grid-cols-3">
       <SettingCard title="Avatar" description="A friendly face for your profile.">
         <div className="flex flex-col items-center gap-4">
-          <div className="grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-primary to-accent font-display text-3xl font-bold shadow-glow">
+          <div className="grid h-24 w-24 place-items-center rounded-full bg-linear-to-br from-primary to-accent font-display text-3xl font-bold shadow-glow">
             {role === "admin" ? "AD" : "EM"}
           </div>
           <div className="flex gap-2">
