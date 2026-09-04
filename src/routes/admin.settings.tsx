@@ -199,6 +199,7 @@ function SecuritySection() {
         >
           <div className="space-y-3">
             <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
+            <ToggleRow title="Require 2FA for all admins" description="Force every admin to enable two-factor sign-in." defaultChecked />
           </div>
         </SettingCard>
       )}

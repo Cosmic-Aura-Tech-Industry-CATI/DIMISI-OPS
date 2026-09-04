@@ -12,7 +12,6 @@ import {
   Search,
   StickyNote,
   Trophy,
-  User,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,7 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { employees, admins, type Task } from "@/lib/mock-data";
+import { employees, type Task } from "@/lib/mock-data";
 import { logAudit } from "@/lib/audit-log";
 import { useProjectsQuery } from "@/features/projects";
 import { useTasksQuery, useReviewTask } from "@/features/tasks";
@@ -157,11 +156,10 @@ function ReviewCenter() {
         subtitle="Approve, reject, or leave remarks on employee task submissions."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Pending review" value={submissions.length} icon={ClipboardCheck} accent="primary" />
         <StatCard label="High priority" value={highPriority} icon={Trophy} accent="warning" />
         <StatCard label="Points at stake" value={totalPoints} icon={Trophy} accent="success" />
-        <StatCard label="Reviewers online" value={admins.length} icon={User} accent="info" />
       </div>
 
       <div className="glass flex flex-wrap items-center gap-2 rounded-2xl p-3">
