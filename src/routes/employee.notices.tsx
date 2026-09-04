@@ -62,6 +62,9 @@ function EmployeeNoticeBoard() {
             <TabsTrigger value="important">⚠ Important</TabsTrigger>
             <TabsTrigger value="meeting">👥 Meetings</TabsTrigger>
             <TabsTrigger value="holiday">🎉 Holidays</TabsTrigger>
+            <TabsTrigger value="maintenance">🛠 Maintenance</TabsTrigger>
+            <TabsTrigger value="event">📅 Events</TabsTrigger>
+            <TabsTrigger value="policy_update">📄 Policy</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
