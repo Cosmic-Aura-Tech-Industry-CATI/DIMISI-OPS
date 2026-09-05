@@ -50,6 +50,24 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) => ["notices", "list", filters] as const,
     detail: (id: string) => ["notices", "detail", id] as const,
   },
+  dashboard: {
+    all: ["dashboard"] as const,
+    overview: () => ["dashboard", "overview"] as const,
+  },
+  reports: {
+    all: ["reports"] as const,
+    overview: (timeframe?: string) => ["reports", "overview", timeframe] as const,
+    employees: () => ["reports", "employees"] as const,
+    tasks: (timeframe?: string) => ["reports", "tasks", timeframe] as const,
+    projects: (timeframe?: string) => ["reports", "projects", timeframe] as const,
+    departments: () => ["reports", "departments"] as const,
+  },
+  settings: {
+    all: ["settings"] as const,
+    preferences: () => ["settings", "preferences"] as const,
+    workspace: () => ["settings", "workspace"] as const,
+    sessions: () => ["settings", "sessions"] as const,
+  },
 } as const;
 
 

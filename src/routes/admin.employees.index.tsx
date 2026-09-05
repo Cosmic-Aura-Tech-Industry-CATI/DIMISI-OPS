@@ -117,6 +117,11 @@ function EmployeesPage() {
     [all],
   );
 
+  const jobTitles = useMemo(
+    () => Array.from(new Set(all.map((e) => e.jobTitle))).sort(),
+    [all],
+  );
+
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
@@ -147,7 +152,7 @@ function EmployeesPage() {
       else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [all, query, dept, status, sortKey, sortDir]);
+  }, [all, query, dept, role, status, sortKey, sortDir]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -169,8 +174,7 @@ function EmployeesPage() {
     setPage(1);
   };
 
-  const handleRevoke = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleRevoke = () => {
     if (!pendingDelete) return;
     revokeMutation.mutate(pendingDelete.id, {
       onSuccess: () => {
@@ -218,11 +222,11 @@ function EmployeesPage() {
               setQuery(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by name, ID, email…"
+            placeholder="Search by name, ID, email, department…"
             className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center">
           <Select
             value={dept}
             onValueChange={(v) => {
@@ -238,6 +242,26 @@ function EmployeesPage() {
               {departments.map((d) => (
                 <SelectItem key={d} value={d}>
                   {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={role}
+            onValueChange={(v) => {
+              setRole(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 rounded-full">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              {jobTitles.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
                 </SelectItem>
               ))}
             </SelectContent>

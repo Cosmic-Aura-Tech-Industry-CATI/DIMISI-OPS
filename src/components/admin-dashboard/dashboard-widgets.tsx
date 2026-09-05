@@ -1,9 +1,34 @@
 import { Link } from "@tanstack/react-router";
 import { Activity, CalendarClock, Star, Trophy, Users } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
-import type { getOverviewData } from "./dashboard-data";
+import type { AuthUser } from "@/auth/types/auth";
+import type { LeaderboardEntry } from "@/features/leaderboard/types";
+import type { Task } from "@/features/tasks/types";
 
-type OverviewData = ReturnType<typeof getOverviewData>;
+export interface DashboardActivityItem {
+  id: string;
+  user: string;
+  userAvatar?: string;
+  userCode?: string;
+  action: string;
+  target: string;
+  timestamp: string | number | Date;
+}
+
+/** Safely converts string / number / populated object ({ _id, name }) to a displayable string. */
+function getDisplayName(val: any, fallback = "—"): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val.trim() || fallback;
+  if (typeof val === "number") return String(val);
+  if (typeof val === "object") {
+    if (typeof val.name === "string" && val.name.trim()) return val.name;
+    if (typeof val.title === "string" && val.title.trim()) return val.title;
+    if (typeof val.label === "string" && val.label.trim()) return val.label;
+    if (typeof val.username === "string" && val.username.trim()) return val.username;
+    if (typeof val._id === "string") return val._id;
+  }
+  return fallback;
+}
 
 /** Shared header for the small dashboard widgets: icon + title + trailing link. */
 function WidgetHeader({
@@ -30,104 +55,150 @@ function WidgetHeader({
   );
 }
 
-export function RecentActivities({ items }: { items: OverviewData["recentActivity"] }) {
+export function RecentActivities({ items = [] }: { items?: DashboardActivityItem[] }) {
   return (
     <div className="glass rounded-2xl p-5">
       <WidgetHeader icon={Activity} title="Recent activities" linkTo="/admin/activity" linkLabel="View all" />
-      <ul className="mt-4 space-y-4">
-        {items.map((a) => (
-          <li key={a.id} className="flex items-start gap-3">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-              {a.userAvatar}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm leading-snug">
-                <span className="font-medium">{a.user}</span>
-                {a.userCode && <> <IdBadge id={a.userCode} /></>}{" "}
-                <span className="text-muted-foreground">{a.action}</span>{" "}
-                <span className="font-medium">{a.target}</span>
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {new Date(a.timestamp).toLocaleString(undefined, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {items.length === 0 ? (
+        <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
+          <Activity className="mb-2 h-6 w-6 opacity-40" />
+          No recent activity logged
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-4">
+          {items.map((a) => {
+            const user = getDisplayName(a.user, "User");
+            const action = getDisplayName(a.action, "updated");
+            const target = getDisplayName(a.target, "item");
+            const avatar = a.userAvatar || user.slice(0, 2).toUpperCase();
+
+            return (
+              <li key={a.id} className="flex items-start gap-3">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
+                  {avatar}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm leading-snug">
+                    <span className="font-medium">{user}</span>
+                    {a.userCode && <> <IdBadge id={a.userCode} /></>}{" "}
+                    <span className="text-muted-foreground">{action}</span>{" "}
+                    <span className="font-medium">{target}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {new Date(a.timestamp).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
-export function UpcomingDeadlines({ tasks }: { tasks: OverviewData["deadlines"] }) {
+export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
   return (
     <div className="glass rounded-2xl p-5">
       <WidgetHeader icon={CalendarClock} title="Upcoming deadlines" linkTo="/admin/tasks" linkLabel="All tasks" />
-      <ul className="mt-4 space-y-3">
-        {tasks.map((t) => {
-          const days = Math.max(
-            0,
-            Math.ceil((+new Date(t.dueDate) - Date.now()) / (1000 * 60 * 60 * 24)),
-          );
-          const tone =
-            days <= 2
-              ? "bg-destructive/15 text-destructive"
-              : days <= 5
-                ? "bg-warning/15 text-warning"
-                : "bg-success/15 text-success";
-          return (
-            <li key={t.id} className="rounded-xl border border-border/60 bg-card/40 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{t.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t.assignee} · {t.category}</p>
+      {tasks.length === 0 ? (
+        <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
+          <CalendarClock className="mb-2 h-6 w-6 opacity-40" />
+          No upcoming task deadlines
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {tasks.map((t) => {
+            const dueDate = t.dueDate || "";
+            const days = dueDate
+              ? Math.max(0, Math.ceil((+new Date(dueDate) - Date.now()) / (1000 * 60 * 60 * 24)))
+              : 0;
+            const tone =
+              days <= 2
+                ? "bg-destructive/15 text-destructive"
+                : days <= 5
+                  ? "bg-warning/15 text-warning"
+                  : "bg-success/15 text-success";
+            const title = getDisplayName(t.title, "Task");
+            const assigneeName = getDisplayName(t.assignee, "Unassigned");
+            const categoryName = getDisplayName(t.category || t.taskType, "General");
+
+            return (
+              <li key={t.id || (t as any)._id} className="rounded-xl border border-border/60 bg-card/40 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {assigneeName} · {categoryName}
+                    </p>
+                  </div>
+                  {dueDate && (
+                    <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
+                      {days === 0 ? "Today" : `${days}d`}
+                    </span>
+                  )}
                 </div>
-                <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
-                  {days === 0 ? "Today" : `${days}d`}
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
-export function LeaderboardPreview({ entries }: { entries: OverviewData["topFive"] }) {
+export function LeaderboardPreview({ entries = [] }: { entries?: LeaderboardEntry[] }) {
   return (
     <div className="glass rounded-2xl p-5">
       <WidgetHeader icon={Trophy} title="Leaderboard" linkTo="/admin/leaderboard" linkLabel="Full board" />
-      <ul className="mt-4 space-y-3">
-        {entries.map((e) => (
-          <li key={e.id} className="flex items-center gap-3">
-            <div
-              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                e.rank === 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
-              }`}
-            >
-              {e.rank}
-            </div>
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-              {e.avatar}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{e.name}</p>
-              <p className="text-xs text-muted-foreground">{e.department}</p>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-primary">
-              <Star className="h-3 w-3 fill-primary" /> {e.points.toLocaleString()}
-            </div>
-          </li>
-        ))}
-      </ul>
+      {entries.length === 0 ? (
+        <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
+          <Trophy className="mb-2 h-6 w-6 opacity-40" />
+          No leaderboard entries yet
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {entries.map((e, index) => {
+            const rank = e.rank ?? index + 1;
+            const name = getDisplayName(e.name || e.user?.name || e.user, "User");
+            const avatar = name.slice(0, 2).toUpperCase();
+            const departmentName = getDisplayName(
+              e.user?.department || (e as any).department || (e as any).departmentId,
+              "General"
+            );
+
+            return (
+              <li key={e._id || index} className="flex items-center gap-3">
+                <div
+                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                    rank === 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
+                  }`}
+                >
+                  {rank}
+                </div>
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
+                  {avatar}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{name}</p>
+                  <p className="text-xs text-muted-foreground">{departmentName}</p>
+                </div>
+                <div className="flex items-center gap-1 text-xs font-semibold text-primary">
+                  <Star className="h-3 w-3 fill-primary" /> {Number(e.points || 0).toLocaleString()}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
-export function LatestEmployeesTable({ employees }: { employees: OverviewData["latestEmployees"] }) {
+export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[] }) {
   return (
     <div className="glass rounded-2xl p-5 lg:col-span-2">
       <WidgetHeader
@@ -147,33 +218,52 @@ export function LatestEmployeesTable({ employees }: { employees: OverviewData["l
             </tr>
           </thead>
           <tbody>
-            {employees.map((e) => (
-              <tr key={e.id} className="border-t border-border/60 transition-colors hover:bg-secondary/30">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-                      {e.avatar}
-                    </div>
-                    <div>
-                      <p className="font-medium leading-tight">{e.name}</p>
-                      <IdBadge id={e.code} />
-                    </div>
-                  </div>
+            {employees.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                  No employees found in directory
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{e.department}</td>
-                <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                  {new Date(e.joinedAt).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </td>
-                <td className="px-4 py-3 text-right font-semibold">{e.points.toLocaleString()}</td>
               </tr>
-            ))}
+            ) : (
+              employees.map((e) => {
+                const name = getDisplayName(e.name, "Employee");
+                const avatar = name.slice(0, 2).toUpperCase();
+                const departmentName = getDisplayName(e.department || (e as any).departmentId, "—");
+                const joinedDate = e.joinDate || e.createdAt;
+
+                return (
+                  <tr key={e.id || e._id} className="border-t border-border/60 transition-colors hover:bg-secondary/30">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
+                          {avatar}
+                        </div>
+                        <div>
+                          <p className="font-medium leading-tight">{name}</p>
+                          {e.code && <IdBadge id={e.code} />}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{departmentName}</td>
+                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
+                      {joinedDate
+                        ? new Date(joinedDate).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">{Number(e.points || 0).toLocaleString()}</td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
     </div>
   );
 }
+
+
