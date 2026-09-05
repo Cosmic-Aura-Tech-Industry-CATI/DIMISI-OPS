@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/audit-log";
+import { useAuth } from "@/lib/auth";
 import { ChangePasswordCard } from "@/components/change-password-card";
 import { useAuth } from "@/lib/auth";
 import {
@@ -95,14 +96,16 @@ export function SettingCard({
   description,
   actions,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="glass rounded-2xl p-6">
+    <div className={cn("glass rounded-2xl p-6", className)}>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-base font-semibold">{title}</h3>
@@ -234,7 +237,11 @@ function SecuritySection() {
   ];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
         wrapper={(p) => (
           <SettingCard title={p.title} description={p.description} actions={p.actions}>
