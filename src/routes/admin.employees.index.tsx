@@ -177,8 +177,7 @@ function EmployeesPage() {
     setPage(1);
   };
 
-  const handleRevoke = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleRevoke = () => {
     if (!pendingDelete) return;
     revokeMutation.mutate(pendingDelete.id, {
       onSuccess: () => {

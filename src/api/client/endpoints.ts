@@ -72,5 +72,27 @@ export const API_ENDPOINTS = {
     update: (id: string) => `/employees/${id}`,
     revoke: (id: string) => `/employees/${id}/revoke`,
   },
+  dashboard: {
+    overview: "/dashboard/overview",
+  },
+  reports: {
+    overview: "/reports/overview",
+    employees: "/reports/employees",
+    tasks: "/reports/tasks",
+    projects: "/reports/projects",
+    departments: "/reports/departments",
+  },
+  settings: {
+    preferences: "/settings/general/preferences",
+    workspace: "/settings/general/workspace",
+    setup2Fa: "/settings/general/2fa/authenticator/setup",
+    verify2Fa: "/settings/general/2fa/authenticator/verify",
+    checkPassword: "/settings/passwords/check",
+    updatePassword: "/settings/passwords/update",
+    profile: "/settings/profile",
+    sessions: "/settings/sessions",
+    revokeOtherSessions: "/settings/sessions/others",
+    revokeSession: (id: string) => `/settings/sessions/${id}`,
+  },
 } as const;
 
