@@ -270,7 +270,6 @@ export function NotificationsSection() {
             <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
             <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
             <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
-            <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} />
           </div>
         </SettingCard>
 
@@ -282,7 +281,6 @@ export function NotificationsSection() {
             <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
             <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
             <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
-            <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked />
           </div>
         </SettingCard>
       </div>
