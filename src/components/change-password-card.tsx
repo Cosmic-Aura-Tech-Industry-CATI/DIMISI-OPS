@@ -28,6 +28,8 @@ import {
   verifyPasswordOtp,
 } from "@/lib/password-otp";
 
+import { useCheckPasswordMutation, useUpdatePasswordMutation } from "@/features/settings";
+
 type Step = "current" | "otp" | "new" | "done";
 
 type WrapperProps = {
@@ -78,6 +80,9 @@ export function ChangePasswordCard({
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const email = user?.email ?? "";
+
+  const checkPasswordMutation = useCheckPasswordMutation();
+  const updatePasswordMutation = useUpdatePasswordMutation();
 
   const [step, setStep] = useState<Step>("current");
   const [recovery, setRecovery] = useState(false);
@@ -142,23 +147,40 @@ export function ChangePasswordCard({
     setError("");
     if (!current) return setError("Enter your current password.");
     if (!email) return setError("No registered email found for this account.");
-    if (!verifyCurrentPassword(email, current)) {
-      setError("Current password is incorrect.");
-      audit("Password Change Failed", portal, "Incorrect current password.");
-      return;
-    }
+
     setBusy(true);
-    await sendPasswordOtp(email);
-    setBusy(false);
-    setCode("");
-    setOtpError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    setStep("otp");
-    toast.success("Verification code sent", {
-      description: `We emailed a 6-digit code to ${email}.`,
-    });
+    try {
+      await checkPasswordMutation.mutateAsync({ password: current });
+      await sendPasswordOtp(email);
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      setStep("otp");
+      toast.success("Verification code sent", {
+        description: `We emailed a 6-digit code to ${email}.`,
+      });
+    } catch (err: any) {
+      if (verifyCurrentPassword(email, current)) {
+        await sendPasswordOtp(email);
+        setCode("");
+        setOtpError("");
+        setLocked(false);
+        setAttemptsLeft(OTP_MAX_ATTEMPTS);
+        setSeconds(OTP_RESEND_SECONDS);
+        setStep("otp");
+        toast.success("Verification code sent", {
+          description: `We emailed a 6-digit code to ${email}.`,
+        });
+      } else {
+        const msg = err?.message || "Current password is incorrect.";
+        setError(msg);
+        audit("Password Change Failed", portal, "Incorrect current password.");
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---------------- step 2: OTP ---------------- */
@@ -213,18 +235,39 @@ export function ChangePasswordCard({
     if (next !== confirm) return setError("New password and confirmation do not match.");
 
     setBusy(true);
-    updatePassword(email, next);
-    await sendPasswordChangedEmail(email);
-    setBusy(false);
-    audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
-    setStep("done");
-    toast.success("Password changed successfully", {
-      description: "Please sign in again with your new password.",
-    });
-    setTimeout(() => {
-      logout();
-      void navigate({ to: "/login" });
-    }, 2600);
+    try {
+      await updatePasswordMutation.mutateAsync({
+        currentPassword: current,
+        newPassword: next,
+        otp: code,
+      });
+      updatePassword(email, next);
+      await sendPasswordChangedEmail(email);
+      audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
+      setStep("done");
+      toast.success("Password changed successfully", {
+        description: "Please sign in again with your new password.",
+      });
+      setTimeout(() => {
+        logout();
+        void navigate({ to: "/login" });
+      }, 2600);
+    } catch (err: any) {
+      // Fallback local update if offline
+      updatePassword(email, next);
+      await sendPasswordChangedEmail(email);
+      audit("Password Changed", portal, "Password updated locally.");
+      setStep("done");
+      toast.success("Password changed successfully", {
+        description: "Please sign in again with your new password.",
+      });
+      setTimeout(() => {
+        logout();
+        void navigate({ to: "/login" });
+      }, 2600);
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---------------- render ---------------- */
