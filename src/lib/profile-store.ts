@@ -1,14 +1,14 @@
 import { useSyncExternalStore } from "react";
 
 export type EditableProfile = {
-  bio: string;
+  phone?: string;
+  bio?: string;
   photo: string | null;
 };
 
 const KEY = "dimisi.profile.editable";
 
 const DEFAULT_PROFILE: EditableProfile = {
-  bio: "Product-minded engineer focused on shipping reliable, well-crafted interfaces.",
   photo: null,
 };
 

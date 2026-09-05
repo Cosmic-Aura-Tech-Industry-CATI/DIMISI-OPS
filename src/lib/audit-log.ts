@@ -13,8 +13,8 @@ export type AuditCategory =
   | "project"
   | "notice"
   | "authentication"
-  | "system"
-  | "leaderboard"
+  // | "system"
+  // | "leaderboard"
   | "reports"
   | "settings";
 
@@ -45,8 +45,8 @@ export const auditCategoryMeta: Record<AuditCategory, { label: string; className
   project: { label: "Project", className: "bg-warning/15 text-warning" },
   notice: { label: "Notice", className: "bg-primary/15 text-primary" },
   authentication: { label: "Authentication", className: "bg-muted text-muted-foreground" },
-  system: { label: "System", className: "bg-muted text-muted-foreground" },
-  leaderboard: { label: "Leaderboard", className: "bg-success/15 text-success" },
+  // system: { label: "System", className: "bg-muted text-muted-foreground" },
+  // leaderboard: { label: "Leaderboard", className: "bg-success/15 text-success" },
   reports: { label: "Reports", className: "bg-info/15 text-info" },
   settings: { label: "Settings", className: "bg-muted text-muted-foreground" },
 };
@@ -109,15 +109,15 @@ const seedRaw: SeedInput[] = [
   { hoursAgo: 58, actorName: "Shikhar Dixit", actorId: "DMSDIR01", category: "employee", action: "Deleted Employee", target: "Karan Malhotra", targetId: "DMSEMP2503", details: "Employee offboarded and removed from the directory.", status: "warning" },
   { hoursAgo: 66, actorName: "Shikhar Dixit", actorId: "DMSDIR01", category: "admin", action: "Edited Admin Profile", target: "Ishita Rao", targetId: "DMSADM03", details: "Contact details updated." },
   { hoursAgo: 72, actorName: "Shikhar Dixit", actorId: "DMSDIR01", category: "admin", action: "Deleted Admin", target: "Vikram Nair", targetId: "DMSADM04", details: "Admin access revoked.", status: "warning" },
-  { hoursAgo: 80, actorName: "Rhea Kapoor", actorId: "DMSDIR02", category: "leaderboard", action: "Leaderboard Reset", target: "Monthly cycle", details: "Leaderboard standings reset for the new cycle." },
+  // { hoursAgo: 80, actorName: "Rhea Kapoor", actorId: "DMSDIR02", category: "leaderboard", action: "Leaderboard Reset", target: "Monthly cycle", details: "Leaderboard standings reset for the new cycle." },
   { hoursAgo: 88, actorName: "Shikhar Dixit", actorId: "DMSDIR01", category: "settings", action: "Updated System Settings", target: "Workspace preferences", details: "Notification defaults changed.", previousValue: "Digest: Daily", updatedValue: "Digest: Weekly" },
   { hoursAgo: 96, actorName: "Ishita Rao", actorId: "DMSADM03", category: "reports", action: "Exported Report", target: "Monthly performance report", details: "Report exported as CSV." },
   { hoursAgo: 100, actorName: "Aman Gupta", actorId: "DMSEMP2605", category: "authentication", action: "Login", target: "Employee portal", details: "Signed in successfully." },
   { hoursAgo: 104, actorName: "Unknown", actorId: "—", category: "authentication", action: "Login", target: "Admin portal", details: "Failed sign-in attempt — invalid credentials.", status: "failed" },
   { hoursAgo: 110, actorName: "Neha Kulkarni", actorId: "DMSEMP2609", category: "authentication", action: "Password Changed", target: "Own account", details: "Password updated from the settings page." },
   { hoursAgo: 120, actorName: "Shikhar Dixit", actorId: "DMSDIR01", category: "authentication", action: "Logout", target: "Admin portal", details: "Session ended." },
-  { hoursAgo: 130, actorName: "System", actorId: "SYSTEM", category: "system", action: "Scheduled Maintenance", target: "Deployment pipeline", details: "Automated maintenance window completed." },
-  { hoursAgo: 150, actorName: "System", actorId: "SYSTEM", category: "system", action: "Data Backup", target: "Workspace snapshot", details: "Nightly backup completed successfully." },
+  // { hoursAgo: 130, actorName: "System", actorId: "SYSTEM", category: "system", action: "Scheduled Maintenance", target: "Deployment pipeline", details: "Automated maintenance window completed." },
+  // { hoursAgo: 150, actorName: "System", actorId: "SYSTEM", category: "system", action: "Data Backup", target: "Workspace snapshot", details: "Nightly backup completed successfully." },
 ];
 
 const seedEntries: AuditEntry[] = seedRaw.map((s, i) => ({
