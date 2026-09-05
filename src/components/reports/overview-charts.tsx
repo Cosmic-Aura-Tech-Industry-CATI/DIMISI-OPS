@@ -17,12 +17,28 @@ import {
 } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { performanceTrend, weeklyCompletion } from "@/lib/mock-data";
 import { ACCENT, GRID_STROKE, axisStyle, chartColorAt, tooltipStyle } from "./chart-theme";
 import { ChartPanel, ColorDot } from "./report-panels";
 import type { TaskBucket } from "./use-report-data";
 
-export function WeeklyCompletionChart() {
+export interface WeeklyCompletionItem {
+  day: string;
+  created: number;
+  completed: number;
+}
+
+export interface PointsVelocityItem {
+  week: string;
+  points: number;
+}
+
+export function WeeklyCompletionChart({
+  data = [],
+  trend = 0,
+}: {
+  data?: WeeklyCompletionItem[];
+  trend?: number;
+}) {
   return (
     <ChartPanel
       title="Weekly completion"
@@ -31,12 +47,12 @@ export function WeeklyCompletionChart() {
       bodyClassName="h-72"
       aside={
         <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-          <TrendingUp className="mr-1 h-3 w-3" /> +14%
+          <TrendingUp className="mr-1 h-3 w-3" /> {trend >= 0 ? `+${trend}%` : `${trend}%`}
         </Badge>
       }
     >
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={weeklyCompletion}>
+        <BarChart data={data}>
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="day" {...axisStyle} tickLine={false} axisLine={false} />
           <YAxis {...axisStyle} tickLine={false} axisLine={false} />
@@ -50,7 +66,7 @@ export function WeeklyCompletionChart() {
   );
 }
 
-export function TaskStatusMixChart({ taskReport }: { taskReport: TaskBucket[] }) {
+export function TaskStatusMixChart({ taskReport = [] }: { taskReport?: TaskBucket[] }) {
   return (
     <ChartPanel title="Task status mix" subtitle="Breakdown across all tasks">
       <div className="h-56">
@@ -88,17 +104,21 @@ export function TaskStatusMixChart({ taskReport }: { taskReport: TaskBucket[] })
   );
 }
 
-export function PointsVelocityChart() {
+export function PointsVelocityChart({
+  data = [],
+}: {
+  data?: PointsVelocityItem[];
+}) {
   return (
     <ChartPanel
       title="Points velocity"
       subtitle="Weekly points earned org-wide"
       className="lg:col-span-2"
       bodyClassName="h-64"
-      aside={<Badge variant="outline" className="border-border/60">Last 8 weeks</Badge>}
+      aside={<Badge variant="outline" className="border-border/60">Recent weeks</Badge>}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={performanceTrend}>
+        <AreaChart data={data}>
           <defs>
             <linearGradient id="rptPts" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={ACCENT} stopOpacity={0.5} />
@@ -116,7 +136,7 @@ export function PointsVelocityChart() {
   );
 }
 
-export function PriorityMixChart({ data }: { data: { name: string; value: number }[] }) {
+export function PriorityMixChart({ data = [] }: { data?: { name: string; value: number }[] }) {
   return (
     <ChartPanel title="Priority mix" subtitle="Task load by priority" dense bodyClassName="h-64">
       <ResponsiveContainer width="100%" height="100%">
@@ -132,7 +152,25 @@ export function PriorityMixChart({ data }: { data: { name: string; value: number
   );
 }
 
-export function ThroughputTrendChart() {
+export function ThroughputTrendChart({
+  data = [],
+}: {
+  data?: { week: string; tasks: number }[];
+}) {
+  const chartData =
+    data.length > 0
+      ? data
+      : [
+          { week: "W1", tasks: 8 },
+          { week: "W2", tasks: 12 },
+          { week: "W3", tasks: 15 },
+          { week: "W4", tasks: 14 },
+          { week: "W5", tasks: 18 },
+          { week: "W6", tasks: 21 },
+          { week: "W7", tasks: 25 },
+          { week: "W8", tasks: 28 },
+        ];
+
   return (
     <ChartPanel
       title="Tasks completed per week"
@@ -140,7 +178,7 @@ export function ThroughputTrendChart() {
       bodyClassName="h-64"
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={performanceTrend}>
+        <LineChart data={chartData}>
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="week" {...axisStyle} tickLine={false} axisLine={false} />
           <YAxis {...axisStyle} tickLine={false} axisLine={false} />

@@ -1,19 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Palette, Key } from "lucide-react";
+import { Bell, Key, Palette, UserCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { SettingCard, ToggleRow, ThemeSection } from "./admin.settings";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  NotificationsSection,
+  ProfileSection,
+  SettingCard,
+  ThemeSection,
+  ToggleRow,
+} from "./admin.settings";
 import { ChangePasswordCard } from "@/components/change-password-card";
-
+import {
+  useUpdatePreferencesMutation,
+  useUserPreferencesQuery,
+} from "@/features/settings";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/employee/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Poll" },
+      { title: "Settings — Dimisi Operations" },
       { name: "description", content: "Manage your profile, preferences, theme, password, and notifications." },
-      { property: "og:title", content: "Settings — Poll" },
+      { property: "og:title", content: "Settings — Dimisi Operations" },
       { property: "og:description", content: "Manage your profile, preferences, theme, password, and notifications." },
     ],
   }),
@@ -23,24 +31,29 @@ export const Route = createFileRoute("/employee/settings")({
 function EmployeeSettingsPage() {
   return (
     <>
-      <PageHeader title="Settings" subtitle="Theme and account security controls." />
+      <PageHeader title="Settings" subtitle="Profile, theme, and account security controls." />
 
-      <Tabs defaultValue="theme" className="space-y-6">
+      <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
+          <TabsTrigger value="profile"><UserCircle className="mr-1.5 h-3.5 w-3.5" />Profile</TabsTrigger>
           <TabsTrigger value="password"><Key className="mr-1.5 h-3.5 w-3.5" />Password</TabsTrigger>
+          <TabsTrigger value="notifications"><Bell className="mr-1.5 h-3.5 w-3.5" />Notifications</TabsTrigger>
+          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
+        <TabsContent value="profile"><ProfileSection role="employee" /></TabsContent>
         <TabsContent value="password"><PasswordSection /></TabsContent>
+        <TabsContent value="notifications"><NotificationsSection /></TabsContent>
+        <TabsContent value="theme"><ThemeSection /></TabsContent>
       </Tabs>
     </>
   );
 }
 
-
-
 function PasswordSection() {
+  const { data: preferences } = useUserPreferencesQuery();
+  const updatePreferences = useUpdatePreferencesMutation();
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
@@ -51,18 +64,36 @@ function PasswordSection() {
         )}
       />
 
-
       <SettingCard title="Sign-in security" description="Extra protection on your account.">
         <div className="space-y-3">
-          <ToggleRow title="Two-factor authentication" description="Require a one-time code when signing in." defaultChecked />
-          <ToggleRow title="Sign-in alerts" description="Email me when a new device signs in." defaultChecked />
-          <ToggleRow title="Trusted devices" description="Skip 2FA on devices I mark as trusted." />
-        </div>
-        <Separator className="my-5" />
-        <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-          <div className="text-sm font-medium">Backup codes</div>
-          <p className="mt-1 text-xs text-muted-foreground">Generate one-time codes to sign in when you can't access your authenticator.</p>
-          <Button variant="outline" size="sm" className="mt-3 rounded-md">Generate codes</Button>
+          <ToggleRow
+            title="Email verification on sign-in"
+            description="Send an email OTP code to verify new sign-ins."
+            checked={preferences?.security?.emailOtpEnabled ?? true}
+            onChange={(checked) => {
+              updatePreferences.mutate(
+                { security: { emailOtpEnabled: checked } },
+                {
+                  onSuccess: () => toast.success("Sign-in security preference updated."),
+                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                },
+              );
+            }}
+          />
+          <ToggleRow
+            title="Two-factor authentication requirement"
+            description="Require 2FA authentication when accessing the employee portal."
+            checked={preferences?.security?.twoFactorEnabled ?? false}
+            onChange={(checked) => {
+              updatePreferences.mutate(
+                { security: { twoFactorEnabled: checked } },
+                {
+                  onSuccess: () => toast.success("2FA preference updated."),
+                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                },
+              );
+            }}
+          />
         </div>
       </SettingCard>
     </div>
