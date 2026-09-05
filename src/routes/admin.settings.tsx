@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -375,6 +376,18 @@ function SecuritySection() {
         )}
       </SettingCard>
 
+      {isDirector && (
+        <SettingCard
+          title="Access & privacy"
+          description="Workspace-level access controls."
+        >
+          <div className="space-y-3">
+            <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
+            <ToggleRow title="Require 2FA for all admins" description="Force every admin to enable two-factor sign-in." defaultChecked />
+          </div>
+        </SettingCard>
+      )}
+      </div>
       <SettingCard title="Workspace access & privacy" description="Organization-wide policies.">
         <div className="space-y-3">
           <ToggleRow

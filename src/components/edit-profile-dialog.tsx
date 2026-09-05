@@ -10,12 +10,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEditableProfile, updateProfile } from "@/lib/profile-store";
-import { cn } from "@/lib/utils";
-
-const MAX_BIO = 280;
 
 type Props = {
   open: boolean;
@@ -24,20 +21,21 @@ type Props = {
   initials: string;
   /** Read-only fields shown for context. */
   readOnly: { label: string; value: string }[];
+  currentPhone?: string;
 };
 
-export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Props) {
+export function EditProfileDialog({ open, onOpenChange, initials, readOnly, currentPhone }: Props) {
   const profile = useEditableProfile();
-  const [bio, setBio] = useState(profile.bio);
+  const [phone, setPhone] = useState(profile.phone ?? currentPhone ?? "");
   const [photo, setPhoto] = useState<string | null>(profile.photo);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
-      setBio(profile.bio);
+      setPhone(profile.phone ?? currentPhone ?? "");
       setPhoto(profile.photo);
     }
-  }, [open, profile.bio, profile.photo]);
+  }, [open, profile.phone, profile.photo, currentPhone]);
 
   const onPick = (file?: File) => {
     if (!file) return;
@@ -55,7 +53,7 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Pr
   };
 
   const save = () => {
-    updateProfile({ bio: bio.slice(0, MAX_BIO), photo });
+    updateProfile({ phone: phone.trim(), photo });
     toast.success("Profile updated");
     onOpenChange(false);
   };
@@ -66,7 +64,7 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Pr
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
-            Only your profile picture and bio can be changed. Contact an admin for other details.
+            Only your profile picture and phone number can be changed. Contact an admin for other details.
           </DialogDescription>
         </DialogHeader>
 
@@ -101,20 +99,16 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Pr
             </div>
           </div>
 
-          {/* Bio */}
+          {/* Phone Number */}
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              value={bio}
-              maxLength={MAX_BIO}
-              rows={4}
-              onChange={(ev) => setBio(ev.target.value)}
-              placeholder="Tell your team a little about yourself…"
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(ev) => setPhone(ev.target.value)}
+              placeholder="e.g. +1 (415) 555-0142"
             />
-            <div className={cn("text-right text-xs", bio.length >= MAX_BIO ? "text-destructive" : "text-muted-foreground")}>
-              {bio.length}/{MAX_BIO}
-            </div>
           </div>
 
           {/* Locked fields */}

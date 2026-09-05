@@ -28,6 +28,20 @@ export const Route = createFileRoute("/employee/settings")({
   component: EmployeeSettingsPage,
 });
 
+function saveToast(label: string) {
+  return () => {
+    logAudit({
+      category: "settings",
+      action: "Updated Personal Settings",
+      target: label,
+      details: `${label} settings saved.`,
+    });
+    toast.success(`${label} saved`, {
+      description: "Your changes are stored locally (demo).",
+    });
+  };
+}
+
 function EmployeeSettingsPage() {
   return (
     <>
@@ -95,6 +109,48 @@ function PasswordSection() {
             }}
           />
         </div>
+      </SettingCard>
+
+      <SettingCard
+        title="Sessions"
+        description="Devices currently signed in to your account."
+        actions={
+          <Button variant="outline" size="sm" className="rounded-md">
+            Sign out all
+          </Button>
+        }
+      >
+        <ul className="divide-y divide-border/60">
+          {[
+            { device: "MacBook Pro · Chrome", location: "San Francisco, US", when: "Active now", current: true },
+            { device: "iPhone 15 · Safari", location: "San Francisco, US", when: "2h ago" },
+            { device: "Windows · Edge", location: "Austin, US", when: "3d ago" },
+          ].map((s) => (
+            <li key={s.device} className="flex items-center justify-between gap-3 py-3">
+              <div className="flex items-center gap-3">
+                <Monitor className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {s.device}
+                    {s.current && (
+                      <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                        Current
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {s.location} · {s.when}
+                  </p>
+                </div>
+              </div>
+              {!s.current && (
+                <Button variant="ghost" size="sm">
+                  Revoke
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
       </SettingCard>
     </div>
   );

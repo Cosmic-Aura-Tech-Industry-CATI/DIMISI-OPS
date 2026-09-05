@@ -2,16 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ClipboardList,
-  Play,
-  Upload,
-  Eye,
   CheckCircle2,
-  Sparkles,
   XCircle,
-  MessageSquare,
   UserPlus,
+  UserRoundMinus,
+  ShieldPlus,
+  ShieldMinus,
+  FolderPlus,
+  FolderX,
+  Archive,
   KeyRound,
-  Settings2,
   Search,
   Filter,
 } from "lucide-react";
@@ -43,16 +43,16 @@ export const Route = createFileRoute("/admin/activity")({
 
 type EventType =
   | "task_assigned"
-  | "task_opened"
-  | "proof_submitted"
-  | "under_review"
   | "approved"
   | "rejected"
-  | "points_added"
-  | "comment"
-  | "invited"
-  | "login"
-  | "system";
+  | "project_created"
+  | "project_deleted"
+  | "project_archived"
+  | "employee_added"
+  | "employee_removed"
+  | "admin_added"
+  | "admin_removed"
+  | "login";
 
 type ActivityEvent = {
   id: string;
@@ -63,21 +63,20 @@ type ActivityEvent = {
   target: string;
   detail?: string;
   timestamp: string; // ISO
-  points?: number;
 };
 
 const meta: Record<EventType, { label: string; Icon: typeof ClipboardList; tone: string; ring: string }> = {
   task_assigned:   { label: "Task Assigned",   Icon: ClipboardList, tone: "bg-primary/15 text-primary",       ring: "ring-primary/30" },
-  task_opened:     { label: "Task Opened",     Icon: Play,          tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  proof_submitted: { label: "Proof Submitted", Icon: Upload,        tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  under_review:    { label: "Under Review",    Icon: Eye,           tone: "bg-primary/15 text-primary",   ring: "ring-primary/30" },
-  approved:        { label: "Approved",        Icon: CheckCircle2,  tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  rejected:        { label: "Rejected",        Icon: XCircle,       tone: "bg-primary/15 text-primary",     ring: "ring-primary/30" },
-  points_added:    { label: "Points Added",    Icon: Sparkles,      tone: "bg-primary/15 text-primary",       ring: "ring-primary/30" },
-  comment:         { label: "Comment",         Icon: MessageSquare, tone: "bg-slate-500/15 text-slate-300",   ring: "ring-slate-500/30" },
-  invited:         { label: "Invited",         Icon: UserPlus,      tone: "bg-primary/15 text-primary",     ring: "ring-primary/30" },
+  approved:        { label: "Task Approved",   Icon: CheckCircle2,  tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  rejected:        { label: "Task Rejected",   Icon: XCircle,       tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  project_created: { label: "Project Created", Icon: FolderPlus,    tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  project_deleted: { label: "Project Deleted", Icon: FolderX,       tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
+  project_archived:{ label: "Project Archived",Icon: Archive,       tone: "bg-warning/15 text-warning", ring: "ring-warning/30" },
+  employee_added:  { label: "Employee Added",  Icon: UserPlus,      tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  employee_removed:{ label: "Employee Removed",Icon: UserRoundMinus, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
+  admin_added:     { label: "Admin Added",     Icon: ShieldPlus,    tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  admin_removed:   { label: "Admin Removed",   Icon: ShieldMinus,   tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
   login:           { label: "Login",           Icon: KeyRound,      tone: "bg-primary/15 text-primary",       ring: "ring-primary/30" },
-  system:          { label: "System",          Icon: Settings2,     tone: "bg-muted text-muted-foreground",   ring: "ring-border/40" },
 };
 
 const nowIso = "2026-07-29T09:00:00Z";
@@ -88,22 +87,18 @@ function hoursAgo(h: number) {
 
 const events: ActivityEvent[] = [
   { id: "e1",  type: "task_assigned",   actor: "Elena Voss",     actorAvatar: "EV", actorId: "a1", target: tasks[9]?.title ?? "Enterprise SSO rollout", detail: "assigned to Priya Nair", timestamp: hoursAgo(1) },
-  { id: "e2",  type: "task_opened",     actor: "Priya Nair",     actorAvatar: "PN", actorId: "u3", target: tasks[9]?.title ?? "Enterprise SSO rollout", timestamp: hoursAgo(2) },
-  { id: "e3",  type: "proof_submitted", actor: "Ava Chen",       actorAvatar: "AC", actorId: "u1", target: "API rate-limit dashboard", detail: "2 files attached", timestamp: hoursAgo(3) },
-  { id: "e4",  type: "under_review",    actor: "Rhea Kapoor",    actorAvatar: "RK", actorId: "a3", target: "API rate-limit dashboard", detail: "picked up for review", timestamp: hoursAgo(4) },
   { id: "e5",  type: "approved",        actor: "Rhea Kapoor",    actorAvatar: "RK", actorId: "a3", target: "Fix mobile crash on iOS 19", detail: "reviewed by admin", timestamp: hoursAgo(5) },
-  { id: "e6",  type: "points_added",    actor: "System",         actorAvatar: "SY", actorId: "sys", target: "Ava Chen", detail: "+75 points for Fix mobile crash on iOS 19", timestamp: hoursAgo(5), points: 75 },
-  { id: "e7",  type: "comment",         actor: "Julian Park",    actorAvatar: "JP", actorId: "a2", target: "Design onboarding flow v3", detail: "left a comment for Marcus", timestamp: hoursAgo(6) },
+  { id: "e18", type: "project_created", actor: "Elena Voss", actorAvatar: "EV", actorId: "a1", target: "Customer insights sprint", detail: "created a new project", timestamp: hoursAgo(7) },
+  { id: "e19", type: "employee_added", actor: "Julian Park", actorAvatar: "JP", actorId: "a2", target: "Nisha Patel", detail: "added to the Engineering team", timestamp: hoursAgo(8) },
+  { id: "e20", type: "admin_added", actor: "Elena Voss", actorAvatar: "EV", actorId: "a1", target: "Dev Mehta", detail: "granted admin access", timestamp: hoursAgo(9) },
   { id: "e8",  type: "rejected",        actor: "Elena Voss",     actorAvatar: "EV", actorId: "a1", target: "Legacy cron cleanup", detail: "requested changes", timestamp: hoursAgo(28) },
+  { id: "e21", type: "project_archived", actor: "Elena Voss", actorAvatar: "EV", actorId: "a1", target: "Spring launch", detail: "no longer accepts new tasks", timestamp: hoursAgo(32) },
+  { id: "e22", type: "project_deleted", actor: "Julian Park", actorAvatar: "JP", actorId: "a2", target: "Legacy migration", detail: "removed after all tasks were completed", timestamp: hoursAgo(36) },
+  { id: "e23", type: "employee_removed", actor: "Elena Voss", actorAvatar: "EV", actorId: "a1", target: "Karan Malhotra", detail: "removed from the organization", timestamp: hoursAgo(40) },
+  { id: "e24", type: "admin_removed", actor: "Elena Voss", actorAvatar: "EV", actorId: "a1", target: "Vikram Nair", detail: "admin access revoked", timestamp: hoursAgo(44) },
   { id: "e9",  type: "task_assigned",   actor: "Elena Voss",     actorAvatar: "EV", actorId: "a1", target: "Q3 pipeline forecast", detail: "assigned to Sofia Alvarez", timestamp: hoursAgo(30) },
-  { id: "e10", type: "proof_submitted", actor: "Sofia Alvarez",  actorAvatar: "SA", actorId: "u5", target: "Q3 pipeline forecast", detail: "1 file attached", timestamp: hoursAgo(48) },
   { id: "e11", type: "approved",        actor: "Elena Voss",     actorAvatar: "EV", actorId: "a1", target: "Roadmap workshop prep", timestamp: hoursAgo(72) },
-  { id: "e12", type: "points_added",    actor: "System",         actorAvatar: "SY", actorId: "sys", target: "Zara Ahmed", detail: "+55 points for Roadmap workshop prep", timestamp: hoursAgo(72), points: 55 },
-  { id: "e13", type: "invited",         actor: "Julian Park",    actorAvatar: "JP", actorId: "a2", target: "noah@poll.io", detail: "sent an invitation", timestamp: hoursAgo(120) },
   { id: "e14", type: "login",           actor: "Marcus Reed",    actorAvatar: "MR", actorId: "u2", target: "Web · Chrome", detail: "signed in", timestamp: hoursAgo(168) },
-  { id: "e15", type: "system",          actor: "System",         actorAvatar: "SY", actorId: "sys", target: "Weekly digest generated", timestamp: hoursAgo(180) },
-  { id: "e16", type: "task_opened",     actor: "Liam Foster",    actorAvatar: "LF", actorId: "u4", target: "Launch summer campaign", timestamp: hoursAgo(240) },
-  { id: "e17", type: "under_review",    actor: "Julian Park",    actorAvatar: "JP", actorId: "a2", target: "Checkout webhook retries", timestamp: hoursAgo(320) },
 ];
 
 type RangeKey = "today" | "week" | "month" | "all";
@@ -179,8 +174,6 @@ function ActivityPage() {
     return {
       total: filtered.length,
       approvals: filtered.filter((e) => e.type === "approved").length,
-      submissions: filtered.filter((e) => e.type === "proof_submitted").length,
-      points: filtered.reduce((s, e) => s + (e.points ?? 0), 0),
     };
   }, [filtered]);
 
@@ -196,8 +189,8 @@ function ActivityPage() {
         {[
           { label: "Events", value: totals.total, tone: "text-foreground" },
           { label: "Approvals", value: totals.approvals, tone: "text-primary" },
-          { label: "Submissions", value: totals.submissions, tone: "text-primary" },
-          { label: "Points awarded", value: totals.points, tone: "text-primary" },
+          { label: "Assignments", value: filtered.filter((e) => e.type === "task_assigned").length, tone: "text-primary" },
+          { label: "Logins", value: filtered.filter((e) => e.type === "login").length, tone: "text-primary" },
         ].map((s) => (
           <div key={s.label} className="glass rounded-2xl p-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</div>
@@ -275,7 +268,7 @@ function ActivityPage() {
             </div>
 
             <ol className="relative space-y-4">
-              <div className="absolute bottom-2 left-[27px] top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
+              <div className="absolute bottom-2 left-6.75 top-2 w-px bg-linear-to-b from-primary/40 via-border to-transparent" />
               {list.map((ev, idx) => {
                 const m = meta[ev.type];
                 return (
@@ -304,17 +297,12 @@ function ActivityPage() {
                         >
                           {m.label}
                         </Badge>
-                        {ev.points ? (
-                          <Badge className="bg-primary/15 text-primary hover:bg-primary/15">
-                            <Sparkles className="mr-1 h-3 w-3" />+{ev.points} pts
-                          </Badge>
-                        ) : null}
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatWhen(ev.timestamp)}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center gap-2 text-sm">
-                        <div className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[10px] font-semibold">
+                        <div className="grid h-6 w-6 place-items-center rounded-full bg-linear-to-br from-primary/30 to-accent text-[10px] font-semibold">
                           {ev.actorAvatar}
                         </div>
                         <span className="font-medium">{ev.actor}</span>

@@ -49,8 +49,8 @@ import {
   currentEmployee,
   tasks,
   performanceTrend,
-  activityLogs,
 } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
 import { useEditableProfile } from "@/lib/profile-store";
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { cn } from "@/lib/utils";
@@ -95,9 +95,30 @@ const achievements = [
 ];
 
 function ProfilePage() {
-  const e = currentEmployee;
+  const { user } = useAuth();
   const editable = useEditableProfile();
   const [editOpen, setEditOpen] = useState(false);
+
+  const e = useMemo(() => {
+    if (user) {
+      return {
+        id: user.id || user._id || currentEmployee.id,
+        code: user.code || user.empId || currentEmployee.code,
+        name: user.name || currentEmployee.name,
+        email: user.email || currentEmployee.email,
+        role: (user.role as "employee" | "admin") || "employee",
+        jobTitle: user.designation || currentEmployee.jobTitle,
+        department: (user.department as any)?.name || user.department || currentEmployee.department,
+        avatar: user.avatar || currentEmployee.avatar,
+        points: (user as any).rewardPoints ?? user.points ?? currentEmployee.points,
+        tasksCompleted: currentEmployee.tasksCompleted,
+        status: (user.isActive === false ? "inactive" : "active") as "active" | "inactive",
+        joinedAt: user.joinDate || currentEmployee.joinedAt,
+        phone: user.phone || currentEmployee.phone || "",
+      };
+    }
+    return currentEmployee;
+  }, [user]);
 
 
   const myTasks = useMemo(() => tasks.filter((t) => t.assigneeId === e.id), [e.id]);
@@ -118,14 +139,6 @@ function ProfilePage() {
   );
 
   const recentTasks = myTasks.slice(0, 6);
-
-  const timeline = useMemo(
-    () =>
-      activityLogs
-        .filter((l) => l.user === e.name || l.user === "Shikhar Dixit" || l.user === "Swatantra Singh")
-        .slice(0, 6),
-    [e.name],
-  );
 
   const stats = [
     { label: "Total points", value: e.points.toLocaleString(), Icon: Sparkles, tone: "text-primary" },
@@ -160,9 +173,6 @@ function ProfilePage() {
               </Badge>
               <Badge variant="outline" className={cn("capitalize", e.status === "active" ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 text-muted-foreground")}>{e.status}</Badge>
             </div>
-            {editable.bio && (
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{editable.bio}</p>
-            )}
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground sm:text-sm">
               <IdBadge id={e.code} />
               <span className="inline-flex min-w-0 items-center gap-1.5"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{e.email}</span></span>
@@ -203,7 +213,7 @@ function ProfilePage() {
               { Icon: Briefcase, label: "Employee ID", value: e.id.toUpperCase() },
               { Icon: Building2, label: "Department", value: e.department },
               { Icon: Mail, label: "Email", value: e.email },
-              { Icon: Phone, label: "Phone", value: "+1 (415) 555-0142" },
+              { Icon: Phone, label: "Phone", value: editable.phone || e.phone || "+1 (415) 555-0142" },
               { Icon: MapPin, label: "Location", value: "San Francisco, CA" },
               { Icon: Calendar, label: "Joined", value: new Date(e.joinedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) },
             ].map(({ Icon, label, value }) => (
@@ -263,7 +273,7 @@ function ProfilePage() {
         </div>
       </div>
 
-      {/* Achievements */}
+      {/* Achievements (Temporarily commented out)
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">Achievements</h3>
@@ -294,6 +304,7 @@ function ProfilePage() {
           ))}
         </div>
       </div>
+      */}
 
       {/* Charts row: Points history + Weekly tasks */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -365,95 +376,53 @@ function ProfilePage() {
         </div>
       </div>
 
-      {/* Task History + Points History table + Timeline */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="glass overflow-hidden rounded-2xl lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-            <div>
-              <h3 className="font-display text-lg font-semibold">Task history</h3>
-              <p className="text-xs text-muted-foreground">Your most recent {recentTasks.length} tasks</p>
-            </div>
-            <Button asChild variant="ghost" size="sm" className="rounded-md">
-              <Link to="/employee/tasks">View all</Link>
-            </Button>
+      {/* Task History */}
+      <div className="glass overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+          <div>
+            <h3 className="font-display text-lg font-semibold">Task history</h3>
+            <p className="text-xs text-muted-foreground">Your most recent {recentTasks.length} tasks</p>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border/60 hover:bg-transparent">
-                  <TableHead>Task</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Points</TableHead>
-                  <TableHead className="text-right">Deadline</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentTasks.map((t) => (
-                  <TableRow key={t.id} className="border-border/40">
-                    <TableCell>
-                      <Link to="/employee/tasks/$id" params={{ id: t.id }} className="font-medium hover:text-primary">
-                        {t.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
-                    <TableCell><StatusBadge status={t.status} /></TableCell>
-                    <TableCell className="text-right font-medium">+{t.points}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {new Date(t.dueDate).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {recentTasks.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                      No tasks assigned yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Button asChild variant="ghost" size="sm" className="rounded-md">
+            <Link to="/employee/tasks">View all</Link>
+          </Button>
         </div>
-
-        <div className="glass overflow-hidden rounded-2xl">
-          <div className="border-b border-border/60 px-5 py-4">
-            <h3 className="font-display text-lg font-semibold">Activity timeline</h3>
-            <p className="text-xs text-muted-foreground">Recent activity on your account</p>
-          </div>
-          <ol className="relative space-y-5 p-5">
-            <div className="absolute bottom-3 left-[27px] top-3 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
-            {timeline.map((l) => {
-              const Icon =
-                l.type === "task" ? CheckCircle2 :
-                l.type === "reward" ? Sparkles :
-                l.type === "auth" ? Zap : Star;
-              const tone =
-                l.type === "task" ? "bg-primary/15 text-primary" :
-                l.type === "reward" ? "bg-primary/15 text-primary" :
-                l.type === "auth" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground";
-              return (
-                <li key={l.id} className="relative flex gap-3">
-                  <div className={cn("relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-4 ring-background", tone)}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="text-sm">
-                      <span className="font-medium">{l.user}</span>{l.userCode && <> <IdBadge id={l.userCode} /></>}{" "}
-                      <span className="text-muted-foreground">{l.action}</span>{" "}
-                      <span className="font-medium">{l.target}</span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {new Date(l.timestamp).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-            {timeline.length === 0 && (
-              <li className="text-center text-sm text-muted-foreground">No recent activity.</li>
-            )}
-          </ol>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/60 hover:bg-transparent">
+                <TableHead>Task</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Points</TableHead>
+                <TableHead className="text-right">Deadline</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentTasks.map((t) => (
+                <TableRow key={t.id} className="border-border/40">
+                  <TableCell>
+                    <Link to="/employee/tasks/$id" params={{ id: t.id }} className="font-medium hover:text-primary">
+                      {t.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
+                  <TableCell><StatusBadge status={t.status} /></TableCell>
+                  <TableCell className="text-right font-medium">+{t.points}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {new Date(t.dueDate).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {recentTasks.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                    No tasks assigned yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
 
@@ -509,6 +478,7 @@ function ProfilePage() {
         open={editOpen}
         onOpenChange={setEditOpen}
         initials={e.avatar}
+        currentPhone={e.phone}
         readOnly={[
           { label: "Full name", value: e.name },
           { label: "Employee ID", value: e.code },
