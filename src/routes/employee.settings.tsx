@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Key, Palette, UserCircle } from "lucide-react";
+import { Bell, Key, Monitor, Palette, UserCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -15,6 +15,9 @@ import {
   useUserPreferencesQuery,
 } from "@/features/settings";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { logAudit } from "@/lib/audit-log";
 
 export const Route = createFileRoute("/employee/settings")({
   head: () => ({
