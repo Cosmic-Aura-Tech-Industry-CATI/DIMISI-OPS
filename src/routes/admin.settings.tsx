@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -40,7 +39,6 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/audit-log";
-import { useAuth } from "@/lib/auth";
 import { ChangePasswordCard } from "@/components/change-password-card";
 import { useAuth } from "@/lib/auth";
 import {
@@ -67,6 +65,20 @@ export const Route = createFileRoute("/admin/settings")({
   }),
   component: AdminSettingsPage,
 });
+
+function saveToast(label: string) {
+  return () => {
+    logAudit({
+      category: "settings",
+      action: "Updated Personal Settings",
+      target: label,
+      details: `${label} settings saved.`,
+    });
+    toast.success(`${label} saved`, {
+      description: "Your changes are stored locally (demo).",
+    });
+  };
+}
 
 function AdminSettingsPage() {
   return (
@@ -162,6 +174,9 @@ export function ToggleRow({
 /* ---------------- Security ---------------- */
 
 function SecuritySection() {
+  const { user } = useAuth();
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
+
   const { data: preferences } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
@@ -268,7 +283,7 @@ function SecuritySection() {
       >
         <div className="space-y-3">
           <ToggleRow
-            title="Authenticator app (TOTP)"
+            title="Authenticator app"
             description={
               preferences?.twoFactorAuth?.isTotpEnabled
                 ? "Active · Authenticator app enabled."
@@ -288,21 +303,6 @@ function SecuritySection() {
                 { security: { emailOtpEnabled: checked } },
                 {
                   onSuccess: () => toast.success("Email verification preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
-                },
-              );
-            }}
-          />
-          <ToggleRow
-            title="Two-factor sign-in requirement"
-            description="Require secondary verification when logging in to your account."
-            icon={ShieldCheck}
-            checked={preferences?.security?.twoFactorEnabled ?? false}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { twoFactorEnabled: checked } },
-                {
-                  onSuccess: () => toast.success("Two-factor sign-in requirement updated."),
                   onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
                 },
               );
@@ -388,40 +388,6 @@ function SecuritySection() {
         </SettingCard>
       )}
       </div>
-      <SettingCard title="Workspace access & privacy" description="Organization-wide policies.">
-        <div className="space-y-3">
-          <ToggleRow
-            title="Require 2FA for all admins"
-            description="Force every admin and director to configure two-factor verification."
-            icon={ShieldAlert}
-            checked={workspace?.require2FaForAdmins ?? true}
-            onChange={(checked) => {
-              updateWorkspace.mutate(
-                { require2FaForAdmins: checked },
-                {
-                  onSuccess: () => toast.success("Workspace 2FA requirement updated."),
-                  onError: (err: any) => toast.error(err?.message || "Director privilege required."),
-                },
-              );
-            }}
-          />
-          <ToggleRow
-            title="Allow SSO sign-in"
-            description="Permit sign-in via enterprise identity providers (Google / Microsoft)."
-            icon={Key}
-            checked={workspace?.allowSsoSignIn ?? true}
-            onChange={(checked) => {
-              updateWorkspace.mutate(
-                { allowSsoSignIn: checked },
-                {
-                  onSuccess: () => toast.success("Workspace SSO policy updated."),
-                  onError: (err: any) => toast.error(err?.message || "Director privilege required."),
-                },
-              );
-            }}
-          />
-        </div>
-      </SettingCard>
 
       {/* 2FA Setup Modal */}
       <Dialog open={setupModalOpen} onOpenChange={setSetupModalOpen}>
@@ -548,54 +514,44 @@ export function ThemeSection() {
 /* ---------------- Notifications ---------------- */
 
 export function NotificationsSection() {
-  const { data: preferences } = useUserPreferencesQuery();
-  const updatePreferences = useUpdatePreferencesMutation();
-
-  const handleNotificationToggle = (
-    key: "email" | "push" | "marketing",
-    value: boolean,
-  ) => {
-    updatePreferences.mutate(
-      { notifications: { [key]: value } },
-      {
-        onSuccess: () => toast.success("Notification preferences updated."),
-        onError: (err: any) => toast.error(err?.message || "Failed to update notification settings."),
-      },
-    );
-  };
-
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <SettingCard title="Email notifications" description="Control what gets delivered to your inbox.">
+      <div className="flex justify-end">
+        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
+      </div>
+      <SettingCard title="Email notifications" description="What we email you about.">
         <div className="space-y-3">
-          <ToggleRow
-            title="Task assignments & reviews"
-            description="Notify me when tasks are assigned, requested, or reviewed."
-            icon={Mail}
-            checked={preferences?.notifications?.email ?? true}
-            onChange={(checked) => handleNotificationToggle("email", checked)}
-          />
-          <ToggleRow
-            title="Product & announcement updates"
-            description="Company notices and major workspace announcements."
-            icon={MessageSquare}
-            checked={preferences?.notifications?.marketing ?? true}
-            onChange={(checked) => handleNotificationToggle("marketing", checked)}
-          />
+          <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
+          <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
+          <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
+          {/* <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} /> */}
         </div>
       </SettingCard>
 
-      <SettingCard title="Push notifications" description="In-app alerts and desktop push.">
+      <SettingCard title="In-app notifications" description="What shows in your notification tray.">
         <div className="space-y-3">
-          <ToggleRow
-            title="Real-time push alerts"
-            description="Show alerts for task deadlines, mentions, and point awards."
-            icon={Bell}
-            checked={preferences?.notifications?.push ?? true}
-            onChange={(checked) => handleNotificationToggle("push", checked)}
-          />
+          <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
+          <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
+          <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
+          {/* <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked /> */}
         </div>
       </SettingCard>
+
+      <SettingCard title="Delivery schedule" description="Quiet hours and preferred delivery windows.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Quiet hours start</Label>
+            <Input type="time" defaultValue="22:00" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Quiet hours end</Label>
+            <Input type="time" defaultValue="07:00" />
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
+      </SettingCard>
+
+
     </div>
   );
 }
@@ -632,7 +588,7 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
     <div className="grid gap-6 lg:grid-cols-3">
       <SettingCard title="Avatar" description="Profile photo and visual identifier.">
         <div className="flex flex-col items-center gap-4">
-          <div className="grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-primary to-accent font-display text-3xl font-bold shadow-glow">
+          <div className="grid h-24 w-24 place-items-center rounded-full bg-linear-to-br from-primary to-accent font-display text-3xl font-bold shadow-glow">
             {avatar}
           </div>
           <div className="flex gap-2">
