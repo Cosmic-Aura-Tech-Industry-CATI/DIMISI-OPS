@@ -1,9 +1,19 @@
 /** Types for settings and preferences module. */
 
 export interface UserPreferencesNotifications {
-  email: boolean;
-  push: boolean;
-  marketing: boolean;
+  email?: boolean;
+  push?: boolean;
+  marketing?: boolean;
+  taskAssignments?: boolean;
+  reviewRequests?: boolean;
+  weeklyDigest?: boolean;
+  productUpdates?: boolean;
+  deadlineReminders?: boolean;
+  taskApprovals?: boolean;
+  pointsEarned?: boolean;
+  mentionsComments?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
 }
 
 export interface UserPreferencesSecurity {
