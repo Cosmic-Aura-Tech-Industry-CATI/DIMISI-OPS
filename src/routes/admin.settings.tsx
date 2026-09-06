@@ -514,26 +514,90 @@ export function ThemeSection() {
 /* ---------------- Notifications ---------------- */
 
 export function NotificationsSection() {
+  const { data: preferences } = useUserPreferencesQuery();
+  const updatePreferences = useUpdatePreferencesMutation();
+
+  const notifs = preferences?.notifications;
+
+  const handleToggle = (key: keyof NonNullable<typeof notifs>, value: boolean) => {
+    updatePreferences.mutate(
+      {
+        notifications: {
+          [key]: value,
+        },
+      },
+      {
+        onSuccess: () => toast.success("Notification preference updated."),
+        onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+      },
+    );
+  };
+
+  const handleQuietHoursChange = (field: "quietHoursStart" | "quietHoursEnd", value: string) => {
+    updatePreferences.mutate(
+      {
+        notifications: {
+          [field]: value,
+        },
+      },
+      {
+        onSuccess: () => toast.success("Delivery schedule updated."),
+        onError: (err: any) => toast.error(err?.message || "Failed to update delivery schedule."),
+      },
+    );
+  };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="flex justify-end">
-        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
-      </div>
+    <div className="grid gap-6 lg:grid-cols-2 items-start">
       <SettingCard title="Email notifications" description="What we email you about.">
         <div className="space-y-3">
-          <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
-          <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
-          <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
-          {/* <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} /> */}
+          <ToggleRow
+            title="Task assignments"
+            description="When a task is assigned to you or your team."
+            icon={Mail}
+            checked={notifs?.taskAssignments ?? true}
+            onChange={(checked) => handleToggle("taskAssignments", checked)}
+          />
+          <ToggleRow
+            title="Review requests"
+            description="New submissions waiting for approval."
+            icon={Mail}
+            checked={notifs?.reviewRequests ?? true}
+            onChange={(checked) => handleToggle("reviewRequests", checked)}
+          />
+          <ToggleRow
+            title="Weekly digest"
+            description="Summary of activity and performance every Monday."
+            icon={Mail}
+            checked={notifs?.weeklyDigest ?? false}
+            onChange={(checked) => handleToggle("weeklyDigest", checked)}
+          />
         </div>
       </SettingCard>
 
       <SettingCard title="In-app notifications" description="What shows in your notification tray.">
         <div className="space-y-3">
-          <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
-          <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
-          <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
-          {/* <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked /> */}
+          <ToggleRow
+            title="Deadline reminders"
+            description="24 hours before a task is due."
+            icon={Bell}
+            checked={notifs?.deadlineReminders ?? true}
+            onChange={(checked) => handleToggle("deadlineReminders", checked)}
+          />
+          <ToggleRow
+            title="Task approvals"
+            description="Approvals and rejections on submissions."
+            icon={Bell}
+            checked={notifs?.taskApprovals ?? true}
+            onChange={(checked) => handleToggle("taskApprovals", checked)}
+          />
+          <ToggleRow
+            title="Points earned"
+            description="When points are credited to an employee."
+            icon={Bell}
+            checked={notifs?.pointsEarned ?? true}
+            onChange={(checked) => handleToggle("pointsEarned", checked)}
+          />
         </div>
       </SettingCard>
 
@@ -541,17 +605,23 @@ export function NotificationsSection() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Quiet hours start</Label>
-            <Input type="time" defaultValue="22:00" />
+            <Input
+              type="time"
+              defaultValue={notifs?.quietHoursStart || "22:00"}
+              onBlur={(e) => handleQuietHoursChange("quietHoursStart", e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Quiet hours end</Label>
-            <Input type="time" defaultValue="07:00" />
+            <Input
+              type="time"
+              defaultValue={notifs?.quietHoursEnd || "07:00"}
+              onBlur={(e) => handleQuietHoursChange("quietHoursEnd", e.target.value)}
+            />
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
       </SettingCard>
-
-
     </div>
   );
 }

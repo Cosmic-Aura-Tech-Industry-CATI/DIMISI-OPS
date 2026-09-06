@@ -21,7 +21,21 @@ export const settingsService = {
       res ?? {
         userId: "",
         theme: "system",
-        notifications: { email: true, push: true, marketing: true },
+        notifications: {
+          email: true,
+          push: true,
+          marketing: true,
+          taskAssignments: true,
+          reviewRequests: true,
+          weeklyDigest: false,
+          productUpdates: false,
+          deadlineReminders: true,
+          taskApprovals: true,
+          pointsEarned: true,
+          mentionsComments: true,
+          quietHoursStart: "22:00",
+          quietHoursEnd: "07:00",
+        },
         security: { twoFactorEnabled: false, emailOtpEnabled: true, sessionTimeout: 30 },
         twoFactorAuth: { isTotpEnabled: false },
       }
