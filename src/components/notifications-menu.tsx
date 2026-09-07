@@ -67,10 +67,11 @@ export function NotificationsMenu() {
         const icon = noticeTypeMeta[n.type]?.icon || "📢";
         const headline = n.headline || n.title || "";
         const timeStr = n.createdAt ? shortTime(n.createdAt) : "Recently";
+        const content = n.content || "";
         return {
           id: `notice-${noticeId}`,
           title: `${icon} ${headline}`,
-          body: n.content.length > 90 ? `${n.content.slice(0, 90)}…` : n.content,
+          body: content.length > 90 ? `${content.slice(0, 90)}…` : content,
           time: timeStr,
           tone: n.priority === "urgent" || n.priority === "high" ? "warning" : "info",
           unread: !readNotices.includes(noticeId),

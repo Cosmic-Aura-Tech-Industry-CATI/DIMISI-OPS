@@ -124,6 +124,7 @@ function EmployeesPage() {
 
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
+  const [role, setRole] = useState("all");
   const [status, setStatus] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -134,6 +135,7 @@ function EmployeesPage() {
     const q = query.trim().toLowerCase();
     const list = all.filter((e) => {
       if (dept !== "all" && e.department !== dept) return false;
+      if (role !== "all" && e.jobTitle !== role) return false;
       if (status !== "all" && e.status !== status) return false;
       if (!q) return true;
       return (
@@ -170,6 +172,7 @@ function EmployeesPage() {
   const clearFilters = () => {
     setQuery("");
     setDept("all");
+    setRole("all");
     setStatus("all");
     setPage(1);
   };
