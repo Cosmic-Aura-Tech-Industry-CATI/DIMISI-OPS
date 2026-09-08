@@ -10,17 +10,13 @@ import type {
   UpdateProfilePayload,
   UpdateWorkspaceSettingsPayload,
   UserPreferences,
-<<<<<<< Updated upstream
   UserSession,
-=======
->>>>>>> Stashed changes
   Verify2FaResponse,
   WorkspaceSettings,
 } from "../types";
 
 export const settingsService = {
   getPreferences: async (): Promise<UserPreferences> => {
-<<<<<<< Updated upstream
     const res = await http.get<{ preferences?: UserPreferences } | UserPreferences>(
       API_ENDPOINTS.settings.preferences,
     );
@@ -33,7 +29,11 @@ export const settingsService = {
         deliverySchedule: { quietHoursStart: "22:00", quietHoursEnd: "07:00" },
       },
       security: {
-        twoFactor: { authenticatorApp: false, emailVerification: true, isAuthenticatorVerified: false },
+        twoFactor: {
+          authenticatorApp: false,
+          emailVerification: true,
+          isAuthenticatorVerified: false,
+        },
       },
     };
 
@@ -97,26 +97,16 @@ export const settingsService = {
         theme: "dark",
         notifications: {},
         security: {},
-=======
-    const res = await http.get<UserPreferences>(API_ENDPOINTS.settings.preferences);
-    return (
-      res ?? {
-        userId: "",
-        theme: "system",
-        notifications: { email: true, push: true, marketing: true },
-        security: { twoFactorEnabled: false, emailOtpEnabled: true, sessionTimeout: 30 },
-        twoFactorAuth: { isTotpEnabled: false },
->>>>>>> Stashed changes
       }
     );
   },
 
-<<<<<<< Updated upstream
   getWorkspace: async (): Promise<WorkspaceSettings> => {
     const res = await http.get<{ workspaceSettings?: WorkspaceSettings } | WorkspaceSettings>(
       API_ENDPOINTS.settings.workspace,
     );
-    const data = res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
+    const data =
+      res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
     return data ?? { require2FaForAdmins: false, allowSsoSignIn: true };
   },
 
@@ -125,7 +115,8 @@ export const settingsService = {
       API_ENDPOINTS.settings.workspace,
       payload,
     );
-    const data = res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
+    const data =
+      res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
     return data ?? { require2FaForAdmins: false, allowSsoSignIn: true };
   },
 
@@ -149,73 +140,34 @@ export const settingsService = {
     return res ?? {};
   },
 
-  checkPassword: async (payload: CheckPasswordPayload): Promise<{ message: string; email?: string }> => {
+  checkPassword: async (
+    payload: CheckPasswordPayload,
+  ): Promise<{ message: string; email?: string }> => {
     const res = await http.post<{ message: string; email?: string }>(
       API_ENDPOINTS.settings.checkPassword,
       { currentPassword: payload.currentPassword || payload.password },
     );
-=======
-  updatePreferences: async (payload: UpdatePreferencesPayload): Promise<UserPreferences> => {
-    const res = await http.patch<UserPreferences>(API_ENDPOINTS.settings.preferences, payload);
-    return res;
-  },
-
-  getWorkspace: async (): Promise<WorkspaceSettings> => {
-    const res = await http.get<WorkspaceSettings>(API_ENDPOINTS.settings.workspace);
-    return res ?? { require2FaForAdmins: false, allowSsoSignIn: true };
-  },
-
-  updateWorkspace: async (payload: UpdateWorkspaceSettingsPayload): Promise<WorkspaceSettings> => {
-    const res = await http.patch<WorkspaceSettings>(API_ENDPOINTS.settings.workspace, payload);
-    return res;
-  },
-
-  setup2Fa: async (): Promise<Setup2FaResponse> => {
-    const res = await http.post<Setup2FaResponse>(API_ENDPOINTS.settings.setup2Fa);
-    return res;
-  },
-
-  verify2Fa: async (token: string): Promise<Verify2FaResponse> => {
-    const res = await http.post<Verify2FaResponse>(API_ENDPOINTS.settings.verify2Fa, { token });
-    return res ?? {};
-  },
-
-  checkPassword: async (payload: CheckPasswordPayload): Promise<{ message: string }> => {
-    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.checkPassword, payload);
->>>>>>> Stashed changes
     return res;
   },
 
   updatePassword: async (payload: UpdatePasswordPayload): Promise<{ message: string }> => {
-<<<<<<< Updated upstream
-    const res = await http.post<{ message: string }>(
-      API_ENDPOINTS.settings.updatePassword,
-      {
-        otp: payload.otp,
-        newPassword: payload.newPassword,
-        refreshToken: payload.refreshToken,
-      },
-    );
-=======
-    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, payload);
->>>>>>> Stashed changes
+    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, {
+      otp: payload.otp,
+      newPassword: payload.newPassword,
+      refreshToken: payload.refreshToken,
+    });
     return res;
   },
 
   updateProfile: async (payload: UpdateProfilePayload): Promise<any> => {
-<<<<<<< Updated upstream
     const res = await http.patch<any>(API_ENDPOINTS.settings.profile, {
       phone: payload.phone,
       avatar: payload.avatar || payload.avtar,
     });
-=======
-    const res = await http.patch<any>(API_ENDPOINTS.settings.profile, payload);
->>>>>>> Stashed changes
     return res;
   },
 
   getSessions: async (): Promise<SessionsData> => {
-<<<<<<< Updated upstream
     const res = await http.get<{ sessions?: UserSession[] } | UserSession[]>(
       API_ENDPOINTS.settings.sessions,
     );
@@ -232,10 +184,6 @@ export const settingsService = {
       currentSession: normalizedSessions[0],
       otherSessions: normalizedSessions.slice(1),
     };
-=======
-    const res = await http.get<SessionsData>(API_ENDPOINTS.settings.sessions);
-    return res ?? { otherSessions: [] };
->>>>>>> Stashed changes
   },
 
   revokeOtherSessions: async (): Promise<{ message: string }> => {

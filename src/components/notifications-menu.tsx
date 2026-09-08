@@ -77,7 +77,12 @@ export function NotificationsMenu() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-md" aria-label="Notifications">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative rounded-md"
+          aria-label="Notifications"
+        >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
             <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground shadow-glow">
@@ -111,7 +116,9 @@ export function NotificationsMenu() {
         </div>
         <ScrollArea className="max-h-[55vh] sm:max-h-80">
           {notifications.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">You're all caught up.</p>
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">
+              You're all caught up.
+            </p>
           ) : (
             <ul className="divide-y divide-border/60">
               {notifications.map((n) => (
@@ -123,13 +130,20 @@ export function NotificationsMenu() {
                     n.unread && "bg-primary/[0.03]",
                   )}
                 >
-                  <div className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg", toneStyles[n.tone])}>
+                  <div
+                    className={cn(
+                      "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                      toneStyles[n.tone],
+                    )}
+                  >
                     <Bell className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
                       <p className="min-w-0 break-words text-sm font-medium">{n.title}</p>
-                      <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">{n.time}</span>
+                      <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
+                        {n.time}
+                      </span>
                     </div>
                     <p className="mt-0.5 break-words text-xs text-muted-foreground">{n.body}</p>
                   </div>

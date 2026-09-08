@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-<<<<<<< Updated upstream
 import { Bell, Key, Monitor, Palette, Trash2, UserCircle } from "lucide-react";
-=======
-import { Bell, Key, Monitor, Palette, UserCircle } from "lucide-react";
->>>>>>> Stashed changes
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -15,30 +11,30 @@ import {
 } from "./admin.settings";
 import { ChangePasswordCard } from "@/components/change-password-card";
 import {
-<<<<<<< Updated upstream
   useRevokeOtherSessionsMutation,
   useRevokeSessionMutation,
   useSessionsQuery,
-=======
->>>>>>> Stashed changes
   useUpdatePreferencesMutation,
   useUserPreferencesQuery,
 } from "@/features/settings";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-<<<<<<< Updated upstream
-=======
 import { logAudit } from "@/lib/audit-log";
->>>>>>> Stashed changes
 
 export const Route = createFileRoute("/employee/settings")({
   head: () => ({
     meta: [
       { title: "Settings — Dimisi Operations" },
-      { name: "description", content: "Manage your profile, preferences, theme, password, and notifications." },
+      {
+        name: "description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
       { property: "og:title", content: "Settings — Dimisi Operations" },
-      { property: "og:description", content: "Manage your profile, preferences, theme, password, and notifications." },
+      {
+        property: "og:description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
     ],
   }),
   component: EmployeeSettingsPage,
@@ -65,16 +61,36 @@ function EmployeeSettingsPage() {
 
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="profile"><UserCircle className="mr-1.5 h-3.5 w-3.5" />Profile</TabsTrigger>
-          <TabsTrigger value="password"><Key className="mr-1.5 h-3.5 w-3.5" />Password</TabsTrigger>
-          <TabsTrigger value="notifications"><Bell className="mr-1.5 h-3.5 w-3.5" />Notifications</TabsTrigger>
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
+          <TabsTrigger value="profile">
+            <UserCircle className="mr-1.5 h-3.5 w-3.5" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="password">
+            <Key className="mr-1.5 h-3.5 w-3.5" />
+            Password
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-1.5 h-3.5 w-3.5" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="theme">
+            <Palette className="mr-1.5 h-3.5 w-3.5" />
+            Theme
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile"><ProfileSection role="employee" /></TabsContent>
-        <TabsContent value="password"><PasswordSection /></TabsContent>
-        <TabsContent value="notifications"><NotificationsSection /></TabsContent>
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
+        <TabsContent value="profile">
+          <ProfileSection role="employee" />
+        </TabsContent>
+        <TabsContent value="password">
+          <PasswordSection />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="theme">
+          <ThemeSection />
+        </TabsContent>
       </Tabs>
     </>
   );
@@ -84,7 +100,6 @@ function PasswordSection() {
   const { data: preferences } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
-<<<<<<< Updated upstream
   const { data: sessionsData } = useSessionsQuery();
   const revokeSession = useRevokeSessionMutation();
   const revokeOtherSessions = useRevokeOtherSessionsMutation();
@@ -117,8 +132,6 @@ function PasswordSection() {
     preferences?.security?.emailOtpEnabled ??
     true;
 
-=======
->>>>>>> Stashed changes
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
@@ -134,41 +147,18 @@ function PasswordSection() {
           <ToggleRow
             title="Email verification on sign-in"
             description="Send an email OTP code to verify new sign-ins."
-<<<<<<< Updated upstream
             checked={isEmailVerificationEnabled}
             onChange={(checked) => {
               updatePreferences.mutate(
                 { security: { twoFactor: { emailVerification: checked } } },
-=======
-            checked={preferences?.security?.emailOtpEnabled ?? true}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { emailOtpEnabled: checked } },
->>>>>>> Stashed changes
                 {
                   onSuccess: () => toast.success("Sign-in security preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                  onError: (err: any) =>
+                    toast.error(err?.message || "Failed to update preference."),
                 },
               );
             }}
           />
-<<<<<<< Updated upstream
-=======
-          <ToggleRow
-            title="Two-factor authentication requirement"
-            description="Require 2FA authentication when accessing the employee portal."
-            checked={preferences?.security?.twoFactorEnabled ?? false}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { twoFactorEnabled: checked } },
-                {
-                  onSuccess: () => toast.success("2FA preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
-                },
-              );
-            }}
-          />
->>>>>>> Stashed changes
         </div>
       </SettingCard>
 
@@ -176,7 +166,6 @@ function PasswordSection() {
         title="Sessions"
         description="Devices currently signed in to your account."
         actions={
-<<<<<<< Updated upstream
           allSessions.length > 1 ? (
             <Button
               variant="outline"
@@ -205,7 +194,10 @@ function PasswordSection() {
                       {s.device || s.browser || "Active Device"}
                       {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
                       {s.current && (
-                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                        <Badge
+                          variant="outline"
+                          className="border-primary/30 bg-primary/10 text-primary"
+                        >
                           Current
                         </Badge>
                       )}
@@ -236,44 +228,6 @@ function PasswordSection() {
             ))}
           </ul>
         )}
-=======
-          <Button variant="outline" size="sm" className="rounded-md">
-            Sign out all
-          </Button>
-        }
-      >
-        <ul className="divide-y divide-border/60">
-          {[
-            { device: "MacBook Pro · Chrome", location: "San Francisco, US", when: "Active now", current: true },
-            { device: "iPhone 15 · Safari", location: "San Francisco, US", when: "2h ago" },
-            { device: "Windows · Edge", location: "Austin, US", when: "3d ago" },
-          ].map((s) => (
-            <li key={s.device} className="flex items-center justify-between gap-3 py-3">
-              <div className="flex items-center gap-3">
-                <Monitor className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {s.device}
-                    {s.current && (
-                      <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                        Current
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {s.location} · {s.when}
-                  </p>
-                </div>
-              </div>
-              {!s.current && (
-                <Button variant="ghost" size="sm">
-                  Revoke
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
->>>>>>> Stashed changes
       </SettingCard>
     </div>
   );

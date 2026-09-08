@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-<<<<<<< Updated upstream
 import { CheckCircle2, TrendingUp, Trophy, Users } from "lucide-react";
-=======
-import { CheckCircle2, Trophy, Users } from "lucide-react";
->>>>>>> Stashed changes
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,9 +25,15 @@ export const Route = createFileRoute("/admin/reports")({
   head: () => ({
     meta: [
       { title: "Reports — Dimisi Operations" },
-      { name: "description", content: "Deep analytics across employees, tasks, projects, and departments." },
+      {
+        name: "description",
+        content: "Deep analytics across employees, tasks, projects, and departments.",
+      },
       { property: "og:title", content: "Reports — Dimisi Operations" },
-      { property: "og:description", content: "Deep analytics across employees, tasks, projects, and departments." },
+      {
+        property: "og:description",
+        content: "Deep analytics across employees, tasks, projects, and departments.",
+      },
     ],
   }),
   component: ReportsPage,

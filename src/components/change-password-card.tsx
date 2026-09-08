@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Key,
-  Mail,
-  RotateCcw,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Key, Mail, RotateCcw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -150,23 +143,14 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-<<<<<<< Updated upstream
       const res = await checkPasswordMutation.mutateAsync({ currentPassword: current });
-=======
-      await checkPasswordMutation.mutateAsync({ password: current });
-      await sendPasswordOtp(email);
->>>>>>> Stashed changes
       setCode("");
       setOtpError("");
       setLocked(false);
       setAttemptsLeft(OTP_MAX_ATTEMPTS);
       setSeconds(OTP_RESEND_SECONDS);
       setStep("otp");
-<<<<<<< Updated upstream
       toast.success(res?.message || "Verification code sent", {
-=======
-      toast.success("Verification code sent", {
->>>>>>> Stashed changes
         description: `We emailed a 6-digit code to ${email}.`,
       });
     } catch (err: any) {
@@ -235,24 +219,20 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-<<<<<<< Updated upstream
       const res = await updatePasswordMutation.mutateAsync({
-=======
-      await updatePasswordMutation.mutateAsync({
->>>>>>> Stashed changes
         currentPassword: current,
         newPassword: next,
         otp: code,
       });
       updatePassword(email, next);
       await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
+      audit(
+        "Password Changed",
+        portal,
+        "Password updated after email OTP verification. Status: Success",
+      );
       setStep("done");
-<<<<<<< Updated upstream
       toast.success(res?.message || "Password changed successfully", {
-=======
-      toast.success("Password changed successfully", {
->>>>>>> Stashed changes
         description: "Please sign in again with your new password.",
       });
       setTimeout(() => {
@@ -260,24 +240,9 @@ export function ChangePasswordCard({
         void navigate({ to: "/login" });
       }, 2600);
     } catch (err: any) {
-<<<<<<< Updated upstream
       const msg = err?.message || "Failed to update password. Please check your OTP code.";
       setError(msg);
       toast.error(msg);
-=======
-      // Fallback local update if offline
-      updatePassword(email, next);
-      await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated locally.");
-      setStep("done");
-      toast.success("Password changed successfully", {
-        description: "Please sign in again with your new password.",
-      });
-      setTimeout(() => {
-        logout();
-        void navigate({ to: "/login" });
-      }, 2600);
->>>>>>> Stashed changes
     } finally {
       setBusy(false);
     }
@@ -318,11 +283,7 @@ export function ChangePasswordCard({
       description={description}
       actions={
         step === "current" ? (
-          <Button
-            className="rounded-md"
-            onClick={() => void continueFromCurrent()}
-            disabled={busy}
-          >
+          <Button className="rounded-md" onClick={() => void continueFromCurrent()} disabled={busy}>
             <Key className="mr-1.5 h-4 w-4" />
             {busy ? "Sending code…" : "Continue"}
           </Button>
@@ -348,7 +309,6 @@ export function ChangePasswordCard({
               Forgot current password?
             </button>
           </div>
-
 
           {error && (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -436,7 +396,8 @@ export function ChangePasswordCard({
             </p>
           ) : (
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              The code expires in 5 minutes. {attemptsLeft} of {OTP_MAX_ATTEMPTS} attempts remaining.
+              The code expires in 5 minutes. {attemptsLeft} of {OTP_MAX_ATTEMPTS} attempts
+              remaining.
             </p>
           )}
 
@@ -446,7 +407,9 @@ export function ChangePasswordCard({
             disabled={busy || locked || code.length !== OTP_LENGTH}
             className="mt-6 h-11 w-full rounded-md text-sm shadow-glow"
           >
-            {busy ? "Verifying…" : (
+            {busy ? (
+              "Verifying…"
+            ) : (
               <span className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> Verify OTP
               </span>

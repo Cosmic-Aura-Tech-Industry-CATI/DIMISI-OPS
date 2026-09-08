@@ -1,6 +1,5 @@
 /** Types for settings and preferences module. */
 
-<<<<<<< Updated upstream
 export interface EmailNotifications {
   taskAssignments?: boolean;
   reviewRequests?: boolean;
@@ -45,18 +44,6 @@ export interface UserPreferencesSecurity {
   twoFactorEnabled?: boolean;
   emailOtpEnabled?: boolean;
   sessionTimeout?: number;
-=======
-export interface UserPreferencesNotifications {
-  email: boolean;
-  push: boolean;
-  marketing: boolean;
-}
-
-export interface UserPreferencesSecurity {
-  twoFactorEnabled: boolean;
-  emailOtpEnabled: boolean;
-  sessionTimeout: number;
->>>>>>> Stashed changes
 }
 
 export interface UserPreferencesTwoFactorAuth {
@@ -70,16 +57,11 @@ export interface UserPreferences {
   theme: "light" | "dark" | "system";
   notifications: UserPreferencesNotifications;
   security: UserPreferencesSecurity;
-<<<<<<< Updated upstream
   twoFactorAuth?: UserPreferencesTwoFactorAuth;
-=======
-  twoFactorAuth: UserPreferencesTwoFactorAuth;
->>>>>>> Stashed changes
 }
 
 export interface UpdatePreferencesPayload {
   theme?: "light" | "dark" | "system";
-<<<<<<< Updated upstream
   notifications?: {
     email?: Partial<EmailNotifications>;
     inApp?: Partial<InAppNotifications>;
@@ -91,10 +73,6 @@ export interface UpdatePreferencesPayload {
     emailOtpEnabled?: boolean;
     twoFactorEnabled?: boolean;
   };
-=======
-  notifications?: Partial<UserPreferencesNotifications>;
-  security?: Partial<UserPreferencesSecurity>;
->>>>>>> Stashed changes
 }
 
 export interface WorkspaceSettings {
@@ -110,7 +88,6 @@ export interface UpdateWorkspaceSettingsPayload {
 }
 
 export interface UserSession {
-<<<<<<< Updated upstream
   _id?: string;
   id?: string;
   ipAddress: string;
@@ -119,22 +96,13 @@ export interface UserSession {
     browser?: string;
     device?: string;
   };
-=======
-  id: string;
-  ipAddress: string;
->>>>>>> Stashed changes
   device?: string;
   browser?: string;
   os?: string;
   location?: string;
-<<<<<<< Updated upstream
   lastActive?: string | Date;
   createdAt?: string | Date;
   current?: boolean;
-=======
-  lastActive: string | Date;
-  createdAt: string | Date;
->>>>>>> Stashed changes
 }
 
 export interface SessionsData {
@@ -143,16 +111,12 @@ export interface SessionsData {
 }
 
 export interface Setup2FaResponse {
-<<<<<<< Updated upstream
   qrCode: string;
-=======
->>>>>>> Stashed changes
   qrCodeUrl: string;
   secret: string;
 }
 
 export interface Verify2FaResponse {
-<<<<<<< Updated upstream
   preferences?: UserPreferences;
   recoveryCodes?: string[];
   message?: string;
@@ -168,26 +132,10 @@ export interface UpdatePasswordPayload {
   newPassword: string;
   currentPassword?: string;
   refreshToken?: string;
-=======
-  recoveryCodes?: string[];
-}
-
-export interface CheckPasswordPayload {
-  password: string;
-}
-
-export interface UpdatePasswordPayload {
-  currentPassword: string;
-  newPassword: string;
-  otp?: string;
->>>>>>> Stashed changes
 }
 
 export interface UpdateProfilePayload {
   phone?: string;
   avatar?: string;
-<<<<<<< Updated upstream
   avtar?: string;
-=======
->>>>>>> Stashed changes
 }

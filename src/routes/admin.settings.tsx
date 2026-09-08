@@ -57,9 +57,15 @@ export const Route = createFileRoute("/admin/settings")({
   head: () => ({
     meta: [
       { title: "Settings — Dimisi Operations" },
-      { name: "description", content: "Configure security, appearance, and notification preferences." },
+      {
+        name: "description",
+        content: "Configure security, appearance, and notification preferences.",
+      },
       { property: "og:title", content: "Settings — Dimisi Operations" },
-      { property: "og:description", content: "Configure security, appearance, and notification preferences." },
+      {
+        property: "og:description",
+        content: "Configure security, appearance, and notification preferences.",
+      },
     ],
   }),
   component: AdminSettingsPage,
@@ -86,16 +92,36 @@ function AdminSettingsPage() {
 
       <Tabs defaultValue="security" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="security"><Shield className="mr-1.5 h-3.5 w-3.5" />Security</TabsTrigger>
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
-          <TabsTrigger value="notifications"><Bell className="mr-1.5 h-3.5 w-3.5" />Notifications</TabsTrigger>
-          <TabsTrigger value="profile"><UserCircle className="mr-1.5 h-3.5 w-3.5" />Profile</TabsTrigger>
+          <TabsTrigger value="security">
+            <Shield className="mr-1.5 h-3.5 w-3.5" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="theme">
+            <Palette className="mr-1.5 h-3.5 w-3.5" />
+            Theme
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-1.5 h-3.5 w-3.5" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="profile">
+            <UserCircle className="mr-1.5 h-3.5 w-3.5" />
+            Profile
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="security"><SecuritySection /></TabsContent>
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
-        <TabsContent value="notifications"><NotificationsSection /></TabsContent>
-        <TabsContent value="profile"><ProfileSection role="admin" /></TabsContent>
+        <TabsContent value="security">
+          <SecuritySection />
+        </TabsContent>
+        <TabsContent value="theme">
+          <ThemeSection />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="profile">
+          <ProfileSection role="admin" />
+        </TabsContent>
       </Tabs>
     </>
   );
@@ -199,11 +225,7 @@ function SecuritySection() {
   const handleStartTotpSetup = async () => {
     try {
       const res = await setup2Fa.mutateAsync();
-<<<<<<< Updated upstream
       setQrCodeUrl(res.qrCodeUrl || res.qrCode);
-=======
-      setQrCodeUrl(res.qrCodeUrl);
->>>>>>> Stashed changes
       setTotpSecret(res.secret);
       setRecoveryCodes([]);
       setTotpToken("");
@@ -223,11 +245,8 @@ function SecuritySection() {
       const res = await verify2Fa.mutateAsync(totpToken);
       if (res.recoveryCodes && res.recoveryCodes.length > 0) {
         setRecoveryCodes(res.recoveryCodes);
-<<<<<<< Updated upstream
       } else {
         setSetupModalOpen(false);
-=======
->>>>>>> Stashed changes
       }
       toast.success("Two-factor authentication enabled successfully!");
     } catch (err: any) {
@@ -260,11 +279,10 @@ function SecuritySection() {
     ...(sessionsData?.otherSessions || []).map((s) => ({ ...s, current: false })),
   ];
 
-<<<<<<< Updated upstream
   const isTotpConfigured = Boolean(
     preferences?.twoFactorAuth?.isTotpEnabled ||
     preferences?.security?.twoFactor?.authenticatorApp ||
-    preferences?.security?.twoFactor?.isAuthenticatorVerified
+    preferences?.security?.twoFactor?.isAuthenticatorVerified,
   );
 
   const isEmailOtpEnabled =
@@ -320,7 +338,8 @@ function SecuritySection() {
                   { security: { twoFactor: { emailVerification: checked } } },
                   {
                     onSuccess: () => toast.success("Email verification preference updated."),
-                    onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                    onError: (err: any) =>
+                      toast.error(err?.message || "Failed to update preference."),
                   },
                 );
               }}
@@ -360,7 +379,10 @@ function SecuritySection() {
                         {s.device || s.browser || "Active Device"}
                         {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
                         {s.current && (
-                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                          <Badge
+                            variant="outline"
+                            className="border-primary/30 bg-primary/10 text-primary"
+                          >
                             Current
                           </Badge>
                         )}
@@ -394,10 +416,7 @@ function SecuritySection() {
         </SettingCard>
 
         {isDirector && (
-          <SettingCard
-            title="Access & privacy"
-            description="Workspace-level access controls."
-          >
+          <SettingCard title="Access & privacy" description="Workspace-level access controls.">
             <div className="space-y-3">
               <ToggleRow
                 title="Allow SSO sign-in"
@@ -408,8 +427,9 @@ function SecuritySection() {
                     { allowSsoSignIn: checked },
                     {
                       onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
-                    }
+                      onError: (err: any) =>
+                        toast.error(err?.message || "Failed to update workspace setting."),
+                    },
                   );
                 }}
               />
@@ -422,154 +442,16 @@ function SecuritySection() {
                     { require2FaForAdmins: checked },
                     {
                       onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
-                    }
+                      onError: (err: any) =>
+                        toast.error(err?.message || "Failed to update workspace setting."),
+                    },
                   );
                 }}
               />
             </div>
-=======
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-      <ChangePasswordCard
-        wrapper={(p) => (
-          <SettingCard title={p.title} description={p.description} actions={p.actions}>
-            {p.children}
->>>>>>> Stashed changes
           </SettingCard>
         )}
       </div>
-
-<<<<<<< Updated upstream
-=======
-      <SettingCard
-        title="Two-factor authentication"
-        description="Add an extra layer of protection to your account."
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-md"
-            onClick={handleStartTotpSetup}
-            disabled={setup2Fa.isPending}
-          >
-            <QrCode className="mr-1.5 h-3.5 w-3.5" /> Setup App
-          </Button>
-        }
-      >
-        <div className="space-y-3">
-          <ToggleRow
-            title="Authenticator app"
-            description={
-              preferences?.twoFactorAuth?.isTotpEnabled
-                ? "Active · Authenticator app enabled."
-                : "Not configured · Scan QR to link."
-            }
-            icon={Smartphone}
-            checked={Boolean(preferences?.twoFactorAuth?.isTotpEnabled)}
-            disabled
-          />
-          <ToggleRow
-            title="Email verification"
-            description="Confirm sign-ins and sensitive changes via one-time email OTP."
-            icon={Mail}
-            checked={preferences?.security?.emailOtpEnabled ?? true}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { emailOtpEnabled: checked } },
-                {
-                  onSuccess: () => toast.success("Email verification preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
-                },
-              );
-            }}
-          />
-        </div>
-      </SettingCard>
-
-      <SettingCard
-        title="Active sessions"
-        description="Devices currently signed in to your account."
-        actions={
-          allSessions.length > 1 ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-md text-destructive hover:bg-destructive/10"
-              onClick={handleRevokeAllOtherSessions}
-              disabled={revokeOtherSessions.isPending}
-            >
-              Sign out all others
-            </Button>
-          ) : undefined
-        }
-      >
-        {allSessions.length === 0 ? (
-          <div className="py-6 text-center text-xs text-muted-foreground">
-            No active session records found
-          </div>
-        ) : (
-          <ul className="divide-y divide-border/60">
-            {allSessions.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="flex items-center gap-3">
-                  <Monitor className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      {s.device || s.browser || "Active Device"}
-                      {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
-                      {s.current && (
-                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                          Current
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {s.location || s.ipAddress || "Localhost"} ·{" "}
-                      {s.lastActive
-                        ? new Date(s.lastActive).toLocaleString(undefined, {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
-                        : "Active now"}
-                    </p>
-                  </div>
-                </div>
-                {!s.current && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRevokeSession(s.id)}
-                    disabled={revokeSession.isPending}
-                  >
-                    <Trash2 className="mr-1 h-3 w-3" /> Revoke
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SettingCard>
-
-      {isDirector && (
-        <SettingCard
-          title="Access & privacy"
-          description="Workspace-level access controls."
-        >
-          <div className="space-y-3">
-            <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
-            <ToggleRow title="Require 2FA for all admins" description="Force every admin to enable two-factor sign-in." defaultChecked />
-          </div>
-        </SettingCard>
-      )}
-      </div>
-
->>>>>>> Stashed changes
       {/* 2FA Setup Modal */}
       <Dialog open={setupModalOpen} onOpenChange={setSetupModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -590,7 +472,9 @@ function SecuritySection() {
               </div>
               <div className="grid grid-cols-2 gap-2 font-mono text-xs bg-muted p-3 rounded-lg">
                 {recoveryCodes.map((c, i) => (
-                  <div key={i} className="p-1">{c}</div>
+                  <div key={i} className="p-1">
+                    {c}
+                  </div>
                 ))}
               </div>
               <Button className="w-full" onClick={() => setSetupModalOpen(false)}>
@@ -653,7 +537,10 @@ export function ThemeSection() {
 
   return (
     <div className="grid gap-6">
-      <SettingCard title="Appearance" description="Choose how Dimisi Operations looks on this device.">
+      <SettingCard
+        title="Appearance"
+        description="Choose how Dimisi Operations looks on this device."
+      >
         <div className="grid grid-cols-2 gap-4 sm:max-w-md">
           {options.map((o) => {
             const active = theme === o.value;
@@ -672,7 +559,9 @@ export function ThemeSection() {
                 <div
                   className={cn(
                     "mb-3 grid h-10 w-10 place-items-center rounded-lg",
-                    active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -702,7 +591,10 @@ export function NotificationsSection() {
   const inAppNotifs = preferences?.notifications?.inApp;
   const schedule = preferences?.notifications?.deliverySchedule;
 
-  const handleEmailToggle = (key: "taskAssignments" | "reviewRequests" | "weeklyDigest", value: boolean) => {
+  const handleEmailToggle = (
+    key: "taskAssignments" | "reviewRequests" | "weeklyDigest",
+    value: boolean,
+  ) => {
     updatePreferences.mutate(
       {
         notifications: {
@@ -718,7 +610,10 @@ export function NotificationsSection() {
     );
   };
 
-  const handleInAppToggle = (key: "deadlineReminders" | "taskApprovals" | "pointsEarned", value: boolean) => {
+  const handleInAppToggle = (
+    key: "deadlineReminders" | "taskApprovals" | "pointsEarned",
+    value: boolean,
+  ) => {
     updatePreferences.mutate(
       {
         notifications: {
@@ -751,7 +646,6 @@ export function NotificationsSection() {
   };
 
   return (
-<<<<<<< Updated upstream
     <div className="grid gap-6 lg:grid-cols-2 items-start">
       <SettingCard title="Email notifications" description="What we email you about.">
         <div className="space-y-3">
@@ -759,14 +653,18 @@ export function NotificationsSection() {
             title="Task assignments"
             description="When a task is assigned to you or your team."
             icon={Mail}
-            checked={emailNotifs?.taskAssignments ?? preferences?.notifications?.taskAssignments ?? true}
+            checked={
+              emailNotifs?.taskAssignments ?? preferences?.notifications?.taskAssignments ?? true
+            }
             onChange={(checked) => handleEmailToggle("taskAssignments", checked)}
           />
           <ToggleRow
             title="Review requests"
             description="New submissions waiting for approval."
             icon={Mail}
-            checked={emailNotifs?.reviewRequests ?? preferences?.notifications?.reviewRequests ?? true}
+            checked={
+              emailNotifs?.reviewRequests ?? preferences?.notifications?.reviewRequests ?? true
+            }
             onChange={(checked) => handleEmailToggle("reviewRequests", checked)}
           />
           <ToggleRow
@@ -776,36 +674,29 @@ export function NotificationsSection() {
             checked={emailNotifs?.weeklyDigest ?? preferences?.notifications?.weeklyDigest ?? false}
             onChange={(checked) => handleEmailToggle("weeklyDigest", checked)}
           />
-=======
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="flex justify-end">
-        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
-      </div>
-      <SettingCard title="Email notifications" description="What we email you about.">
-        <div className="space-y-3">
-          <ToggleRow title="Task assignments" description="When a task is assigned to you or your team." icon={Mail} defaultChecked />
-          <ToggleRow title="Review requests" description="New submissions waiting for approval." icon={Mail} defaultChecked />
-          <ToggleRow title="Weekly digest" description="Summary of activity and performance every Monday." icon={Mail} />
-          {/* <ToggleRow title="Product updates" description="New features and improvements." icon={Mail} /> */}
->>>>>>> Stashed changes
         </div>
       </SettingCard>
 
       <SettingCard title="In-app notifications" description="What shows in your notification tray.">
         <div className="space-y-3">
-<<<<<<< Updated upstream
           <ToggleRow
             title="Deadline reminders"
             description="24 hours before a task is due."
             icon={Bell}
-            checked={inAppNotifs?.deadlineReminders ?? preferences?.notifications?.deadlineReminders ?? true}
+            checked={
+              inAppNotifs?.deadlineReminders ??
+              preferences?.notifications?.deadlineReminders ??
+              true
+            }
             onChange={(checked) => handleInAppToggle("deadlineReminders", checked)}
           />
           <ToggleRow
             title="Task approvals"
             description="Approvals and rejections on submissions."
             icon={Bell}
-            checked={inAppNotifs?.taskApprovals ?? preferences?.notifications?.taskApprovals ?? true}
+            checked={
+              inAppNotifs?.taskApprovals ?? preferences?.notifications?.taskApprovals ?? true
+            }
             onChange={(checked) => handleInAppToggle("taskApprovals", checked)}
           />
           <ToggleRow
@@ -815,22 +706,21 @@ export function NotificationsSection() {
             checked={inAppNotifs?.pointsEarned ?? preferences?.notifications?.pointsEarned ?? true}
             onChange={(checked) => handleInAppToggle("pointsEarned", checked)}
           />
-=======
-          <ToggleRow title="Deadline reminders" description="24 hours before a task is due." icon={Bell} defaultChecked />
-          <ToggleRow title="Task approvals" description="Approvals and rejections on submissions." icon={Bell} defaultChecked />
-          <ToggleRow title="Points earned" description="When points are credited to an employee." icon={Bell} defaultChecked />
-          {/* <ToggleRow title="Mentions & comments" description="When someone mentions you in a task." icon={Bell} defaultChecked /> */}
->>>>>>> Stashed changes
         </div>
       </SettingCard>
 
-      <SettingCard title="Delivery schedule" description="Quiet hours and preferred delivery windows.">
+      <SettingCard
+        title="Delivery schedule"
+        description="Quiet hours and preferred delivery windows."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Quiet hours start</Label>
             <Input
               type="time"
-              defaultValue={schedule?.quietHoursStart || preferences?.notifications?.quietHoursStart || "22:00"}
+              defaultValue={
+                schedule?.quietHoursStart || preferences?.notifications?.quietHoursStart || "22:00"
+              }
               onBlur={(e) => handleQuietHoursChange("quietHoursStart", e.target.value)}
             />
           </div>
@@ -838,12 +728,16 @@ export function NotificationsSection() {
             <Label>Quiet hours end</Label>
             <Input
               type="time"
-              defaultValue={schedule?.quietHoursEnd || preferences?.notifications?.quietHoursEnd || "07:00"}
+              defaultValue={
+                schedule?.quietHoursEnd || preferences?.notifications?.quietHoursEnd || "07:00"
+              }
               onBlur={(e) => handleQuietHoursChange("quietHoursEnd", e.target.value)}
             />
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Non-urgent notifications will be batched during this window.
+        </p>
       </SettingCard>
     </div>
   );
@@ -872,17 +766,13 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
   };
 
   const name = user?.name || (role === "admin" ? "Admin User" : "Employee User");
-<<<<<<< Updated upstream
   const avatar = user?.avatar || (user as any)?.avtar || name.slice(0, 2).toUpperCase();
   const email = user?.email || "user@dimisi.com";
-  const dept = typeof user?.department === "object" && user?.department !== null ? (user.department as any).name : (user?.department || "Operations");
+  const dept =
+    typeof user?.department === "object" && user?.department !== null
+      ? (user.department as any).name
+      : user?.department || "Operations";
   const code = (user as any)?.empId || user?.code || "EMP-01";
-=======
-  const avatar = user?.avatar || name.slice(0, 2).toUpperCase();
-  const email = user?.email || "user@dimisi.com";
-  const dept = typeof user?.department === "object" && user?.department !== null ? (user.department as any).name : (user?.department || "Operations");
-  const code = user?.code || "EMP-01";
->>>>>>> Stashed changes
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -896,7 +786,9 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
               <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
             </Button>
           </div>
-          <p className="text-center text-xs text-muted-foreground">JPG or PNG · square · up to 5MB</p>
+          <p className="text-center text-xs text-muted-foreground">
+            JPG or PNG · square · up to 5MB
+          </p>
         </div>
       </SettingCard>
 
@@ -918,11 +810,7 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
             <Field label="Full name" defaultValue={name} disabled />
             <Field label="Employee ID / Code" defaultValue={code} disabled />
             <Field label="Email" type="email" defaultValue={email} disabled />
-            <Field
-              label="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
+            <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <Field label="Department" defaultValue={dept} disabled />
             <Field label="Role" defaultValue={role.toUpperCase()} disabled />
           </div>
@@ -932,7 +820,10 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
   );
 }
 
-function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+function Field({
+  label,
+  ...props
+}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
