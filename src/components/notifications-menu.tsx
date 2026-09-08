@@ -95,7 +95,7 @@ export function NotificationsMenu() {
         align="end"
         collisionPadding={12}
         sideOffset={8}
-        className="w-[calc(100vw-1.5rem)] max-w-[92vw] rounded-2xl p-0 sm:w-[360px] sm:max-w-[380px] md:w-[380px]"
+        className="w-[calc(100vw-1.5rem)] max-w-[92vw] rounded-2xl p-0 sm:w-90 sm:max-w-95 md:w-95"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -127,7 +127,7 @@ export function NotificationsMenu() {
                   onClick={() => handleNotificationClick(n.id, n.unread)}
                   className={cn(
                     "flex cursor-pointer gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
-                    n.unread && "bg-primary/[0.03]",
+                    n.unread && "bg-primary/3",
                   )}
                 >
                   <div
@@ -140,12 +140,12 @@ export function NotificationsMenu() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
-                      <p className="min-w-0 break-words text-sm font-medium">{n.title}</p>
+                      <p className="min-w-0 wrap-break text-sm font-medium">{n.title}</p>
                       <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
                         {n.time}
                       </span>
                     </div>
-                    <p className="mt-0.5 break-words text-xs text-muted-foreground">{n.body}</p>
+                    <p className="mt-0.5 wrap-break-words text-xs text-muted-foreground">{n.body}</p>
                   </div>
                   {n.unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                 </li>
