@@ -1,170 +1,120 @@
-import { Bell, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import * as React from "react";
+import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
+import { cva } from "class-variance-authority";
+import { ChevronDown } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth";
-import {
-  useMarkAllNotificationsReadMutation,
-  useMarkNotificationReadMutation,
-  useNotificationsQuery,
-} from "@/features/notifications";
 
-type ToneType = "info" | "success" | "warning";
+const NavigationMenu = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Root
+    ref={ref}
+    className={cn("relative z-10 flex max-w-max flex-1 items-center justify-center", className)}
+    {...props}
+  >
+    {children}
+    <NavigationMenuViewport />
+  </NavigationMenuPrimitive.Root>
+));
+NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName;
 
-const toneStyles: Record<ToneType, string> = {
-  info: "bg-info/15 text-info",
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
+const NavigationMenuList = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.List
+    ref={ref}
+    className={cn("group flex flex-1 list-none items-center justify-center space-x-1", className)}
+    {...props}
+  />
+));
+NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName;
+
+const NavigationMenuItem = NavigationMenuPrimitive.Item;
+
+const navigationMenuTriggerStyle = cva(
+  "group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=open]:text-accent-foreground data-[state=open]:bg-accent/50 data-[state=open]:hover:bg-accent data-[state=open]:focus:bg-accent",
+);
+
+const NavigationMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Trigger
+    ref={ref}
+    className={cn(navigationMenuTriggerStyle(), "group", className)}
+    {...props}
+  >
+    {children}{" "}
+    <ChevronDown
+      className="relative top-[1px] ml-1 h-3 w-3 transition duration-300 group-data-[state=open]:rotate-180"
+      aria-hidden="true"
+    />
+  </NavigationMenuPrimitive.Trigger>
+));
+NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName;
+
+const NavigationMenuContent = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Content
+    ref={ref}
+    className={cn(
+      "left-0 top-0 w-full data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 md:absolute md:w-auto ",
+      className,
+    )}
+    {...props}
+  />
+));
+NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
+
+const NavigationMenuLink = NavigationMenuPrimitive.Link;
+
+const NavigationMenuViewport = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Viewport>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Viewport>
+>(({ className, ...props }, ref) => (
+  <div className={cn("absolute left-0 top-full flex justify-center")}>
+    <NavigationMenuPrimitive.Viewport
+      className={cn(
+        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
+        className,
+      )}
+      ref={ref}
+      {...props}
+    />
+  </div>
+));
+NavigationMenuViewport.displayName = NavigationMenuPrimitive.Viewport.displayName;
+
+const NavigationMenuIndicator = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Indicator>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Indicator>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Indicator
+    ref={ref}
+    className={cn(
+      "top-full z-[1] flex h-1.5 items-end justify-center overflow-hidden data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out data-[state=visible]:fade-in",
+      className,
+    )}
+    {...props}
+  >
+    <div className="relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm bg-border shadow-md" />
+  </NavigationMenuPrimitive.Indicator>
+));
+NavigationMenuIndicator.displayName = NavigationMenuPrimitive.Indicator.displayName;
+
+export {
+  navigationMenuTriggerStyle,
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuContent,
+  NavigationMenuTrigger,
+  NavigationMenuLink,
+  NavigationMenuIndicator,
+  NavigationMenuViewport,
 };
-
-function shortTime(ts: string | Date) {
-  const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
-  if (diffM < 60) return `${diffM}m`;
-  if (diffM < 60 * 24) return `${Math.round(diffM / 60)}h`;
-  return `${Math.round(diffM / 60 / 24)}d`;
-}
-
-export function NotificationsMenu() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "director";
-  const [open, setOpen] = useState(false);
-
-  const { data: rawNotifications = [] } = useNotificationsQuery();
-  const markAllReadMutation = useMarkAllNotificationsReadMutation();
-  const markReadMutation = useMarkNotificationReadMutation();
-
-  const notifications = rawNotifications.map((n) => {
-    let tone: ToneType = "info";
-    if (n.type.includes("approved") || n.type.includes("points")) {
-      tone = "success";
-    } else if (n.type.includes("rejected") || n.type.includes("deadline")) {
-      tone = "warning";
-    }
-
-    return {
-      id: n._id || n.id || "",
-      title: n.title,
-      body: n.message,
-      time: shortTime(n.createdAt),
-      tone,
-      unread: !n.isRead,
-    };
-  });
-
-  const unread = notifications.filter((i) => i.unread).length;
-
-  const handleMarkAllRead = async () => {
-    try {
-      await markAllReadMutation.mutateAsync();
-    } catch {
-      // Ignore background errors
-    }
-  };
-
-  const handleNotificationClick = (id: string, isUnread: boolean) => {
-    if (isUnread) {
-      markReadMutation.mutate(id);
-    }
-    setOpen(false);
-    navigate({ to: isAdmin ? "/admin/notifications" : "/employee/notifications" });
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative rounded-md"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-          {unread > 0 && (
-            <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground shadow-glow">
-              {unread}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        collisionPadding={12}
-        sideOffset={8}
-        className="w-[calc(100vw-1.5rem)] max-w-[92vw] rounded-2xl p-0 sm:w-90 sm:max-w-95 md:w-95"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-display text-sm font-semibold">Notifications</span>
-            {unread > 0 && (
-              <Badge variant="secondary" className="shrink-0 rounded-full px-2 text-[10px]">
-                {unread} new
-              </Badge>
-            )}
-          </div>
-          <button
-            onClick={handleMarkAllRead}
-            disabled={markAllReadMutation.isPending || unread === 0}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-          >
-            <Check className="h-3 w-3" /> Mark all read
-          </button>
-        </div>
-        <ScrollArea className="max-h-[55vh] sm:max-h-80">
-          {notifications.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">
-              You're all caught up.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border/60">
-              {notifications.map((n) => (
-                <li
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n.id, n.unread)}
-                  className={cn(
-                    "flex cursor-pointer gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
-                    n.unread && "bg-primary/3",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg",
-                      toneStyles[n.tone],
-                    )}
-                  >
-                    <Bell className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
-                      <p className="min-w-0 wrap-break text-sm font-medium">{n.title}</p>
-                      <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
-                        {n.time}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 wrap-break-words text-xs text-muted-foreground">{n.body}</p>
-                  </div>
-                  {n.unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                </li>
-              ))}
-            </ul>
-          )}
-        </ScrollArea>
-        <div className="border-t border-border/60 px-4 py-2 text-center">
-          <button
-            onClick={() => {
-              setOpen(false);
-              navigate({ to: isAdmin ? "/admin/notifications" : "/employee/notifications" });
-            }}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            View all notifications
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
