@@ -68,6 +68,7 @@ export const queryKeys = {
     workspace: () => ["settings", "workspace"] as const,
     sessions: () => ["settings", "sessions"] as const,
   },
+<<<<<<< Updated upstream
   activity: {
     all: ["activity"] as const,
     personal: (filters?: Record<string, unknown>) => ["activity", "personal", filters] as const,
@@ -83,6 +84,8 @@ export const queryKeys = {
     all: ["notifications"] as const,
     list: () => ["notifications", "list"] as const,
   },
+=======
+>>>>>>> Stashed changes
 } as const;
 
 
