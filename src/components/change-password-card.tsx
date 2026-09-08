@@ -150,15 +150,14 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-      await checkPasswordMutation.mutateAsync({ password: current });
-      await sendPasswordOtp(email);
+      const res = await checkPasswordMutation.mutateAsync({ currentPassword: current });
       setCode("");
       setOtpError("");
       setLocked(false);
       setAttemptsLeft(OTP_MAX_ATTEMPTS);
       setSeconds(OTP_RESEND_SECONDS);
       setStep("otp");
-      toast.success("Verification code sent", {
+      toast.success(res?.message || "Verification code sent", {
         description: `We emailed a 6-digit code to ${email}.`,
       });
     } catch (err: any) {
@@ -186,43 +185,34 @@ export function ChangePasswordCard({
   /* ---------------- step 2: OTP ---------------- */
   const submitOtp = async (value: string) => {
     if (busy || locked || value.length !== OTP_LENGTH) return;
-    setBusy(true);
     setOtpError("");
-    const res = await verifyPasswordOtp(email, value);
-    setBusy(false);
-    if (res.ok) {
-      toast.success("Identity verified");
-      setStep("new");
-      return;
-    }
-    setCode("");
-    setAttemptsLeft(res.attemptsLeft);
-    if (res.reason === "locked") {
-      setLocked(true);
-      setOtpError("Too many incorrect attempts. Please request a new OTP.");
-      audit("Password Change Failed", portal, "Too many incorrect OTP attempts.");
-    } else if (res.reason === "expired" || res.reason === "no_code") {
-      setOtpError("This verification code has expired. Please request a new one.");
-      audit("Password Change Failed", portal, "OTP expired.");
-    } else {
-      setOtpError(
-        `Incorrect verification code. ${res.attemptsLeft} attempt${res.attemptsLeft === 1 ? "" : "s"} remaining.`,
-      );
-      audit("Password Change Failed", portal, "Incorrect OTP entered.");
-    }
+    setCode(value);
+    toast.success("Code entered. Now create your new password.");
+    setStep("new");
   };
 
   const resend = async () => {
     if (seconds > 0 || resending) return;
     setResending(true);
-    await sendPasswordOtp(email);
-    setResending(false);
-    setCode("");
-    setOtpError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    toast.success("A new verification code has been sent to your email.");
+    try {
+      await checkPasswordMutation.mutateAsync({ currentPassword: current });
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } catch (err: any) {
+      await sendPasswordOtp(email);
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } finally {
+      setResending(false);
+    }
   };
 
   /* ---------------- step 3: new password ---------------- */
@@ -236,7 +226,7 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-      await updatePasswordMutation.mutateAsync({
+      const res = await updatePasswordMutation.mutateAsync({
         currentPassword: current,
         newPassword: next,
         otp: code,
@@ -245,7 +235,7 @@ export function ChangePasswordCard({
       await sendPasswordChangedEmail(email);
       audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
       setStep("done");
-      toast.success("Password changed successfully", {
+      toast.success(res?.message || "Password changed successfully", {
         description: "Please sign in again with your new password.",
       });
       setTimeout(() => {
@@ -253,18 +243,9 @@ export function ChangePasswordCard({
         void navigate({ to: "/login" });
       }, 2600);
     } catch (err: any) {
-      // Fallback local update if offline
-      updatePassword(email, next);
-      await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated locally.");
-      setStep("done");
-      toast.success("Password changed successfully", {
-        description: "Please sign in again with your new password.",
-      });
-      setTimeout(() => {
-        logout();
-        void navigate({ to: "/login" });
-      }, 2600);
+      const msg = err?.message || "Failed to update password. Please check your OTP code.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }

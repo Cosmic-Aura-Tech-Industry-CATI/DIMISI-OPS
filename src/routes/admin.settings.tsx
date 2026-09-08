@@ -25,7 +25,6 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -65,20 +64,6 @@ export const Route = createFileRoute("/admin/settings")({
   }),
   component: AdminSettingsPage,
 });
-
-function saveToast(label: string) {
-  return () => {
-    logAudit({
-      category: "settings",
-      action: "Updated Personal Settings",
-      target: label,
-      details: `${label} settings saved.`,
-    });
-    toast.success(`${label} saved`, {
-      description: "Your changes are stored locally (demo).",
-    });
-  };
-}
 
 function AdminSettingsPage() {
   return (
@@ -200,7 +185,7 @@ function SecuritySection() {
   const handleStartTotpSetup = async () => {
     try {
       const res = await setup2Fa.mutateAsync();
-      setQrCodeUrl(res.qrCodeUrl);
+      setQrCodeUrl(res.qrCodeUrl || res.qrCode);
       setTotpSecret(res.secret);
       setRecoveryCodes([]);
       setTotpToken("");
@@ -220,6 +205,8 @@ function SecuritySection() {
       const res = await verify2Fa.mutateAsync(totpToken);
       if (res.recoveryCodes && res.recoveryCodes.length > 0) {
         setRecoveryCodes(res.recoveryCodes);
+      } else {
+        setSetupModalOpen(false);
       }
       toast.success("Two-factor authentication enabled successfully!");
     } catch (err: any) {
@@ -252,141 +239,175 @@ function SecuritySection() {
     ...(sessionsData?.otherSessions || []).map((s) => ({ ...s, current: false })),
   ];
 
+  const isTotpConfigured = Boolean(
+    preferences?.twoFactorAuth?.isTotpEnabled ||
+    preferences?.security?.twoFactor?.authenticatorApp ||
+    preferences?.security?.twoFactor?.isAuthenticatorVerified
+  );
+
+  const isEmailOtpEnabled =
+    preferences?.security?.twoFactor?.emailVerification ??
+    preferences?.security?.emailOtpEnabled ??
+    true;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button className="rounded-md" onClick={saveToast("Security")}><Save className="mr-1.5 h-4 w-4" />Save</Button>
-      </div>
       <div className="grid gap-6 lg:grid-cols-2">
-      <ChangePasswordCard
-        wrapper={(p) => (
-          <SettingCard title={p.title} description={p.description} actions={p.actions}>
-            {p.children}
-          </SettingCard>
-        )}
-      />
+        <ChangePasswordCard
+          wrapper={(p) => (
+            <SettingCard title={p.title} description={p.description} actions={p.actions}>
+              {p.children}
+            </SettingCard>
+          )}
+        />
 
-      <SettingCard
-        title="Two-factor authentication"
-        description="Add an extra layer of protection to your account."
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-md"
-            onClick={handleStartTotpSetup}
-            disabled={setup2Fa.isPending}
-          >
-            <QrCode className="mr-1.5 h-3.5 w-3.5" /> Setup App
-          </Button>
-        }
-      >
-        <div className="space-y-3">
-          <ToggleRow
-            title="Authenticator app"
-            description={
-              preferences?.twoFactorAuth?.isTotpEnabled
-                ? "Active · Authenticator app enabled."
-                : "Not configured · Scan QR to link."
-            }
-            icon={Smartphone}
-            checked={Boolean(preferences?.twoFactorAuth?.isTotpEnabled)}
-            disabled
-          />
-          <ToggleRow
-            title="Email verification"
-            description="Confirm sign-ins and sensitive changes via one-time email OTP."
-            icon={Mail}
-            checked={preferences?.security?.emailOtpEnabled ?? true}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { emailOtpEnabled: checked } },
-                {
-                  onSuccess: () => toast.success("Email verification preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
-                },
-              );
-            }}
-          />
-        </div>
-      </SettingCard>
-
-      <SettingCard
-        title="Active sessions"
-        description="Devices currently signed in to your account."
-        actions={
-          allSessions.length > 1 ? (
+        <SettingCard
+          title="Two-factor authentication"
+          description="Add an extra layer of protection to your account."
+          actions={
             <Button
               variant="outline"
               size="sm"
-              className="rounded-md text-destructive hover:bg-destructive/10"
-              onClick={handleRevokeAllOtherSessions}
-              disabled={revokeOtherSessions.isPending}
+              className="rounded-md"
+              onClick={handleStartTotpSetup}
+              disabled={setup2Fa.isPending}
             >
-              Sign out all others
+              <QrCode className="mr-1.5 h-3.5 w-3.5" /> Setup App
             </Button>
-          ) : undefined
-        }
-      >
-        {allSessions.length === 0 ? (
-          <div className="py-6 text-center text-xs text-muted-foreground">
-            No active session records found
-          </div>
-        ) : (
-          <ul className="divide-y divide-border/60">
-            {allSessions.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="flex items-center gap-3">
-                  <Monitor className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      {s.device || s.browser || "Active Device"}
-                      {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
-                      {s.current && (
-                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                          Current
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {s.location || s.ipAddress || "Localhost"} ·{" "}
-                      {s.lastActive
-                        ? new Date(s.lastActive).toLocaleString(undefined, {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
-                        : "Active now"}
-                    </p>
-                  </div>
-                </div>
-                {!s.current && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRevokeSession(s.id)}
-                    disabled={revokeSession.isPending}
-                  >
-                    <Trash2 className="mr-1 h-3 w-3" /> Revoke
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SettingCard>
-
-      {isDirector && (
-        <SettingCard
-          title="Access & privacy"
-          description="Workspace-level access controls."
+          }
         >
           <div className="space-y-3">
-            <ToggleRow title="Allow SSO sign-in" description="Enable Google / Microsoft sign-in for employees." defaultChecked />
-            <ToggleRow title="Require 2FA for all admins" description="Force every admin to enable two-factor sign-in." defaultChecked />
+            <ToggleRow
+              title="Authenticator app"
+              description={
+                isTotpConfigured
+                  ? "Active · Authenticator app enabled."
+                  : "Not configured · Scan QR to link."
+              }
+              icon={Smartphone}
+              checked={isTotpConfigured}
+              disabled
+            />
+            <ToggleRow
+              title="Email verification"
+              description="Confirm sign-ins and sensitive changes via one-time email OTP."
+              icon={Mail}
+              checked={isEmailOtpEnabled}
+              onChange={(checked) => {
+                updatePreferences.mutate(
+                  { security: { twoFactor: { emailVerification: checked } } },
+                  {
+                    onSuccess: () => toast.success("Email verification preference updated."),
+                    onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                  },
+                );
+              }}
+            />
           </div>
         </SettingCard>
-      )}
+
+        <SettingCard
+          title="Active sessions"
+          description="Devices currently signed in to your account."
+          actions={
+            allSessions.length > 1 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-md text-destructive hover:bg-destructive/10"
+                onClick={handleRevokeAllOtherSessions}
+                disabled={revokeOtherSessions.isPending}
+              >
+                Sign out all others
+              </Button>
+            ) : undefined
+          }
+        >
+          {allSessions.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted-foreground">
+              No active session records found
+            </div>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {allSessions.map((s) => (
+                <li key={s.id || s._id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <Monitor className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        {s.device || s.browser || "Active Device"}
+                        {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
+                        {s.current && (
+                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {s.location || s.ipAddress || "Active"} ·{" "}
+                        {s.lastActive
+                          ? new Date(s.lastActive).toLocaleString(undefined, {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })
+                          : "Active now"}
+                      </p>
+                    </div>
+                  </div>
+                  {!s.current && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-destructive hover:bg-destructive/10"
+                      onClick={() => handleRevokeSession(s.id || s._id || "")}
+                      disabled={revokeSession.isPending}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" /> Revoke
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </SettingCard>
+
+        {isDirector && (
+          <SettingCard
+            title="Access & privacy"
+            description="Workspace-level access controls."
+          >
+            <div className="space-y-3">
+              <ToggleRow
+                title="Allow SSO sign-in"
+                description="Enable Google / Microsoft sign-in for employees."
+                checked={workspace?.allowSsoSignIn ?? true}
+                onChange={(checked) => {
+                  updateWorkspace.mutate(
+                    { allowSsoSignIn: checked },
+                    {
+                      onSuccess: () => toast.success("Workspace setting updated."),
+                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
+                    }
+                  );
+                }}
+              />
+              <ToggleRow
+                title="Require 2FA for all admins"
+                description="Force every admin to enable two-factor sign-in."
+                checked={workspace?.require2FaForAdmins ?? false}
+                onChange={(checked) => {
+                  updateWorkspace.mutate(
+                    { require2FaForAdmins: checked },
+                    {
+                      onSuccess: () => toast.success("Workspace setting updated."),
+                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
+                    }
+                  );
+                }}
+              />
+            </div>
+          </SettingCard>
+        )}
       </div>
 
       {/* 2FA Setup Modal */}
@@ -517,13 +538,33 @@ export function NotificationsSection() {
   const { data: preferences } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
-  const notifs = preferences?.notifications;
+  const emailNotifs = preferences?.notifications?.email;
+  const inAppNotifs = preferences?.notifications?.inApp;
+  const schedule = preferences?.notifications?.deliverySchedule;
 
-  const handleToggle = (key: keyof NonNullable<typeof notifs>, value: boolean) => {
+  const handleEmailToggle = (key: "taskAssignments" | "reviewRequests" | "weeklyDigest", value: boolean) => {
     updatePreferences.mutate(
       {
         notifications: {
-          [key]: value,
+          email: {
+            [key]: value,
+          },
+        },
+      },
+      {
+        onSuccess: () => toast.success("Notification preference updated."),
+        onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+      },
+    );
+  };
+
+  const handleInAppToggle = (key: "deadlineReminders" | "taskApprovals" | "pointsEarned", value: boolean) => {
+    updatePreferences.mutate(
+      {
+        notifications: {
+          inApp: {
+            [key]: value,
+          },
         },
       },
       {
@@ -537,7 +578,9 @@ export function NotificationsSection() {
     updatePreferences.mutate(
       {
         notifications: {
-          [field]: value,
+          deliverySchedule: {
+            [field]: value,
+          },
         },
       },
       {
@@ -555,22 +598,22 @@ export function NotificationsSection() {
             title="Task assignments"
             description="When a task is assigned to you or your team."
             icon={Mail}
-            checked={notifs?.taskAssignments ?? true}
-            onChange={(checked) => handleToggle("taskAssignments", checked)}
+            checked={emailNotifs?.taskAssignments ?? preferences?.notifications?.taskAssignments ?? true}
+            onChange={(checked) => handleEmailToggle("taskAssignments", checked)}
           />
           <ToggleRow
             title="Review requests"
             description="New submissions waiting for approval."
             icon={Mail}
-            checked={notifs?.reviewRequests ?? true}
-            onChange={(checked) => handleToggle("reviewRequests", checked)}
+            checked={emailNotifs?.reviewRequests ?? preferences?.notifications?.reviewRequests ?? true}
+            onChange={(checked) => handleEmailToggle("reviewRequests", checked)}
           />
           <ToggleRow
             title="Weekly digest"
             description="Summary of activity and performance every Monday."
             icon={Mail}
-            checked={notifs?.weeklyDigest ?? false}
-            onChange={(checked) => handleToggle("weeklyDigest", checked)}
+            checked={emailNotifs?.weeklyDigest ?? preferences?.notifications?.weeklyDigest ?? false}
+            onChange={(checked) => handleEmailToggle("weeklyDigest", checked)}
           />
         </div>
       </SettingCard>
@@ -581,22 +624,22 @@ export function NotificationsSection() {
             title="Deadline reminders"
             description="24 hours before a task is due."
             icon={Bell}
-            checked={notifs?.deadlineReminders ?? true}
-            onChange={(checked) => handleToggle("deadlineReminders", checked)}
+            checked={inAppNotifs?.deadlineReminders ?? preferences?.notifications?.deadlineReminders ?? true}
+            onChange={(checked) => handleInAppToggle("deadlineReminders", checked)}
           />
           <ToggleRow
             title="Task approvals"
             description="Approvals and rejections on submissions."
             icon={Bell}
-            checked={notifs?.taskApprovals ?? true}
-            onChange={(checked) => handleToggle("taskApprovals", checked)}
+            checked={inAppNotifs?.taskApprovals ?? preferences?.notifications?.taskApprovals ?? true}
+            onChange={(checked) => handleInAppToggle("taskApprovals", checked)}
           />
           <ToggleRow
             title="Points earned"
             description="When points are credited to an employee."
             icon={Bell}
-            checked={notifs?.pointsEarned ?? true}
-            onChange={(checked) => handleToggle("pointsEarned", checked)}
+            checked={inAppNotifs?.pointsEarned ?? preferences?.notifications?.pointsEarned ?? true}
+            onChange={(checked) => handleInAppToggle("pointsEarned", checked)}
           />
         </div>
       </SettingCard>
@@ -607,7 +650,7 @@ export function NotificationsSection() {
             <Label>Quiet hours start</Label>
             <Input
               type="time"
-              defaultValue={notifs?.quietHoursStart || "22:00"}
+              defaultValue={schedule?.quietHoursStart || preferences?.notifications?.quietHoursStart || "22:00"}
               onBlur={(e) => handleQuietHoursChange("quietHoursStart", e.target.value)}
             />
           </div>
@@ -615,7 +658,7 @@ export function NotificationsSection() {
             <Label>Quiet hours end</Label>
             <Input
               type="time"
-              defaultValue={notifs?.quietHoursEnd || "07:00"}
+              defaultValue={schedule?.quietHoursEnd || preferences?.notifications?.quietHoursEnd || "07:00"}
               onBlur={(e) => handleQuietHoursChange("quietHoursEnd", e.target.value)}
             />
           </div>
@@ -649,10 +692,10 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
   };
 
   const name = user?.name || (role === "admin" ? "Admin User" : "Employee User");
-  const avatar = user?.avatar || name.slice(0, 2).toUpperCase();
+  const avatar = user?.avatar || (user as any)?.avtar || name.slice(0, 2).toUpperCase();
   const email = user?.email || "user@dimisi.com";
   const dept = typeof user?.department === "object" && user?.department !== null ? (user.department as any).name : (user?.department || "Operations");
-  const code = user?.code || "EMP-01";
+  const code = (user as any)?.empId || user?.code || "EMP-01";
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">

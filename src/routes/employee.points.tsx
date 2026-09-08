@@ -1,9 +1,13 @@
+import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Sparkles, Trophy, Zap, Star } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
-import { currentEmployee, tasks, leaderboard } from "@/lib/mock-data";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/lib/auth";
+import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useTasksQuery } from "@/features/tasks";
+import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
 export const Route = createFileRoute("/employee/points")({
   head: () => ({
@@ -25,22 +29,47 @@ const tiers = [
 ];
 
 function PointsPage() {
-  const rank = leaderboard.find((l) => l.id === currentEmployee.id)?.rank ?? "—";
-  const points = currentEmployee.points;
+  const auth = useAuth();
+  const currentUserId = auth.user?.id || auth.user?._id || "";
+  const { data: leaderboard = [] } = useLeaderboardQuery(100);
+  const { data: tasks = [] } = useTasksQuery();
+  const { data: analytics } = useEmployeeProgressAnalyticsQuery();
+
+  const userRankIndex = leaderboard.findIndex((l) => {
+    return (
+      (currentUserId && (l.id === currentUserId || (l as any)._id === currentUserId)) ||
+      (auth.user?.email && (l as any).email === auth.user.email) ||
+      (auth.user?.name && l.name === auth.user.name)
+    );
+  });
+  const rank = userRankIndex >= 0 ? `${userRankIndex + 1}` : "—";
+
+  const points = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? (analytics?.monthlyPerformance?.totalPoints || 0);
+  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+
   const nextTier = tiers.find((t) => t.min > points) ?? tiers[tiers.length - 1];
-  const currentTier = [...tiers].reverse().find((t) => points >= t.min)!;
+  const currentTier = [...tiers].reverse().find((t) => points >= t.min) || tiers[0];
   const progress = Math.min(100, Math.round(((points - currentTier.min) / Math.max(1, nextTier.min - currentTier.min)) * 100));
-  const recent = tasks.filter((t) => t.assigneeId === currentEmployee.id && t.status === "completed");
+
+  const recent = useMemo(() => {
+    return tasks.filter((t) => {
+      const isMine =
+        (currentUserId && t.assigneeId === currentUserId) ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email);
+      return isMine && (t.status === "completed" || (t.status as string) === "Completed");
+    });
+  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
 
   return (
     <>
       <PageHeader title="Points" subtitle="Every task you close moves you up." />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total points" value={points.toLocaleString()} icon={Sparkles} delta={6.2} accent="primary" />
+        <StatCard label="Total points" value={points.toLocaleString()} icon={Sparkles} accent="primary" />
         <StatCard label="Current rank" value={`#${rank}`} icon={Trophy} accent="warning" />
-        <StatCard label="Streak bonus" value="+45" icon={Zap} hint="7-day streak" accent="info" />
-        <StatCard label="This month" value="+320" icon={Star} delta={11.4} accent="success" />
+        <StatCard label="Completed tasks" value={`${recent.length}`} icon={Zap} hint="Verified closes" accent="info" />
+        <StatCard label="This month" value={`+${monthlyPoints}`} icon={Star} accent="success" />
       </div>
 
       <div className="glass rounded-2xl p-6">
@@ -80,21 +109,25 @@ function PointsPage() {
 
       <div className="glass rounded-2xl p-5">
         <h3 className="font-display text-lg font-semibold">Points history</h3>
-        <ul className="mt-3 divide-y divide-border/40">
-          {recent.map((t) => (
-            <li key={t.id} className="flex items-center justify-between py-3">
-              <div>
-                <div className="font-medium">{t.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · {t.category}
+        {recent.length === 0 ? (
+          <p className="mt-4 text-xs text-muted-foreground">No completed tasks yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border/40">
+            {recent.map((t) => (
+              <li key={t.id} className="flex items-center justify-between py-3">
+                <div>
+                  <div className="font-medium">{t.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Completed"} · {t.category}
+                  </div>
                 </div>
-              </div>
-              <div className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-sm font-medium text-success">
-                +{t.points}
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-sm font-medium text-success">
+                  +{t.points}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </>
   );

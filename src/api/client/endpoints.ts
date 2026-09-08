@@ -94,5 +94,19 @@ export const API_ENDPOINTS = {
     revokeOtherSessions: "/settings/sessions/others",
     revokeSession: (id: string) => `/settings/sessions/${id}`,
   },
+  activity: {
+    personal: "/activity/personal",
+    admin: "/activity/admin",
+    org: "/activity/org",
+  },
+  employeeDashboard: {
+    tasksDeadlines: "/employee-dashboard/tasks-deadlines",
+    analytics: "/employee-dashboard/analytics",
+  },
+  notifications: {
+    list: "/notifications",
+    readAll: "/notifications/read-all",
+    markRead: (id: string) => `/notifications/${id}/read`,
+  },
 } as const;
 

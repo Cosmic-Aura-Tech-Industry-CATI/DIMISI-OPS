@@ -68,6 +68,21 @@ export const queryKeys = {
     workspace: () => ["settings", "workspace"] as const,
     sessions: () => ["settings", "sessions"] as const,
   },
+  activity: {
+    all: ["activity"] as const,
+    personal: (filters?: Record<string, unknown>) => ["activity", "personal", filters] as const,
+    admin: (filters?: Record<string, unknown>) => ["activity", "admin", filters] as const,
+    org: (filters?: Record<string, unknown>) => ["activity", "org", filters] as const,
+  },
+  employeeDashboard: {
+    all: ["employee-dashboard"] as const,
+    tasksDeadlines: () => ["employee-dashboard", "tasks-deadlines"] as const,
+    analytics: () => ["employee-dashboard", "analytics"] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: () => ["notifications", "list"] as const,
+  },
 } as const;
 
 

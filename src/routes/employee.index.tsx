@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
@@ -33,10 +34,14 @@ import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { activityLogs, currentEmployee, performanceTrend } from "@/lib/mock-data";
 import { useTasksQuery } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import { AvailableTasks } from "@/components/available-tasks";
+import {
+  useEmployeeTasksDeadlinesQuery,
+  useEmployeeProgressAnalyticsQuery,
+} from "@/features/employee-dashboard";
+import { usePersonalActivityQuery, type ActivityLog } from "@/features/activity";
 
 export const Route = createFileRoute("/employee/")({
   component: EmployeeOverview,
@@ -59,44 +64,110 @@ const statusTone: Record<string, string> = {
 function EmployeeOverview() {
   const auth = useAuth();
   const { data: tasks = [] } = useTasksQuery();
-  const currentUserId = auth.user?.id || auth.user?._id || currentEmployee.id;
+  const { data: tasksDeadlines } = useEmployeeTasksDeadlinesQuery();
+  const { data: analytics } = useEmployeeProgressAnalyticsQuery();
+  const { data: activityData } = usePersonalActivityQuery({ limit: 6 });
 
-  const mine = tasks.filter((t) => {
-    return (
-      t.assigneeId === currentUserId ||
-      (auth.user?.name && t.assignee === auth.user.name) ||
-      (auth.user?.email && t.assignee === auth.user.email)
-    );
-  });
+  const currentUserId = auth.user?.id || auth.user?._id || "";
+
+  const mine = useMemo(() => {
+    return tasks.filter((t) => {
+      return (
+        (currentUserId && t.assigneeId === currentUserId) ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email)
+      );
+    });
+  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+
   const completed = mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
   const pending = mine.filter((t) => t.status === "pending" || t.status === "in_progress" || (t.status as string) === "In Progress" || (t.status as string) === "Assigned");
-  const today = mine
-    .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed")
-    .slice(0, 3);
-  const deadlines = [...mine]
-    .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed" && t.dueDate)
-    .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
-    .slice(0, 4);
+  
+  const displayToday = useMemo(() => {
+    if (tasksDeadlines?.todayTasks) return tasksDeadlines.todayTasks;
+    return mine
+      .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed")
+      .slice(0, 3);
+  }, [tasksDeadlines?.todayTasks, mine]);
 
-  const goal = 50;
-  const progress = Math.min(100, Math.round((completed.length / goal) * 100));
-  const monthlyGoal = 600;
-  const monthlyPoints = 482;
-  const monthlyProgress = Math.round((monthlyPoints / monthlyGoal) * 100);
+  const displayDeadlines = useMemo(() => {
+    if (tasksDeadlines?.upcomingDeadlines) return tasksDeadlines.upcomingDeadlines;
+    return [...mine]
+      .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed" && t.dueDate)
+      .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
+      .slice(0, 4);
+  }, [tasksDeadlines?.upcomingDeadlines, mine]);
 
-  const weekProgress = [
-    { day: "Mon", done: 3, planned: 4 },
-    { day: "Tue", done: 5, planned: 5 },
-    { day: "Wed", done: 4, planned: 6 },
-    { day: "Thu", done: 6, planned: 5 },
-    { day: "Fri", done: 2, planned: 4 },
-    { day: "Sat", done: 1, planned: 2 },
-    { day: "Sun", done: 0, planned: 1 },
+  const defaultWeekProgress = [
+    { day: "Mon", done: 0, planned: 0 },
+    { day: "Tue", done: 0, planned: 0 },
+    { day: "Wed", done: 0, planned: 0 },
+    { day: "Thu", done: 0, planned: 0 },
+    { day: "Fri", done: 0, planned: 0 },
+    { day: "Sat", done: 0, planned: 0 },
+    { day: "Sun", done: 0, planned: 0 },
   ];
+
+  const weekProgress = analytics?.weeklyProgress?.length
+    ? analytics.weeklyProgress.map((w) => ({
+        day: w.day,
+        done: w.completed,
+        planned: w.planned,
+      }))
+    : defaultWeekProgress;
+
+  const monthlyGoal = analytics?.monthlyPerformance?.pointsGoal ?? 600;
+  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const monthlyProgress = monthlyGoal > 0 ? Math.min(100, Math.round((monthlyPoints / monthlyGoal) * 100)) : 0;
+
+  const avgPointsPerDay = analytics?.monthlyPerformance?.avgPointsPerDay !== undefined
+    ? `${analytics.monthlyPerformance.avgPointsPerDay} pts`
+    : "0 pts";
+  const bestDayPoints = analytics?.monthlyPerformance?.bestDayPoints !== undefined
+    ? `${analytics.monthlyPerformance.bestDayPoints} pts`
+    : "0 pts";
+  const tasksPerWeekAvg = analytics?.monthlyPerformance?.tasksPerWeekAvg !== undefined
+    ? `${analytics.monthlyPerformance.tasksPerWeekAvg}`
+    : "0";
+
+  const currentMonthName = new Date().toLocaleDateString(undefined, { month: "short" });
 
   const userName = auth.user?.name || "Employee";
   const userAvatar = userName.slice(0, 2).toUpperCase();
-  const userPoints = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? 0;
+  const userPoints = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? monthlyPoints;
+
+  const performanceTrend = useMemo(() => {
+    const weeks: { week: string; points: number; tasks: number }[] = [];
+    const now = new Date();
+    for (let i = 7; i >= 0; i--) {
+      const target = new Date(now);
+      target.setDate(now.getDate() - i * 7);
+
+      const start = new Date(target);
+      start.setDate(target.getDate() - target.getDay() + (target.getDay() === 0 ? -6 : 1));
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+
+      const weekLabel = `W${Math.max(1, Math.ceil(target.getDate() / 7))} ${target.toLocaleDateString(undefined, { month: "short" })}`;
+      const weekTasks = mine.filter((t) => {
+        if (t.status !== "completed" && (t.status as string) !== "Completed") return false;
+        const d = t.updatedAt ? new Date(t.updatedAt) : t.dueDate ? new Date(t.dueDate) : t.createdAt ? new Date(t.createdAt) : null;
+        return d ? d >= start && d <= end : false;
+      });
+
+      const points = weekTasks.reduce((acc, t) => acc + (t.points || 0), 0);
+      weeks.push({ week: weekLabel, points, tasks: weekTasks.length });
+    }
+    return weeks;
+  }, [mine]);
+
+  const activityLogs: ActivityLog[] = useMemo(() => {
+    if (Array.isArray(activityData)) return activityData;
+    return (activityData as any)?.data || [];
+  }, [activityData]);
 
   return (
     <>
@@ -146,10 +217,10 @@ function EmployeeOverview() {
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's tasks" value={today.length} icon={Target} delta={0} accent="primary" />
-        <StatCard label="Pending" value={pending.length} icon={Timer} delta={-2.1} accent="info" />
-        <StatCard label="Completed" value={completed.length} icon={CheckCircle2} delta={12.5} accent="success" />
-        <StatCard label="Current points" value={userPoints.toLocaleString()} icon={Sparkles} delta={6.2} accent="warning" />
+        <StatCard label="Today's tasks" value={displayToday.length} icon={Target} accent="primary" />
+        <StatCard label="Pending" value={pending.length} icon={Timer} accent="info" />
+        <StatCard label="Completed" value={completed.length} icon={CheckCircle2} accent="success" />
+        <StatCard label="Current points" value={userPoints.toLocaleString()} icon={Sparkles} accent="warning" />
       </div>
 
       {/* Today's Tasks + Upcoming Deadlines */}
@@ -165,12 +236,12 @@ function EmployeeOverview() {
             </Link>
           </div>
           <ul className="mt-4 space-y-3">
-            {today.length === 0 && (
+            {displayToday.length === 0 && (
               <li className="rounded-xl border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground">
                 All caught up — nothing on the docket today.
               </li>
             )}
-            {today.map((t) => (
+            {displayToday.map((t) => (
               <li
                 key={t.id}
                 className="group flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-3 transition-colors hover:bg-secondary/40"
@@ -190,7 +261,7 @@ function EmployeeOverview() {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Due</p>
                   <p className="text-xs font-semibold">
-                    {new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "-"}
                   </p>
                 </div>
               </li>
@@ -206,8 +277,13 @@ function EmployeeOverview() {
             </div>
           </div>
           <ul className="mt-4 space-y-3">
-            {deadlines.map((t) => {
-              const days = Math.max(0, Math.ceil((+new Date(t.dueDate) - Date.now()) / (1000 * 60 * 60 * 24)));
+            {displayDeadlines.length === 0 && (
+              <li className="rounded-xl border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground">
+                No upcoming deadlines.
+              </li>
+            )}
+            {displayDeadlines.map((t) => {
+              const days = t.dueDate ? Math.max(0, Math.ceil((+new Date(t.dueDate) - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
               const tone = days <= 2 ? "bg-destructive/15 text-destructive" : days <= 5 ? "bg-warning/15 text-warning" : "bg-success/15 text-success";
               return (
                 <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
@@ -234,21 +310,23 @@ function EmployeeOverview() {
               <Award className="h-4 w-4 text-primary" />
               <h3 className="font-display text-lg font-semibold">Monthly performance</h3>
             </div>
-            <Badge variant="secondary" className="rounded-full">Jul</Badge>
+            <Badge variant="secondary" className="rounded-full">{currentMonthName}</Badge>
           </div>
           <div className="mt-6 flex items-center gap-5">
             <CircularProgress value={monthlyProgress} />
             <div>
               <p className="font-display text-2xl font-semibold">{monthlyPoints}</p>
               <p className="text-xs text-muted-foreground">of {monthlyGoal} pts goal</p>
-              <p className="mt-2 text-xs text-success">On track · 4 days ahead</p>
+              <p className="mt-2 text-xs text-success">
+                {monthlyProgress >= 100 ? "Goal achieved!" : `${monthlyProgress}% completed`}
+              </p>
             </div>
           </div>
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <MiniStat label="Avg / day" value="16 pts" />
-            <MiniStat label="Best day" value="42 pts" />
-            <MiniStat label="Tasks / wk" value="18" />
-            <MiniStat label="Rating" value="4.8 / 5" />
+            <MiniStat label="Avg / day" value={avgPointsPerDay} />
+            <MiniStat label="Best day" value={bestDayPoints} />
+            <MiniStat label="Tasks / wk" value={tasksPerWeekAvg} />
+            <MiniStat label="Completed" value={`${completed.length} tasks`} />
           </div>
         </div>
 
@@ -317,21 +395,31 @@ function EmployeeOverview() {
           <Link to="/employee/history" className="text-xs text-primary hover:underline">Full history</Link>
         </div>
         <ol className="mt-6 relative space-y-6 border-l border-border/60 pl-6">
-          {activityLogs.slice(0, 6).map((a) => (
-            <li key={a.id} className="relative">
-              <span className="absolute -left-[29px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-background bg-primary shadow-glow" />
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm">
-                  <span className="font-medium">{a.user}</span>{a.userCode && <> <IdBadge id={a.userCode} /></>}{" "}
-                  <span className="text-muted-foreground">{a.action}</span>{" "}
-                  <span className="font-medium">{a.target}</span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(a.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                </p>
-              </div>
-            </li>
-          ))}
+          {activityLogs.length === 0 && (
+            <li className="text-xs text-muted-foreground">No recent activity logs found.</li>
+          )}
+          {activityLogs.map((a) => {
+            const actorName = typeof a.actorId === "object" && a.actorId?.name ? a.actorId.name : userName;
+            const actorCode = typeof a.actorId === "object" ? a.actorId?.empId : undefined;
+            const actionText = (a.action || "").replace(/_/g, " ");
+            const targetText = (a.metadata?.title as string) || (a.metadata?.name as string) || a.entityType || "";
+            return (
+              <li key={a._id || a.id} className="relative">
+                <span className="absolute -left-[29px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-background bg-primary shadow-glow" />
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm">
+                    <span className="font-medium">{actorName}</span>
+                    {actorCode && <> <IdBadge id={actorCode} /></>}{" "}
+                    <span className="text-muted-foreground">{actionText}</span>{" "}
+                    <span className="font-medium">{targetText}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {a.createdAt ? new Date(a.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : ""}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </>

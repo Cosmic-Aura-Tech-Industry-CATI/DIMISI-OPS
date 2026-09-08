@@ -7,32 +7,21 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { noticeTypeMeta, useEmployeeNotices } from "@/lib/notice-store";
-import { bulkSetReviewNotifState, useReviewNotifications } from "@/lib/review-store";
-import { markAllAdminNotifsRead, useAdminNotifications } from "@/lib/admin-notification-store";
+import {
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
+} from "@/features/notifications";
 
-type Notif = {
-  id: string;
-  title: string;
-  body: string;
-  time: string;
-  tone: "info" | "success" | "warning";
-  unread: boolean;
-};
+type ToneType = "info" | "success" | "warning";
 
-const toneStyles: Record<Notif["tone"], string> = {
+const toneStyles: Record<ToneType, string> = {
   info: "bg-info/15 text-info",
   success: "bg-success/15 text-success",
   warning: "bg-warning/15 text-warning",
 };
 
-const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
-const withinMonth = (ts: string) => {
-  const t = new Date(ts).getTime();
-  return Number.isNaN(t) ? true : Date.now() - t < MONTH_MS;
-};
-
-function shortTime(ts: string) {
+function shortTime(ts: string | Date) {
   const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
   if (diffM < 60) return `${diffM}m`;
   if (diffM < 60 * 24) return `${Math.round(diffM / 60)}h`;
@@ -42,60 +31,47 @@ function shortTime(ts: string) {
 export function NotificationsMenu() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "director";
   const [open, setOpen] = useState(false);
-  const [readNotices, setReadNotices] = useState<string[]>([]);
-  const notices = useEmployeeNotices();
-  const reviewNotifs = useReviewNotifications();
-  const adminNotifs = useAdminNotifications();
 
-  const employeeItems: Notif[] = reviewNotifs
-    .filter((n) => n.state !== "archived" && withinMonth(n.timestamp))
-    .map((n) => ({
-      id: n.id,
+  const { data: rawNotifications = [] } = useNotificationsQuery();
+  const markAllReadMutation = useMarkAllNotificationsReadMutation();
+  const markReadMutation = useMarkNotificationReadMutation();
+
+  const notifications = rawNotifications.map((n) => {
+    let tone: ToneType = "info";
+    if (n.type.includes("approved") || n.type.includes("points")) {
+      tone = "success";
+    } else if (n.type.includes("rejected") || n.type.includes("deadline")) {
+      tone = "warning";
+    }
+
+    return {
+      id: n._id || n.id || "",
       title: n.title,
       body: n.message,
-      time: shortTime(n.timestamp),
-      tone: n.type === "rejected" ? "warning" : n.type === "approved" || n.type === "points" ? "success" : "info",
-      unread: n.state === "unread",
-    }));
+      time: shortTime(n.createdAt),
+      tone,
+      unread: !n.isRead,
+    };
+  });
 
-  const noticeItems: Notif[] = isAdmin
-    ? []
-    : notices.map((n) => {
-        const noticeId = n._id || n.id || "";
-        const icon = noticeTypeMeta[n.type]?.icon || "📢";
-        const headline = n.headline || n.title || "";
-        const timeStr = n.createdAt ? shortTime(n.createdAt) : "Recently";
-        return {
-          id: `notice-${noticeId}`,
-          title: `${icon} ${headline}`,
-          body: n.content.length > 90 ? `${n.content.slice(0, 90)}…` : n.content,
-          time: timeStr,
-          tone: n.priority === "urgent" || n.priority === "high" ? "warning" : "info",
-          unread: !readNotices.includes(noticeId),
-        };
-      });
+  const unread = notifications.filter((i) => i.unread).length;
 
-  const adminItems: Notif[] = adminNotifs.filter((n) => withinMonth(n.timestamp)).map((n) => ({
-    id: n.id,
-    title: n.title,
-    body: n.message,
-    time: shortTime(n.timestamp),
-    tone: n.type === "approved" ? "success" : "info",
-    unread: !n.read,
-  }));
-
-  const all = isAdmin ? adminItems : [...employeeItems, ...noticeItems];
-  const unread = all.filter((i) => i.unread).length;
-
-  const markAllRead = () => {
-    if (isAdmin) {
-      markAllAdminNotifsRead();
-      return;
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadMutation.mutateAsync();
+    } catch {
+      // Ignore background errors
     }
-    bulkSetReviewNotifState("unread", "read");
-    setReadNotices(notices.map((n) => n._id || n.id || ""));
+  };
+
+  const handleNotificationClick = (id: string, isUnread: boolean) => {
+    if (isUnread) {
+      markReadMutation.mutate(id);
+    }
+    setOpen(false);
+    navigate({ to: isAdmin ? "/admin/notifications" : "/employee/notifications" });
   };
 
   return (
@@ -126,22 +102,24 @@ export function NotificationsMenu() {
             )}
           </div>
           <button
-            onClick={markAllRead}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap py-1 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleMarkAllRead}
+            disabled={markAllReadMutation.isPending || unread === 0}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <Check className="h-3 w-3" /> Mark all read
           </button>
         </div>
         <ScrollArea className="max-h-[55vh] sm:max-h-80">
-          {all.length === 0 ? (
+          {notifications.length === 0 ? (
             <p className="px-4 py-8 text-center text-xs text-muted-foreground">You're all caught up.</p>
           ) : (
             <ul className="divide-y divide-border/60">
-              {all.map((n) => (
+              {notifications.map((n) => (
                 <li
                   key={n.id}
+                  onClick={() => handleNotificationClick(n.id, n.unread)}
                   className={cn(
-                    "flex gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
+                    "flex cursor-pointer gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
                     n.unread && "bg-primary/[0.03]",
                   )}
                 >

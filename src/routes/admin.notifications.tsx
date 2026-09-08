@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bell, BellOff, ClipboardCheck, CheckCircle2, UserPlus, ShieldPlus, Check } from "lucide-react";
+import { Bell, BellOff, ClipboardCheck, CheckCircle2, UserPlus, ShieldPlus, Check, Sparkles, AlarmClock, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +9,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import {
-  markAllAdminNotifsRead,
-  setAdminNotifRead,
-  useAdminNotifications,
-  type AdminNotifType,
-} from "@/lib/admin-notification-store";
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
+  type NotificationItem,
+} from "@/features/notifications";
 
 export const Route = createFileRoute("/admin/notifications")({
   head: () => ({
@@ -29,14 +29,22 @@ export const Route = createFileRoute("/admin/notifications")({
   component: AdminNotificationsPage,
 });
 
-const meta: Record<AdminNotifType, { label: string; Icon: typeof Bell }> = {
-  approved: { label: "Task Approved", Icon: CheckCircle2 },
-  submission: { label: "New Submission", Icon: ClipboardCheck },
-  new_employee: { label: "New Employee", Icon: UserPlus },
-  new_admin: { label: "New Admin", Icon: ShieldPlus },
+const meta: Record<string, { label: string; Icon: typeof Bell }> = {
+  approved:           { label: "Task Approved",       Icon: CheckCircle2 },
+  task_approval:      { label: "Task Approved",       Icon: CheckCircle2 },
+  submission:         { label: "New Submission",      Icon: ClipboardCheck },
+  new_submission:     { label: "New Submission",      Icon: ClipboardCheck },
+  review_request:     { label: "Review Request",      Icon: ClipboardCheck },
+  new_employee:       { label: "New Employee",        Icon: UserPlus },
+  new_admin:          { label: "New Admin",           Icon: ShieldPlus },
+  deadline_reminder:  { label: "Deadline Reminder",   Icon: AlarmClock },
+  points_earned:      { label: "Points Earned",       Icon: Sparkles },
+  rejected:           { label: "Task Rejected",       Icon: XCircle },
 };
 
-function formatWhen(ts: string) {
+const defaultMeta = { label: "Notification", Icon: Bell };
+
+function formatWhen(ts: string | Date) {
   const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
   if (diffM < 60) return `${diffM}m ago`;
   if (diffM < 60 * 24) return `${Math.round(diffM / 60)}h ago`;
@@ -44,41 +52,58 @@ function formatWhen(ts: string) {
 }
 
 function AdminNotificationsPage() {
-  const items = useAdminNotifications();
+  const { data: notifications = [], isLoading } = useNotificationsQuery();
+  const markReadMutation = useMarkNotificationReadMutation();
+  const markAllReadMutation = useMarkAllNotificationsReadMutation();
+
   const [tab, setTab] = useState<"unread" | "read">("unread");
-  const [typeFilter, setTypeFilter] = useState<AdminNotifType | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const counts = useMemo(
     () => ({
-      unread: items.filter((n) => !n.read).length,
-      read: items.filter((n) => n.read).length,
+      unread: notifications.filter((n) => !n.isRead).length,
+      read: notifications.filter((n) => n.isRead).length,
     }),
-    [items],
+    [notifications],
   );
 
   const filtered = useMemo(
     () =>
-      items
-        .filter((n) => (tab === "unread" ? !n.read : n.read))
+      notifications
+        .filter((n) => (tab === "unread" ? !n.isRead : n.isRead))
         .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
-        .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)),
-    [items, tab, typeFilter],
+        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    [notifications, tab, typeFilter],
   );
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadMutation.mutateAsync();
+      toast.success("All notifications marked as read");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark all as read");
+    }
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await markReadMutation.mutateAsync(id);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark as read");
+    }
+  };
 
   return (
     <>
       <PageHeader
         title="Notifications"
-        subtitle="Approvals, submissions and new team members. Entries clear automatically after 30 days."
+        subtitle="Approvals, submissions and new team members across your workspace."
         actions={
           <Button
             variant="outline"
             className="min-h-11 w-full rounded-md sm:w-auto"
-            onClick={() => {
-              markAllAdminNotifsRead();
-              toast.success("All notifications marked as read");
-            }}
-            disabled={counts.unread === 0}
+            onClick={handleMarkAllRead}
+            disabled={counts.unread === 0 || markAllReadMutation.isPending}
           >
             <Check className="mr-1.5 h-4 w-4" /> Mark all read
           </Button>
@@ -95,7 +120,7 @@ function AdminNotificationsPage() {
         >
           All
         </button>
-        {(Object.keys(meta) as AdminNotifType[]).map((k) => {
+        {Object.keys(meta).map((k) => {
           const M = meta[k];
           const active = typeFilter === k;
           return (
@@ -131,7 +156,11 @@ function AdminNotificationsPage() {
         </TabsList>
       </Tabs>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          Loading notifications…
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={BellOff}
           title="You're all caught up"
@@ -139,15 +168,16 @@ function AdminNotificationsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {filtered.map((n, i) => {
-            const M = meta[n.type];
+          {filtered.map((n: NotificationItem, i) => {
+            const M = meta[n.type] || defaultMeta;
+            const notifId = n._id || n.id || "";
             return (
               <div
-                key={n.id}
+                key={notifId}
                 className={cn(
                   "glass group relative flex items-start gap-3 rounded-2xl p-3 transition-all animate-in fade-in slide-in-from-bottom-1 sm:gap-4 sm:p-4",
                   "hover:border-primary/30",
-                  !n.read && "border-l-2 border-l-primary",
+                  !n.isRead && "border-l-2 border-l-primary",
                 )}
                 style={{ animationDelay: `${i * 40}ms` }}
               >
@@ -159,7 +189,7 @@ function AdminNotificationsPage() {
                     <Badge variant="outline" className="border-border/40 bg-primary/15 text-[10px] uppercase tracking-widest text-primary">
                       {M.label}
                     </Badge>
-                    <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{formatWhen(n.timestamp)}</span>
+                    <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{formatWhen(n.createdAt)}</span>
                   </div>
                   <div className="mt-1.5 break-words font-medium">{n.title}</div>
                   <p className="mt-0.5 break-words text-sm text-muted-foreground">{n.message}</p>
@@ -171,22 +201,17 @@ function AdminNotificationsPage() {
                         </Link>
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-md"
-                      onClick={() => setAdminNotifRead(n.id, !n.read)}
-                    >
-                      {n.read ? (
-                        <>
-                          <Bell className="mr-1 h-3.5 w-3.5" /> Mark unread
-                        </>
-                      ) : (
-                        <>
-                          <Check className="mr-1 h-3.5 w-3.5" /> Mark read
-                        </>
-                      )}
-                    </Button>
+                    {!n.isRead && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-md"
+                        onClick={() => handleMarkRead(notifId)}
+                        disabled={markReadMutation.isPending}
+                      >
+                        <Check className="mr-1 h-3.5 w-3.5" /> Mark read
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,25 +1,49 @@
 /** Types for settings and preferences module. */
 
-export interface UserPreferencesNotifications {
-  email?: boolean;
-  push?: boolean;
-  marketing?: boolean;
+export interface EmailNotifications {
   taskAssignments?: boolean;
   reviewRequests?: boolean;
   weeklyDigest?: boolean;
-  productUpdates?: boolean;
+}
+
+export interface InAppNotifications {
   deadlineReminders?: boolean;
   taskApprovals?: boolean;
   pointsEarned?: boolean;
-  mentionsComments?: boolean;
+}
+
+export interface DeliverySchedule {
   quietHoursStart?: string;
   quietHoursEnd?: string;
 }
 
+export interface UserPreferencesNotifications {
+  email?: EmailNotifications;
+  inApp?: InAppNotifications;
+  deliverySchedule?: DeliverySchedule;
+
+  // Flattened aliases for legacy/simple binding
+  taskAssignments?: boolean;
+  reviewRequests?: boolean;
+  weeklyDigest?: boolean;
+  deadlineReminders?: boolean;
+  taskApprovals?: boolean;
+  pointsEarned?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+export interface TwoFactorSecurity {
+  authenticatorApp?: boolean;
+  emailVerification?: boolean;
+  isAuthenticatorVerified?: boolean;
+}
+
 export interface UserPreferencesSecurity {
-  twoFactorEnabled: boolean;
-  emailOtpEnabled: boolean;
-  sessionTimeout: number;
+  twoFactor?: TwoFactorSecurity;
+  twoFactorEnabled?: boolean;
+  emailOtpEnabled?: boolean;
+  sessionTimeout?: number;
 }
 
 export interface UserPreferencesTwoFactorAuth {
@@ -33,13 +57,22 @@ export interface UserPreferences {
   theme: "light" | "dark" | "system";
   notifications: UserPreferencesNotifications;
   security: UserPreferencesSecurity;
-  twoFactorAuth: UserPreferencesTwoFactorAuth;
+  twoFactorAuth?: UserPreferencesTwoFactorAuth;
 }
 
 export interface UpdatePreferencesPayload {
   theme?: "light" | "dark" | "system";
-  notifications?: Partial<UserPreferencesNotifications>;
-  security?: Partial<UserPreferencesSecurity>;
+  notifications?: {
+    email?: Partial<EmailNotifications>;
+    inApp?: Partial<InAppNotifications>;
+    deliverySchedule?: Partial<DeliverySchedule>;
+    [key: string]: unknown;
+  };
+  security?: {
+    twoFactor?: Partial<TwoFactorSecurity>;
+    emailOtpEnabled?: boolean;
+    twoFactorEnabled?: boolean;
+  };
 }
 
 export interface WorkspaceSettings {
@@ -55,14 +88,21 @@ export interface UpdateWorkspaceSettingsPayload {
 }
 
 export interface UserSession {
-  id: string;
+  _id?: string;
+  id?: string;
   ipAddress: string;
+  deviceInfo?: {
+    os?: string;
+    browser?: string;
+    device?: string;
+  };
   device?: string;
   browser?: string;
   os?: string;
   location?: string;
-  lastActive: string | Date;
-  createdAt: string | Date;
+  lastActive?: string | Date;
+  createdAt?: string | Date;
+  current?: boolean;
 }
 
 export interface SessionsData {
@@ -71,25 +111,31 @@ export interface SessionsData {
 }
 
 export interface Setup2FaResponse {
+  qrCode: string;
   qrCodeUrl: string;
   secret: string;
 }
 
 export interface Verify2FaResponse {
+  preferences?: UserPreferences;
   recoveryCodes?: string[];
+  message?: string;
 }
 
 export interface CheckPasswordPayload {
-  password: string;
+  currentPassword?: string;
+  password?: string;
 }
 
 export interface UpdatePasswordPayload {
-  currentPassword: string;
+  otp: string;
   newPassword: string;
-  otp?: string;
+  currentPassword?: string;
+  refreshToken?: string;
 }
 
 export interface UpdateProfilePayload {
   phone?: string;
   avatar?: string;
+  avtar?: string;
 }
