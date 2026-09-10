@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-<<<<<<< Updated upstream
 import { CheckCircle2, TrendingUp, Trophy, Users } from "lucide-react";
-=======
-import { CheckCircle2, Trophy, Users } from "lucide-react";
->>>>>>> Stashed changes
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

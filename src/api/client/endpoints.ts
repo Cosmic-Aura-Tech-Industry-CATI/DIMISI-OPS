@@ -94,7 +94,6 @@ export const API_ENDPOINTS = {
     revokeOtherSessions: "/settings/sessions/others",
     revokeSession: (id: string) => `/settings/sessions/${id}`,
   },
-<<<<<<< Updated upstream
   activity: {
     personal: "/activity/personal",
     admin: "/activity/admin",
@@ -109,7 +108,5 @@ export const API_ENDPOINTS = {
     readAll: "/notifications/read-all",
     markRead: (id: string) => `/notifications/${id}/read`,
   },
-=======
->>>>>>> Stashed changes
 } as const;
 

@@ -150,23 +150,14 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-<<<<<<< Updated upstream
       const res = await checkPasswordMutation.mutateAsync({ currentPassword: current });
-=======
-      await checkPasswordMutation.mutateAsync({ password: current });
-      await sendPasswordOtp(email);
->>>>>>> Stashed changes
       setCode("");
       setOtpError("");
       setLocked(false);
       setAttemptsLeft(OTP_MAX_ATTEMPTS);
       setSeconds(OTP_RESEND_SECONDS);
       setStep("otp");
-<<<<<<< Updated upstream
       toast.success(res?.message || "Verification code sent", {
-=======
-      toast.success("Verification code sent", {
->>>>>>> Stashed changes
         description: `We emailed a 6-digit code to ${email}.`,
       });
     } catch (err: any) {
@@ -235,11 +226,7 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-<<<<<<< Updated upstream
       const res = await updatePasswordMutation.mutateAsync({
-=======
-      await updatePasswordMutation.mutateAsync({
->>>>>>> Stashed changes
         currentPassword: current,
         newPassword: next,
         otp: code,
@@ -248,11 +235,7 @@ export function ChangePasswordCard({
       await sendPasswordChangedEmail(email);
       audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
       setStep("done");
-<<<<<<< Updated upstream
       toast.success(res?.message || "Password changed successfully", {
-=======
-      toast.success("Password changed successfully", {
->>>>>>> Stashed changes
         description: "Please sign in again with your new password.",
       });
       setTimeout(() => {
@@ -260,24 +243,9 @@ export function ChangePasswordCard({
         void navigate({ to: "/login" });
       }, 2600);
     } catch (err: any) {
-<<<<<<< Updated upstream
       const msg = err?.message || "Failed to update password. Please check your OTP code.";
       setError(msg);
       toast.error(msg);
-=======
-      // Fallback local update if offline
-      updatePassword(email, next);
-      await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated locally.");
-      setStep("done");
-      toast.success("Password changed successfully", {
-        description: "Please sign in again with your new password.",
-      });
-      setTimeout(() => {
-        logout();
-        void navigate({ to: "/login" });
-      }, 2600);
->>>>>>> Stashed changes
     } finally {
       setBusy(false);
     }
