@@ -12,8 +12,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { TaskCardGrid } from "@/components/task-card";
-import { currentEmployee, type TaskPriority } from "@/lib/mock-data";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, type TaskPriority } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import { applySubmissions, useSubmissionMap } from "@/lib/submission-store";
 import { applyReviewDecisions, useReviewMap } from "@/lib/review-store";
@@ -39,7 +38,7 @@ function AssignedTasksPage() {
   const { data: rawTasks = [], isLoading } = useTasksQuery();
   const tasks = applyReviewDecisions(applySubmissions(rawTasks, subs), reviewMap);
 
-  const currentUserId = auth.user?.id || auth.user?._id || currentEmployee.id;
+  const currentUserId = auth.user?.id || auth.user?._id || "";
 
   const mine = useMemo(() => {
     return tasks.filter((t) => {

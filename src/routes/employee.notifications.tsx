@@ -19,11 +19,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import {
-  bulkSetReviewNotifState,
-  setReviewNotifState,
-  useReviewNotifications,
-  type ReviewNotifState,
-} from "@/lib/review-store";
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
+  type NotificationItem,
+} from "@/features/notifications";
 
 export const Route = createFileRoute("/employee/notifications")({
   head: () => ({
@@ -37,137 +37,91 @@ export const Route = createFileRoute("/employee/notifications")({
   component: NotificationsPage,
 });
 
-type NotifType =
-  | "new_task"
-  | "deadline"
-  | "approved"
-  | "rejected"
-  | "points";
-
 type State = "unread" | "read";
 
-type Notif = {
-  id: string;
-  type: NotifType;
-  title: string;
-  message: string;
-  taskId?: string;
-  points?: number;
-  timestamp: string;
-  state: State;
+const meta: Record<string, { label: string; Icon: typeof Bell; tone: string; ring: string }> = {
+  task_assignment:   { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  new_task:          { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  deadline_reminder: { label: "Deadline Reminder",  Icon: AlarmClock,    tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  deadline:          { label: "Deadline Reminder",  Icon: AlarmClock,    tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  task_approval:     { label: "Task Approved",      Icon: CheckCircle2,  tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  approved:          { label: "Task Approved",      Icon: CheckCircle2,  tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  rejected:          { label: "Task Rejected",      Icon: XCircle,       tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
+  points_earned:     { label: "Points Earned",      Icon: Sparkles,      tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  points:            { label: "Points Earned",      Icon: Sparkles,      tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
 };
 
-const nowIso = "2026-07-29T09:00:00Z";
-
-function hoursAgo(h: number) {
-  return new Date(new Date(nowIso).getTime() - h * 3600_000).toISOString();
-}
-
-const seed: Notif[] = [
-  { id: "n1", type: "new_task",  title: "New task assigned", message: "Shikhar Dixit assigned you \"Enterprise SSO rollout\".", taskId: "t10", timestamp: hoursAgo(1), state: "unread" },
-  { id: "n2", type: "deadline",  title: "Deadline in 24 hours", message: "\"Refactor billing service\" is due tomorrow.", taskId: "t1", timestamp: hoursAgo(2), state: "unread" },
-  { id: "n3", type: "approved",  title: "Task approved", message: "Rhea Kapoor approved \"Fix mobile crash on iOS 19\".", taskId: "t8", timestamp: hoursAgo(5), state: "unread" },
-  { id: "n4", type: "points",    title: "Points earned", message: "You earned points for completing a task.", points: 75, taskId: "t8", timestamp: hoursAgo(5), state: "unread" },
-  { id: "n5", type: "rejected",  title: "Changes requested", message: "\"Legacy cron cleanup\" was rejected — check reviewer notes.", taskId: "t13", timestamp: hoursAgo(28), state: "read" },
-  { id: "n6", type: "new_task",  title: "New task assigned", message: "Julian Park assigned you \"API rate-limit dashboard\".", taskId: "t11", timestamp: hoursAgo(48), state: "read" },
-  { id: "n7", type: "points",    title: "Points earned", message: "You earned points for a completed task.", points: 60, taskId: "t11", timestamp: hoursAgo(50), state: "read" },
-  { id: "n8", type: "deadline",  title: "Deadline this week", message: "\"Design onboarding flow v3\" is due Friday.", taskId: "t2", timestamp: hoursAgo(72), state: "read" },
-  { id: "n9", type: "approved",  title: "Task approved", message: "Shikhar Dixit approved \"Roadmap workshop prep\".", taskId: "t7", timestamp: hoursAgo(120), state: "read" },
-];
-
-const meta: Record<NotifType, { label: string; Icon: typeof Bell; tone: string; ring: string }> = {
-  new_task: { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  deadline: { label: "Deadline Reminder",  Icon: AlarmClock,    tone: "bg-primary/15 text-primary",     ring: "ring-primary/30" },
-  approved: { label: "Task Approved",      Icon: CheckCircle2,  tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  rejected: { label: "Task Rejected",      Icon: XCircle,       tone: "bg-primary/15 text-primary",       ring: "ring-primary/30" },
-  points:   { label: "Points Earned",      Icon: Sparkles,      tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+const defaultMeta = {
+  label: "Notification",
+  Icon: Bell,
+  tone: "bg-primary/15 text-primary",
+  ring: "ring-primary/30",
 };
 
-function formatWhen(ts: string) {
-  const d = new Date(ts);
-  const diffM = Math.round((new Date(nowIso).getTime() - d.getTime()) / 60000);
+function formatWhen(ts: string | Date) {
+  const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
   if (diffM < 60) return `${diffM}m ago`;
   if (diffM < 60 * 24) return `${Math.round(diffM / 60)}h ago`;
   const days = Math.round(diffM / 60 / 24);
   return `${days}d ago`;
 }
 
-const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
-const withinMonth = (ts: string) => {
-  const t = new Date(ts).getTime();
-  return Number.isNaN(t) ? true : Date.now() - t < MONTH_MS;
-};
-
 function NotificationsPage() {
-  const [localItems, setItems] = useState<Notif[]>(seed);
-  const reviewNotifs = useReviewNotifications();
+  const { data: notifications = [], isLoading } = useNotificationsQuery();
+  const markReadMutation = useMarkNotificationReadMutation();
+  const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
-  const items = useMemo<Notif[]>(() => {
-    const mapped: Notif[] = reviewNotifs.map((n) => ({
-      id: n.id,
-      type: n.type === "remarks" ? "new_task" : n.type === "approved" ? "approved" : n.type === "points" ? "points" : "rejected",
-      title: n.title,
-      message: n.message,
-      taskId: n.taskId,
-      points: n.points,
-      timestamp: n.timestamp,
-      state: n.state === "archived" ? "read" : n.state,
-    }));
-    // auto-expire anything older than a month
-    return [...mapped, ...localItems].filter((n) => withinMonth(n.timestamp));
-  }, [reviewNotifs, localItems]);
-
-  const isReview = (id: string) => id.startsWith("rv-");
   const [tab, setTab] = useState<State>("unread");
-  const [typeFilter, setTypeFilter] = useState<NotifType | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const counts = useMemo(
     () => ({
-      unread: items.filter((n) => n.state === "unread").length,
-      read: items.filter((n) => n.state === "read").length,
+      unread: notifications.filter((n) => !n.isRead).length,
+      read: notifications.filter((n) => n.isRead).length,
     }),
-    [items],
+    [notifications],
   );
 
-
   const filtered = useMemo(() => {
-    return items
-      .filter((n) => n.state === tab)
+    return notifications
+      .filter((n) => (tab === "unread" ? !n.isRead : n.isRead))
       .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
-      .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  }, [items, tab, typeFilter]);
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  }, [notifications, tab, typeFilter]);
 
-  const updateOne = (id: string, patch: Partial<Notif>) => {
-    if (isReview(id)) {
-      if (patch.state) setReviewNotifState(id, patch.state as ReviewNotifState);
-      return;
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadMutation.mutateAsync();
+      toast.success("All notifications marked as read");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark all as read");
     }
-    setItems((xs) => xs.map((n) => (n.id === id ? { ...n, ...patch } : n)));
   };
 
-  const markAllRead = () => {
-    bulkSetReviewNotifState("unread", "read");
-    setItems((xs) => xs.map((n) => (n.state === "unread" ? { ...n, state: "read" } : n)));
-    toast.success("All notifications marked as read");
+  const handleMarkRead = async (id: string) => {
+    try {
+      await markReadMutation.mutateAsync(id);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark as read");
+    }
   };
 
   return (
     <>
       <PageHeader
         title="Notifications"
-        subtitle="Task updates, reviews, and rewards. Entries clear automatically after 30 days."
+        subtitle="Task updates, reviews, and rewards across your workspace."
         actions={
           <Button
             variant="outline"
             className="min-h-11 w-full rounded-md sm:w-auto"
-            onClick={markAllRead}
-            disabled={counts.unread === 0}
+            onClick={handleMarkAllRead}
+            disabled={counts.unread === 0 || markAllReadMutation.isPending}
           >
             <Check className="mr-1.5 h-4 w-4" /> Mark all read
           </Button>
         }
       />
-
 
       {/* Type filter chips */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -180,7 +134,7 @@ function NotificationsPage() {
         >
           All
         </button>
-        {(Object.keys(meta) as NotifType[]).map((k) => {
+        {Object.keys(meta).map((k) => {
           const M = meta[k];
           const active = typeFilter === k;
           return (
@@ -218,7 +172,11 @@ function NotificationsPage() {
       </Tabs>
 
       {/* List */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          Loading notifications…
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={BellOff}
           title="You're all caught up"
@@ -226,12 +184,13 @@ function NotificationsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {filtered.map((n, i) => {
-            const M = meta[n.type];
-            const isUnread = n.state === "unread";
+          {filtered.map((n: NotificationItem, i) => {
+            const M = meta[n.type] || defaultMeta;
+            const isUnread = !n.isRead;
+            const notifId = n._id || n.id || "";
             return (
               <div
-                key={n.id}
+                key={notifId}
                 className={cn(
                   "glass group relative flex items-start gap-3 rounded-2xl p-3 transition-all animate-in fade-in slide-in-from-bottom-1 sm:gap-4 sm:p-4",
                   "hover:border-primary/30 hover:shadow-glow/40",
@@ -248,17 +207,12 @@ function NotificationsPage() {
                     <Badge variant="outline" className={cn("border-border/40 text-[10px] uppercase tracking-widest", M.tone)}>
                       {M.label}
                     </Badge>
-                    {n.points ? (
-                      <Badge className="bg-primary/15 text-primary hover:bg-primary/15">
-                        <Sparkles className="mr-1 h-3 w-3" />+{n.points} pts
-                      </Badge>
-                    ) : null}
                     {isUnread && (
                       <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-widest text-primary">
                         <Dot className="-mx-1 h-4 w-4" /> New
                       </span>
                     )}
-                    <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{formatWhen(n.timestamp)}</span>
+                    <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{formatWhen(n.createdAt)}</span>
                   </div>
                   <div className="mt-1.5 break-words font-medium">{n.title}</div>
                   <p className="mt-0.5 break-words text-sm text-muted-foreground">{n.message}</p>
@@ -271,24 +225,15 @@ function NotificationsPage() {
                         </Link>
                       </Button>
                     )}
-                    {n.state === "unread" && (
+                    {isUnread && (
                       <Button
                         size="sm"
                         variant="ghost"
                         className="rounded-full"
-                        onClick={() => updateOne(n.id, { state: "read" })}
+                        onClick={() => handleMarkRead(notifId)}
+                        disabled={markReadMutation.isPending}
                       >
                         <Check className="mr-1 h-3.5 w-3.5" /> Mark read
-                      </Button>
-                    )}
-                    {n.state === "read" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="rounded-full"
-                        onClick={() => updateOne(n.id, { state: "unread" })}
-                      >
-                        <Bell className="mr-1 h-3.5 w-3.5" /> Mark unread
                       </Button>
                     )}
                   </div>
