@@ -37,9 +37,15 @@ export const Route = createFileRoute("/admin/activity")({
   head: () => ({
     meta: [
       { title: "Activity — Dimisi Operations" },
-      { name: "description", content: "Full timeline of task and account activity across your organization." },
+      {
+        name: "description",
+        content: "Full timeline of task and account activity across your organization.",
+      },
       { property: "og:title", content: "Activity — Dimisi Operations" },
-      { property: "og:description", content: "Full timeline of task and account activity across your organization." },
+      {
+        property: "og:description",
+        content: "Full timeline of task and account activity across your organization.",
+      },
     ],
   }),
   component: ActivityPage,
@@ -82,34 +88,162 @@ type ActivityEvent = {
   timestamp: string; // ISO
 };
 
-const meta: Record<string, { label: string; Icon: typeof ClipboardList; tone: string; ring: string }> = {
-  task_assigned: { label: "Task Assigned", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  task_created: { label: "Task Created", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  task_completed: { label: "Task Completed", Icon: CheckCircle2, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  task_approved: { label: "Task Approved", Icon: CheckCircle2, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  approved: { label: "Task Approved", Icon: CheckCircle2, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  task_rejected: { label: "Task Rejected", Icon: XCircle, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  rejected: { label: "Task Rejected", Icon: XCircle, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  task_deleted: { label: "Task Deleted", Icon: XCircle, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  project_created: { label: "Project Created", Icon: FolderPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  project_joined: { label: "Project Joined", Icon: FolderPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  project_deleted: { label: "Project Deleted", Icon: FolderX, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  project_archived: { label: "Project Archived", Icon: Archive, tone: "bg-warning/15 text-warning", ring: "ring-warning/30" },
-  employee_added: { label: "Employee Added", Icon: UserPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  employee_removed: { label: "Employee Removed", Icon: UserRoundMinus, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  department_created: { label: "Department Created", Icon: FolderPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  department_deleted: { label: "Department Deleted", Icon: FolderX, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  designation_created: { label: "Designation Created", Icon: ShieldPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  designation_deleted: { label: "Designation Deleted", Icon: ShieldMinus, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  notice_created: { label: "Notice Published", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  notice_deleted: { label: "Notice Deleted", Icon: FolderX, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  workspace_settings_updated: { label: "Workspace Updated", Icon: ShieldPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  admin_added: { label: "Admin Added", Icon: ShieldPlus, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
-  admin_removed: { label: "Admin Removed", Icon: ShieldMinus, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  login: { label: "User Login", Icon: KeyRound, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+const meta: Record<
+  string,
+  { label: string; Icon: typeof ClipboardList; tone: string; ring: string }
+> = {
+  task_assigned: {
+    label: "Task Assigned",
+    Icon: ClipboardList,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  task_created: {
+    label: "Task Created",
+    Icon: ClipboardList,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  task_completed: {
+    label: "Task Completed",
+    Icon: CheckCircle2,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  task_approved: {
+    label: "Task Approved",
+    Icon: CheckCircle2,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  approved: {
+    label: "Task Approved",
+    Icon: CheckCircle2,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  task_rejected: {
+    label: "Task Rejected",
+    Icon: XCircle,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  rejected: {
+    label: "Task Rejected",
+    Icon: XCircle,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  task_deleted: {
+    label: "Task Deleted",
+    Icon: XCircle,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  project_created: {
+    label: "Project Created",
+    Icon: FolderPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  project_joined: {
+    label: "Project Joined",
+    Icon: FolderPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  project_deleted: {
+    label: "Project Deleted",
+    Icon: FolderX,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  project_archived: {
+    label: "Project Archived",
+    Icon: Archive,
+    tone: "bg-warning/15 text-warning",
+    ring: "ring-warning/30",
+  },
+  employee_added: {
+    label: "Employee Added",
+    Icon: UserPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  employee_removed: {
+    label: "Employee Removed",
+    Icon: UserRoundMinus,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  department_created: {
+    label: "Department Created",
+    Icon: FolderPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  department_deleted: {
+    label: "Department Deleted",
+    Icon: FolderX,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  designation_created: {
+    label: "Designation Created",
+    Icon: ShieldPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  designation_deleted: {
+    label: "Designation Deleted",
+    Icon: ShieldMinus,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  notice_created: {
+    label: "Notice Published",
+    Icon: ClipboardList,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  notice_deleted: {
+    label: "Notice Deleted",
+    Icon: FolderX,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  workspace_settings_updated: {
+    label: "Workspace Updated",
+    Icon: ShieldPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  admin_added: {
+    label: "Admin Added",
+    Icon: ShieldPlus,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
+  admin_removed: {
+    label: "Admin Removed",
+    Icon: ShieldMinus,
+    tone: "bg-destructive/15 text-destructive",
+    ring: "ring-destructive/30",
+  },
+  login: {
+    label: "User Login",
+    Icon: KeyRound,
+    tone: "bg-primary/15 text-primary",
+    ring: "ring-primary/30",
+  },
 };
 
-const defaultMeta = { label: "Activity Event", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" };
+const defaultMeta = {
+  label: "Activity Event",
+  Icon: ClipboardList,
+  tone: "bg-primary/15 text-primary",
+  ring: "ring-primary/30",
+};
 
 function formatWhen(ts: string) {
   const d = new Date(ts);
@@ -174,7 +308,8 @@ function ActivityPage() {
     return rawLogs.map((log) => {
       const actorObj = typeof log.actorId === "object" && log.actorId !== null ? log.actorId : null;
       const actor = actorObj?.name || actorObj?.email || "System";
-      const actorId = actorObj?._id || actorObj?.id || (typeof log.actorId === "string" ? log.actorId : "");
+      const actorId =
+        actorObj?._id || actorObj?.id || (typeof log.actorId === "string" ? log.actorId : "");
       const actorAvatar = actorObj?.avatar || actor.slice(0, 2).toUpperCase();
 
       const target =
@@ -252,7 +387,9 @@ function ActivityPage() {
             onClick={() => void activeQuery.refetch()}
             disabled={activeQuery.isFetching}
           >
-            <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", activeQuery.isFetching && "animate-spin")} />
+            <RefreshCw
+              className={cn("mr-1.5 h-3.5 w-3.5", activeQuery.isFetching && "animate-spin")}
+            />
             Refresh
           </Button>
         }
@@ -340,7 +477,9 @@ function ActivityPage() {
                 <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   {label}
                 </h3>
-                <Badge variant="outline" className="border-border/60">{list.length}</Badge>
+                <Badge variant="outline" className="border-border/60">
+                  {list.length}
+                </Badge>
                 <div className="h-px flex-1 bg-border/60" />
               </div>
 
@@ -370,7 +509,10 @@ function ActivityPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge
                             variant="outline"
-                            className={cn("border-border/40 text-[10px] uppercase tracking-widest", m.tone)}
+                            className={cn(
+                              "border-border/40 text-[10px] uppercase tracking-widest",
+                              m.tone,
+                            )}
                           >
                             {m.label}
                           </Badge>
@@ -384,7 +526,9 @@ function ActivityPage() {
                           </div>
                           <span className="font-medium">{ev.actor}</span>
                           <span className="text-muted-foreground">·</span>
-                          <span className="truncate font-medium text-foreground/90">{ev.target}</span>
+                          <span className="truncate font-medium text-foreground/90">
+                            {ev.target}
+                          </span>
                         </div>
                         {ev.detail && (
                           <p className="mt-1.5 text-xs text-muted-foreground">{ev.detail}</p>

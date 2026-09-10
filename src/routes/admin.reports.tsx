@@ -25,9 +25,15 @@ export const Route = createFileRoute("/admin/reports")({
   head: () => ({
     meta: [
       { title: "Reports — Dimisi Operations" },
-      { name: "description", content: "Deep analytics across employees, tasks, projects, and departments." },
+      {
+        name: "description",
+        content: "Deep analytics across employees, tasks, projects, and departments.",
+      },
       { property: "og:title", content: "Reports — Dimisi Operations" },
-      { property: "og:description", content: "Deep analytics across employees, tasks, projects, and departments." },
+      {
+        property: "og:description",
+        content: "Deep analytics across employees, tasks, projects, and departments.",
+      },
     ],
   }),
   component: ReportsPage,

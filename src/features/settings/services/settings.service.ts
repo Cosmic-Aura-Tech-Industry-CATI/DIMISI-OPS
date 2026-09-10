@@ -29,7 +29,11 @@ export const settingsService = {
         deliverySchedule: { quietHoursStart: "22:00", quietHoursEnd: "07:00" },
       },
       security: {
-        twoFactor: { authenticatorApp: false, emailVerification: true, isAuthenticatorVerified: false },
+        twoFactor: {
+          authenticatorApp: false,
+          emailVerification: true,
+          isAuthenticatorVerified: false,
+        },
       },
     };
 
@@ -101,7 +105,8 @@ export const settingsService = {
     const res = await http.get<{ workspaceSettings?: WorkspaceSettings } | WorkspaceSettings>(
       API_ENDPOINTS.settings.workspace,
     );
-    const data = res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
+    const data =
+      res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
     return data ?? { require2FaForAdmins: false, allowSsoSignIn: true };
   },
 
@@ -110,7 +115,8 @@ export const settingsService = {
       API_ENDPOINTS.settings.workspace,
       payload,
     );
-    const data = res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
+    const data =
+      res && "workspaceSettings" in res ? res.workspaceSettings : (res as WorkspaceSettings);
     return data ?? { require2FaForAdmins: false, allowSsoSignIn: true };
   },
 
@@ -134,7 +140,9 @@ export const settingsService = {
     return res ?? {};
   },
 
-  checkPassword: async (payload: CheckPasswordPayload): Promise<{ message: string; email?: string }> => {
+  checkPassword: async (
+    payload: CheckPasswordPayload,
+  ): Promise<{ message: string; email?: string }> => {
     const res = await http.post<{ message: string; email?: string }>(
       API_ENDPOINTS.settings.checkPassword,
       { currentPassword: payload.currentPassword || payload.password },
@@ -143,14 +151,11 @@ export const settingsService = {
   },
 
   updatePassword: async (payload: UpdatePasswordPayload): Promise<{ message: string }> => {
-    const res = await http.post<{ message: string }>(
-      API_ENDPOINTS.settings.updatePassword,
-      {
-        otp: payload.otp,
-        newPassword: payload.newPassword,
-        refreshToken: payload.refreshToken,
-      },
-    );
+    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, {
+      otp: payload.otp,
+      newPassword: payload.newPassword,
+      refreshToken: payload.refreshToken,
+    });
     return res;
   },
 

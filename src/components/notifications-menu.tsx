@@ -77,7 +77,12 @@ export function NotificationsMenu() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-md" aria-label="Notifications">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative rounded-md"
+          aria-label="Notifications"
+        >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
             <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground shadow-glow">
@@ -90,7 +95,7 @@ export function NotificationsMenu() {
         align="end"
         collisionPadding={12}
         sideOffset={8}
-        className="w-[calc(100vw-1.5rem)] max-w-[92vw] rounded-2xl p-0 sm:w-[360px] sm:max-w-[380px] md:w-[380px]"
+        className="w-[calc(100vw-1.5rem)] max-w-[92vw] rounded-2xl p-0 sm:w-90 sm:max-w-95 md:w-95"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -111,7 +116,9 @@ export function NotificationsMenu() {
         </div>
         <ScrollArea className="max-h-[55vh] sm:max-h-80">
           {notifications.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">You're all caught up.</p>
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">
+              You're all caught up.
+            </p>
           ) : (
             <ul className="divide-y divide-border/60">
               {notifications.map((n) => (
@@ -120,18 +127,25 @@ export function NotificationsMenu() {
                   onClick={() => handleNotificationClick(n.id, n.unread)}
                   className={cn(
                     "flex cursor-pointer gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
-                    n.unread && "bg-primary/[0.03]",
+                    n.unread && "bg-primary/3",
                   )}
                 >
-                  <div className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg", toneStyles[n.tone])}>
+                  <div
+                    className={cn(
+                      "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                      toneStyles[n.tone],
+                    )}
+                  >
                     <Bell className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
-                      <p className="min-w-0 break-words text-sm font-medium">{n.title}</p>
-                      <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">{n.time}</span>
+                      <p className="min-w-0 wrap-break text-sm font-medium">{n.title}</p>
+                      <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
+                        {n.time}
+                      </span>
                     </div>
-                    <p className="mt-0.5 break-words text-xs text-muted-foreground">{n.body}</p>
+                    <p className="mt-0.5 wrap-break-words text-xs text-muted-foreground">{n.body}</p>
                   </div>
                   {n.unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                 </li>

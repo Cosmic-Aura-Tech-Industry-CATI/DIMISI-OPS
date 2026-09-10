@@ -84,6 +84,3 @@ export const queryKeys = {
     list: () => ["notifications", "list"] as const,
   },
 } as const;
-
-
-

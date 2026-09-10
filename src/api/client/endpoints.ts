@@ -109,4 +109,3 @@ export const API_ENDPOINTS = {
     markRead: (id: string) => `/notifications/${id}/read`,
   },
 } as const;
-

@@ -57,9 +57,15 @@ export const Route = createFileRoute("/admin/settings")({
   head: () => ({
     meta: [
       { title: "Settings — Dimisi Operations" },
-      { name: "description", content: "Configure security, appearance, and notification preferences." },
+      {
+        name: "description",
+        content: "Configure security, appearance, and notification preferences.",
+      },
       { property: "og:title", content: "Settings — Dimisi Operations" },
-      { property: "og:description", content: "Configure security, appearance, and notification preferences." },
+      {
+        property: "og:description",
+        content: "Configure security, appearance, and notification preferences.",
+      },
     ],
   }),
   component: AdminSettingsPage,
@@ -86,16 +92,36 @@ function AdminSettingsPage() {
 
       <Tabs defaultValue="security" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="security"><Shield className="mr-1.5 h-3.5 w-3.5" />Security</TabsTrigger>
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
-          <TabsTrigger value="notifications"><Bell className="mr-1.5 h-3.5 w-3.5" />Notifications</TabsTrigger>
-          <TabsTrigger value="profile"><UserCircle className="mr-1.5 h-3.5 w-3.5" />Profile</TabsTrigger>
+          <TabsTrigger value="security">
+            <Shield className="mr-1.5 h-3.5 w-3.5" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="theme">
+            <Palette className="mr-1.5 h-3.5 w-3.5" />
+            Theme
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-1.5 h-3.5 w-3.5" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="profile">
+            <UserCircle className="mr-1.5 h-3.5 w-3.5" />
+            Profile
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="security"><SecuritySection /></TabsContent>
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
-        <TabsContent value="notifications"><NotificationsSection /></TabsContent>
-        <TabsContent value="profile"><ProfileSection role="admin" /></TabsContent>
+        <TabsContent value="security">
+          <SecuritySection />
+        </TabsContent>
+        <TabsContent value="theme">
+          <ThemeSection />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="profile">
+          <ProfileSection role="admin" />
+        </TabsContent>
       </Tabs>
     </>
   );
@@ -256,7 +282,7 @@ function SecuritySection() {
   const isTotpConfigured = Boolean(
     preferences?.twoFactorAuth?.isTotpEnabled ||
     preferences?.security?.twoFactor?.authenticatorApp ||
-    preferences?.security?.twoFactor?.isAuthenticatorVerified
+    preferences?.security?.twoFactor?.isAuthenticatorVerified,
   );
 
   const isEmailOtpEnabled =
@@ -312,7 +338,8 @@ function SecuritySection() {
                   { security: { twoFactor: { emailVerification: checked } } },
                   {
                     onSuccess: () => toast.success("Email verification preference updated."),
-                    onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                    onError: (err: any) =>
+                      toast.error(err?.message || "Failed to update preference."),
                   },
                 );
               }}
@@ -352,7 +379,10 @@ function SecuritySection() {
                         {s.device || s.browser || "Active Device"}
                         {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
                         {s.current && (
-                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                          <Badge
+                            variant="outline"
+                            className="border-primary/30 bg-primary/10 text-primary"
+                          >
                             Current
                           </Badge>
                         )}
@@ -361,9 +391,9 @@ function SecuritySection() {
                         {s.location || s.ipAddress || "Active"} ·{" "}
                         {s.lastActive
                           ? new Date(s.lastActive).toLocaleString(undefined, {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })
                           : "Active now"}
                       </p>
                     </div>
@@ -386,10 +416,7 @@ function SecuritySection() {
         </SettingCard>
 
         {isDirector && (
-          <SettingCard
-            title="Access & privacy"
-            description="Workspace-level access controls."
-          >
+          <SettingCard title="Access & privacy" description="Workspace-level access controls.">
             <div className="space-y-3">
               <ToggleRow
                 title="Allow SSO sign-in"
@@ -400,8 +427,9 @@ function SecuritySection() {
                     { allowSsoSignIn: checked },
                     {
                       onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
-                    }
+                      onError: (err: any) =>
+                        toast.error(err?.message || "Failed to update workspace setting."),
+                    },
                   );
                 }}
               />
@@ -414,8 +442,9 @@ function SecuritySection() {
                     { require2FaForAdmins: checked },
                     {
                       onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) => toast.error(err?.message || "Failed to update workspace setting."),
-                    }
+                      onError: (err: any) =>
+                        toast.error(err?.message || "Failed to update workspace setting."),
+                    },
                   );
                 }}
               />
@@ -423,7 +452,6 @@ function SecuritySection() {
           </SettingCard>
         )}
       </div>
-
       {/* 2FA Setup Modal */}
       <Dialog open={setupModalOpen} onOpenChange={setSetupModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -444,7 +472,9 @@ function SecuritySection() {
               </div>
               <div className="grid grid-cols-2 gap-2 font-mono text-xs bg-muted p-3 rounded-lg">
                 {recoveryCodes.map((c, i) => (
-                  <div key={i} className="p-1">{c}</div>
+                  <div key={i} className="p-1">
+                    {c}
+                  </div>
                 ))}
               </div>
               <Button className="w-full" onClick={() => setSetupModalOpen(false)}>
@@ -507,7 +537,10 @@ export function ThemeSection() {
 
   return (
     <div className="grid gap-6">
-      <SettingCard title="Appearance" description="Choose how Dimisi Operations looks on this device.">
+      <SettingCard
+        title="Appearance"
+        description="Choose how Dimisi Operations looks on this device."
+      >
         <div className="grid grid-cols-2 gap-4 sm:max-w-md">
           {options.map((o) => {
             const active = theme === o.value;
@@ -526,7 +559,9 @@ export function ThemeSection() {
                 <div
                   className={cn(
                     "mb-3 grid h-10 w-10 place-items-center rounded-lg",
-                    active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -556,7 +591,10 @@ export function NotificationsSection() {
   const inAppNotifs = preferences?.notifications?.inApp;
   const schedule = preferences?.notifications?.deliverySchedule;
 
-  const handleEmailToggle = (key: "taskAssignments" | "reviewRequests" | "weeklyDigest", value: boolean) => {
+  const handleEmailToggle = (
+    key: "taskAssignments" | "reviewRequests" | "weeklyDigest",
+    value: boolean,
+  ) => {
     updatePreferences.mutate(
       {
         notifications: {
@@ -572,7 +610,10 @@ export function NotificationsSection() {
     );
   };
 
-  const handleInAppToggle = (key: "deadlineReminders" | "taskApprovals" | "pointsEarned", value: boolean) => {
+  const handleInAppToggle = (
+    key: "deadlineReminders" | "taskApprovals" | "pointsEarned",
+    value: boolean,
+  ) => {
     updatePreferences.mutate(
       {
         notifications: {
@@ -612,14 +653,18 @@ export function NotificationsSection() {
             title="Task assignments"
             description="When a task is assigned to you or your team."
             icon={Mail}
-            checked={emailNotifs?.taskAssignments ?? preferences?.notifications?.taskAssignments ?? true}
+            checked={
+              emailNotifs?.taskAssignments ?? preferences?.notifications?.taskAssignments ?? true
+            }
             onChange={(checked) => handleEmailToggle("taskAssignments", checked)}
           />
           <ToggleRow
             title="Review requests"
             description="New submissions waiting for approval."
             icon={Mail}
-            checked={emailNotifs?.reviewRequests ?? preferences?.notifications?.reviewRequests ?? true}
+            checked={
+              emailNotifs?.reviewRequests ?? preferences?.notifications?.reviewRequests ?? true
+            }
             onChange={(checked) => handleEmailToggle("reviewRequests", checked)}
           />
           <ToggleRow
@@ -638,14 +683,20 @@ export function NotificationsSection() {
             title="Deadline reminders"
             description="24 hours before a task is due."
             icon={Bell}
-            checked={inAppNotifs?.deadlineReminders ?? preferences?.notifications?.deadlineReminders ?? true}
+            checked={
+              inAppNotifs?.deadlineReminders ??
+              preferences?.notifications?.deadlineReminders ??
+              true
+            }
             onChange={(checked) => handleInAppToggle("deadlineReminders", checked)}
           />
           <ToggleRow
             title="Task approvals"
             description="Approvals and rejections on submissions."
             icon={Bell}
-            checked={inAppNotifs?.taskApprovals ?? preferences?.notifications?.taskApprovals ?? true}
+            checked={
+              inAppNotifs?.taskApprovals ?? preferences?.notifications?.taskApprovals ?? true
+            }
             onChange={(checked) => handleInAppToggle("taskApprovals", checked)}
           />
           <ToggleRow
@@ -658,13 +709,18 @@ export function NotificationsSection() {
         </div>
       </SettingCard>
 
-      <SettingCard title="Delivery schedule" description="Quiet hours and preferred delivery windows.">
+      <SettingCard
+        title="Delivery schedule"
+        description="Quiet hours and preferred delivery windows."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Quiet hours start</Label>
             <Input
               type="time"
-              defaultValue={schedule?.quietHoursStart || preferences?.notifications?.quietHoursStart || "22:00"}
+              defaultValue={
+                schedule?.quietHoursStart || preferences?.notifications?.quietHoursStart || "22:00"
+              }
               onBlur={(e) => handleQuietHoursChange("quietHoursStart", e.target.value)}
             />
           </div>
@@ -672,12 +728,16 @@ export function NotificationsSection() {
             <Label>Quiet hours end</Label>
             <Input
               type="time"
-              defaultValue={schedule?.quietHoursEnd || preferences?.notifications?.quietHoursEnd || "07:00"}
+              defaultValue={
+                schedule?.quietHoursEnd || preferences?.notifications?.quietHoursEnd || "07:00"
+              }
               onBlur={(e) => handleQuietHoursChange("quietHoursEnd", e.target.value)}
             />
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">Non-urgent notifications will be batched during this window.</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Non-urgent notifications will be batched during this window.
+        </p>
       </SettingCard>
     </div>
   );
@@ -708,7 +768,10 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
   const name = user?.name || (role === "admin" ? "Admin User" : "Employee User");
   const avatar = user?.avatar || (user as any)?.avtar || name.slice(0, 2).toUpperCase();
   const email = user?.email || "user@dimisi.com";
-  const dept = typeof user?.department === "object" && user?.department !== null ? (user.department as any).name : (user?.department || "Operations");
+  const dept =
+    typeof user?.department === "object" && user?.department !== null
+      ? (user.department as any).name
+      : user?.department || "Operations";
   const code = (user as any)?.empId || user?.code || "EMP-01";
 
   return (
@@ -723,7 +786,9 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
               <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
             </Button>
           </div>
-          <p className="text-center text-xs text-muted-foreground">JPG or PNG · square · up to 5MB</p>
+          <p className="text-center text-xs text-muted-foreground">
+            JPG or PNG · square · up to 5MB
+          </p>
         </div>
       </SettingCard>
 

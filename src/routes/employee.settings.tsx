@@ -25,9 +25,15 @@ export const Route = createFileRoute("/employee/settings")({
   head: () => ({
     meta: [
       { title: "Settings — Dimisi Operations" },
-      { name: "description", content: "Manage your profile, preferences, theme, password, and notifications." },
+      {
+        name: "description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
       { property: "og:title", content: "Settings — Dimisi Operations" },
-      { property: "og:description", content: "Manage your profile, preferences, theme, password, and notifications." },
+      {
+        property: "og:description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
     ],
   }),
   component: EmployeeSettingsPage,
@@ -40,16 +46,36 @@ function EmployeeSettingsPage() {
 
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="profile"><UserCircle className="mr-1.5 h-3.5 w-3.5" />Profile</TabsTrigger>
-          <TabsTrigger value="password"><Key className="mr-1.5 h-3.5 w-3.5" />Password</TabsTrigger>
-          <TabsTrigger value="notifications"><Bell className="mr-1.5 h-3.5 w-3.5" />Notifications</TabsTrigger>
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
+          <TabsTrigger value="profile">
+            <UserCircle className="mr-1.5 h-3.5 w-3.5" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="password">
+            <Key className="mr-1.5 h-3.5 w-3.5" />
+            Password
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-1.5 h-3.5 w-3.5" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="theme">
+            <Palette className="mr-1.5 h-3.5 w-3.5" />
+            Theme
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile"><ProfileSection role="employee" /></TabsContent>
-        <TabsContent value="password"><PasswordSection /></TabsContent>
-        <TabsContent value="notifications"><NotificationsSection /></TabsContent>
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
+        <TabsContent value="profile">
+          <ProfileSection role="employee" />
+        </TabsContent>
+        <TabsContent value="password">
+          <PasswordSection />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="theme">
+          <ThemeSection />
+        </TabsContent>
       </Tabs>
     </>
   );
@@ -112,7 +138,8 @@ function PasswordSection() {
                 { security: { twoFactor: { emailVerification: checked } } },
                 {
                   onSuccess: () => toast.success("Sign-in security preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
+                  onError: (err: any) =>
+                    toast.error(err?.message || "Failed to update preference."),
                 },
               );
             }}
@@ -152,7 +179,10 @@ function PasswordSection() {
                       {s.device || s.browser || "Active Device"}
                       {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
                       {s.current && (
-                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                        <Badge
+                          variant="outline"
+                          className="border-primary/30 bg-primary/10 text-primary"
+                        >
                           Current
                         </Badge>
                       )}
