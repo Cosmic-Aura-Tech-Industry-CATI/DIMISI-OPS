@@ -47,6 +47,9 @@ import {
 } from "@/components/ui/select";
 import { ACCENT, GRID_STROKE, axisStyle, chartColorAt, tooltipStyle } from "@/components/reports/chart-theme";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
+import { useTasksQuery } from "@/features/tasks";
+import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
 export const Route = createFileRoute("/employee/statistics")({
   head: () => ({
@@ -152,12 +155,40 @@ const achievements = [
 
 function StatisticsPage() {
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
+  const auth = useAuth();
+  const currentUserId = auth.user?.id || auth.user?._id || "";
+  const { data: tasks = [] } = useTasksQuery();
+  const { data: analytics } = useEmployeeProgressAnalyticsQuery();
+
+  const mine = useMemo(() => {
+    return tasks.filter((t) => {
+      return (
+        (currentUserId && t.assigneeId === currentUserId) ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email)
+      );
+    });
+  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+
+  const completed = mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
+  const inReview = mine.filter((t) => t.reviewState === "in_review" || (t.status as string) === "in_review" || (t.status as string) === "In Review");
+  const totalPoints = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? (analytics?.monthlyPerformance?.totalPoints || 0);
 
   const trendData = useMemo(() => {
-    if (timeRange === "7d") return weeklyData7d;
+    if (timeRange === "7d") {
+      if (analytics?.weeklyProgress?.length) {
+        return analytics.weeklyProgress.map((w) => ({
+          day: w.day,
+          points: w.completed * 25,
+          tasks: w.completed,
+          hours: w.completed * 2.5,
+        }));
+      }
+      return weeklyData7d;
+    }
     if (timeRange === "90d") return trend90d;
     return weeklyTrend30d;
-  }, [timeRange]);
+  }, [timeRange, analytics?.weeklyProgress]);
 
   const xKey = timeRange === "7d" ? "day" : "week";
 
@@ -187,27 +218,24 @@ function StatisticsPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total points earned"
-          value="1,420"
+          value={totalPoints > 0 ? totalPoints.toLocaleString() : "0"}
           icon={Sparkles}
-          delta={12.4}
           accent="primary"
-          hint="Top 5% in organization"
+          hint="Organization ranking points"
         />
         <StatCard
           label="Tasks completed"
-          value="42"
+          value={`${completed.length}`}
           icon={CheckCircle2}
-          delta={8.5}
           accent="success"
-          hint="4 in review right now"
+          hint={`${inReview.length} in review right now`}
         />
         <StatCard
           label="Avg. turnaround"
           value="1.8 d"
           icon={Clock}
-          delta={-14.2}
           accent="info"
-          hint="0.4 days faster than average"
+          hint="Fast completion rate"
         />
         <StatCard
           label="Active streak"

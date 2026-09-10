@@ -124,6 +124,7 @@ export function useRequestTask(options?: {
     mutationFn: (id) => tasksService.requestTask(id),
     onSuccess: (data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       options?.onSuccess?.(data, id);
     },
     onError: (error, id) => {
@@ -147,6 +148,7 @@ export function useAssignTask(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
@@ -169,6 +171,7 @@ export function useStartTask(options?: {
     onSuccess: (data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       options?.onSuccess?.(data, id);
     },
     onError: (error, id) => {
@@ -192,6 +195,7 @@ export function useSubmitTaskForReview(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
