@@ -138,14 +138,13 @@ function PasswordSection() {
                 { security: { twoFactor: { emailVerification: checked } } },
                 {
                   onSuccess: () => toast.success("Sign-in security preference updated."),
-                  onError: (err: any) =>
-                    toast.error(err?.message || "Failed to update preference."),
+                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
                 },
               );
             }}
           />
-        </div>
-      </SettingCard>
+        </div >
+      </SettingCard >
 
       <SettingCard
         title="Sessions"
@@ -191,9 +190,9 @@ function PasswordSection() {
                       {s.location || s.ipAddress || "Active"} ·{" "}
                       {s.lastActive
                         ? new Date(s.lastActive).toLocaleString(undefined, {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })
                         : "Active now"}
                     </p>
                   </div>
@@ -214,6 +213,6 @@ function PasswordSection() {
           </ul>
         )}
       </SettingCard>
-    </div>
+    </div >
   );
 }
