@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Key,
-  Mail,
-  RotateCcw,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Key, Mail, RotateCcw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -150,15 +143,14 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-      await checkPasswordMutation.mutateAsync({ password: current });
-      await sendPasswordOtp(email);
+      const res = await checkPasswordMutation.mutateAsync({ currentPassword: current });
       setCode("");
       setOtpError("");
       setLocked(false);
       setAttemptsLeft(OTP_MAX_ATTEMPTS);
       setSeconds(OTP_RESEND_SECONDS);
       setStep("otp");
-      toast.success("Verification code sent", {
+      toast.success(res?.message || "Verification code sent", {
         description: `We emailed a 6-digit code to ${email}.`,
       });
     } catch (err: any) {
@@ -186,43 +178,34 @@ export function ChangePasswordCard({
   /* ---------------- step 2: OTP ---------------- */
   const submitOtp = async (value: string) => {
     if (busy || locked || value.length !== OTP_LENGTH) return;
-    setBusy(true);
     setOtpError("");
-    const res = await verifyPasswordOtp(email, value);
-    setBusy(false);
-    if (res.ok) {
-      toast.success("Identity verified");
-      setStep("new");
-      return;
-    }
-    setCode("");
-    setAttemptsLeft(res.attemptsLeft);
-    if (res.reason === "locked") {
-      setLocked(true);
-      setOtpError("Too many incorrect attempts. Please request a new OTP.");
-      audit("Password Change Failed", portal, "Too many incorrect OTP attempts.");
-    } else if (res.reason === "expired" || res.reason === "no_code") {
-      setOtpError("This verification code has expired. Please request a new one.");
-      audit("Password Change Failed", portal, "OTP expired.");
-    } else {
-      setOtpError(
-        `Incorrect verification code. ${res.attemptsLeft} attempt${res.attemptsLeft === 1 ? "" : "s"} remaining.`,
-      );
-      audit("Password Change Failed", portal, "Incorrect OTP entered.");
-    }
+    setCode(value);
+    toast.success("Code entered. Now create your new password.");
+    setStep("new");
   };
 
   const resend = async () => {
     if (seconds > 0 || resending) return;
     setResending(true);
-    await sendPasswordOtp(email);
-    setResending(false);
-    setCode("");
-    setOtpError("");
-    setLocked(false);
-    setAttemptsLeft(OTP_MAX_ATTEMPTS);
-    setSeconds(OTP_RESEND_SECONDS);
-    toast.success("A new verification code has been sent to your email.");
+    try {
+      await checkPasswordMutation.mutateAsync({ currentPassword: current });
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } catch (err: any) {
+      await sendPasswordOtp(email);
+      setCode("");
+      setOtpError("");
+      setLocked(false);
+      setAttemptsLeft(OTP_MAX_ATTEMPTS);
+      setSeconds(OTP_RESEND_SECONDS);
+      toast.success("A new verification code has been sent to your email.");
+    } finally {
+      setResending(false);
+    }
   };
 
   /* ---------------- step 3: new password ---------------- */
@@ -236,16 +219,20 @@ export function ChangePasswordCard({
 
     setBusy(true);
     try {
-      await updatePasswordMutation.mutateAsync({
+      const res = await updatePasswordMutation.mutateAsync({
         currentPassword: current,
         newPassword: next,
         otp: code,
       });
       updatePassword(email, next);
       await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated after email OTP verification. Status: Success");
+      audit(
+        "Password Changed",
+        portal,
+        "Password updated after email OTP verification. Status: Success",
+      );
       setStep("done");
-      toast.success("Password changed successfully", {
+      toast.success(res?.message || "Password changed successfully", {
         description: "Please sign in again with your new password.",
       });
       setTimeout(() => {
@@ -253,18 +240,9 @@ export function ChangePasswordCard({
         void navigate({ to: "/login" });
       }, 2600);
     } catch (err: any) {
-      // Fallback local update if offline
-      updatePassword(email, next);
-      await sendPasswordChangedEmail(email);
-      audit("Password Changed", portal, "Password updated locally.");
-      setStep("done");
-      toast.success("Password changed successfully", {
-        description: "Please sign in again with your new password.",
-      });
-      setTimeout(() => {
-        logout();
-        void navigate({ to: "/login" });
-      }, 2600);
+      const msg = err?.message || "Failed to update password. Please check your OTP code.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -305,11 +283,7 @@ export function ChangePasswordCard({
       description={description}
       actions={
         step === "current" ? (
-          <Button
-            className="rounded-md"
-            onClick={() => void continueFromCurrent()}
-            disabled={busy}
-          >
+          <Button className="rounded-md" onClick={() => void continueFromCurrent()} disabled={busy}>
             <Key className="mr-1.5 h-4 w-4" />
             {busy ? "Sending code…" : "Continue"}
           </Button>
@@ -335,7 +309,6 @@ export function ChangePasswordCard({
               Forgot current password?
             </button>
           </div>
-
 
           {error && (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -423,7 +396,8 @@ export function ChangePasswordCard({
             </p>
           ) : (
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              The code expires in 5 minutes. {attemptsLeft} of {OTP_MAX_ATTEMPTS} attempts remaining.
+              The code expires in 5 minutes. {attemptsLeft} of {OTP_MAX_ATTEMPTS} attempts
+              remaining.
             </p>
           )}
 
@@ -433,7 +407,9 @@ export function ChangePasswordCard({
             disabled={busy || locked || code.length !== OTP_LENGTH}
             className="mt-6 h-11 w-full rounded-md text-sm shadow-glow"
           >
-            {busy ? "Verifying…" : (
+            {busy ? (
+              "Verifying…"
+            ) : (
               <span className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> Verify OTP
               </span>

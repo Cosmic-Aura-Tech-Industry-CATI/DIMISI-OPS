@@ -12,8 +12,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { TaskCardGrid } from "@/components/task-card";
-import { currentEmployee, type TaskPriority } from "@/lib/mock-data";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, type TaskPriority } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/employee/tasks")({
@@ -33,7 +32,7 @@ function AssignedTasksPage() {
   const [priority, setPriority] = useState<"all" | TaskPriority>("all");
   const auth = useAuth();
   const { data: tasks = [] } = useTasksQuery();
-  const currentUserId = auth.user?.id || auth.user?._id || currentEmployee.id;
+  const currentUserId = auth.user?.id || auth.user?._id || "";
 
   const mine = useMemo(() => {
     return tasks.filter((t) => {
