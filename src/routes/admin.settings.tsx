@@ -391,9 +391,9 @@ function SecuritySection() {
                         {s.location || s.ipAddress || "Active"} ·{" "}
                         {s.lastActive
                           ? new Date(s.lastActive).toLocaleString(undefined, {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })
                           : "Active now"}
                       </p>
                     </div>
@@ -802,32 +802,42 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
               onClick={handleSaveProfile}
               disabled={updateProfile.isPending}
             >
-              <Save className="mr-1.5 h-4 w-4" /> Save
+              <Save className="mr-1.5 h-4 w-4" /> Save changes
             </Button>
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Full name" defaultValue={name} disabled />
-            <Field label="Employee ID / Code" defaultValue={code} disabled />
-            <Field label="Email" type="email" defaultValue={email} disabled />
-            <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <Field label="Department" defaultValue={dept} disabled />
-            <Field label="Role" defaultValue={role.toUpperCase()} disabled />
+            <div className="space-y-1.5">
+              <Label>Full name</Label>
+              <Input value={name} disabled className="bg-muted/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Employee ID</Label>
+              <Input value={code} disabled className="bg-muted/50 font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email address</Label>
+              <Input value={email} disabled className="bg-muted/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone number</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Department</Label>
+              <Input value={dept} disabled className="bg-muted/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role</Label>
+              <Input value={role === "admin" ? "Operations Admin" : "Employee"} disabled className="bg-muted/50" />
+            </div>
           </div>
         </SettingCard>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  ...props
-}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input {...props} />
     </div>
   );
 }

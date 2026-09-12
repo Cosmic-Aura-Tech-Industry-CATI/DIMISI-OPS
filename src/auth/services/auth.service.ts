@@ -21,6 +21,8 @@ import type {
   VerifyLoginResponse,
   VerifyResetOtpRequest,
   VerifyResetOtpResponse,
+  OAuthLoginRequest,
+  OAuthLoginResponse,
 } from "../types/auth";
 
 const { auth, health } = API_ENDPOINTS;
@@ -91,7 +93,15 @@ export async function resetPassword(payload: ResetPasswordRequest) {
   return http.patch<MessageResponse>(auth.resetPassword, body, { authMode: "none" });
 }
 
-
+/** POST /api/v1/auth/oauth-login — exchanges Firebase ID token for user session. */
+export async function oauthLogin(payload: OAuthLoginRequest) {
+  const res = await http.post<OAuthLoginResponse>(auth.oauthLogin, payload, { authMode: "none" });
+  const token = res?.accessToken || res?.data?.accessToken;
+  if (token) {
+    setAccessToken(token);
+  }
+  return res;
+}
 
 export const authService = {
   getHealth,
@@ -104,4 +114,6 @@ export const authService = {
   forgetPassword,
   verifyResetOtp,
   resetPassword,
+  oauthLogin,
 };
+

@@ -111,6 +111,7 @@ apiClient.interceptors.response.use(
       url.includes("/auth/forget-password") ||
       url.includes("/auth/verify-reset-otp") ||
       url.includes("/auth/reset-password") ||
+      url.includes("/auth/oauth-login") ||
       url.includes("/auth/resend-otp") ||
       url.includes("/auth/refresh");
 
