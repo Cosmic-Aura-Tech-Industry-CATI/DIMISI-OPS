@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
     forgetPassword: "/auth/forget-password",
     verifyResetOtp: "/auth/verify-reset-otp",
     resetPassword: "/auth/reset-password",
+    oauthLogin: "/auth/oauth-login",
   },
   departments: {
     list: "/departments",
