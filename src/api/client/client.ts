@@ -33,6 +33,10 @@ export const apiClient: AxiosInstance = axios.create({
 /* ------------------------------ request layer ------------------------------ */
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
+
   const mode: AuthMode = config.authMode ?? "bearer";
 
   if (mode === "bearer") {

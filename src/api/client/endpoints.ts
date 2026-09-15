@@ -49,6 +49,10 @@ export const API_ENDPOINTS = {
     start: (id: string) => `/tasks/${id}/start`,
     submit: (id: string) => `/tasks/${id}/submit`,
     review: (id: string) => `/tasks/${id}/review`,
+    assigned: "/tasks/assigned",
+    pending: "/tasks/pending",
+    completed: "/tasks/completed",
+    reviewCenter: "/tasks/review-center",
   },
   leaderboard: {
     get: "/leaderboard",

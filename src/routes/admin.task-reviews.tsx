@@ -39,10 +39,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { employees, type Task } from "@/lib/mock-data";
+import { employees } from "@/lib/mock-data";
 import { logAudit } from "@/lib/audit-log";
+import { submitReview } from "@/lib/review-store";
 import { useProjectsQuery } from "@/features/projects";
-import { useTasksQuery, useReviewTask } from "@/features/tasks";
+import { useTasksQuery, useReviewTask, useReviewCenterQuery, type Task } from "@/features/tasks";
 import {
   applySubmissions,
   downloadSubmissionFile,
@@ -97,25 +98,79 @@ function ReviewCenter() {
 
   const subs = useSubmissionMap();
   const { data: projects = [] } = useProjectsQuery();
-  const { data: allTasks = [], isLoading } = useTasksQuery();
+  const { data: allTasks = [] } = useTasksQuery();
+  const { data: reviewCenterData } = useReviewCenterQuery();
+  const reviewCenterTasks = reviewCenterData?.tasks || [];
+
   const reviewMutation = useReviewTask({
-    onSuccess: (updated, variables) => {
-      const label = variables.isApproved ? "Submission approved" : "Submission rejected";
-      toast.success(label, { description: updated.title });
+    onSuccess: (data, variables) => {
+      const isOk = data && (data as any).status !== "fail" && (data as any).status !== "error" && (data as any).success !== false;
+
+      if (!isOk) {
+        toast.error((data as any)?.message || "Failed to submit task review.");
+        return;
+      }
+
+      if (action) {
+        const isApproved = variables.isApproved;
+        logAudit({
+          category: "task",
+          action:
+            isApproved ? "Approved Submission"
+            : action.type === "reject" ? "Rejected Submission"
+            : "Sent Review Remarks",
+          target: action.task.title,
+          targetId: action.task.assigneeId || undefined,
+          details: remarks.trim() || (isApproved ? `Submission approved — ${action.task.points} points awarded.` : "Reviewed submission."),
+          status: isApproved ? "success" : "warning",
+        });
+
+        const decision =
+          isApproved
+            ? "approved"
+            : action.type === "reject"
+              ? "rejected"
+              : "remarks";
+
+        submitReview({
+          task: action.task,
+          decision,
+          remarks: remarks.trim(),
+          reviewer: "Admin",
+        });
+      }
+
+      const msg = variables.isApproved ? "Task approved successfully." : "Task rejected successfully.";
+      toast.success(msg);
       setAction(null);
       setRemarks("");
     },
     onError: (err) => {
-      toast.error("Failed to submit review", {
-        description: err.message || "Please try again.",
-      });
+      toast.error(err?.message || "Failed to submit task review.");
     },
   });
 
-  const submissions = useMemo(
-    () => applySubmissions(allTasks, subs).filter((t) => t.reviewState === "in_review" || (t.status as string) === "In Review"),
-    [allTasks, subs],
-  );
+  const submissions = useMemo(() => {
+    // Combine general task list and dedicated review center endpoint tasks
+    const taskMap = new Map<string, Task>();
+    for (const t of allTasks) {
+      taskMap.set(t.id || t._id, t);
+    }
+    for (const t of reviewCenterTasks) {
+      taskMap.set(t.id || t._id, t);
+    }
+
+    const mergedTasks = Array.from(taskMap.values());
+
+    return applySubmissions(mergedTasks, subs).filter(
+      (t) =>
+        t.reviewState === "in_review" ||
+        (t.status as string) === "In Review" ||
+        (t.status as string) === "in_review" ||
+        t.rawStatus === "In Review" ||
+        t.rawStatus === "in_review",
+    );
+  }, [allTasks, reviewCenterTasks, subs]);
 
   const filtered = submissions.filter((t) => {
     const q = query.trim().toLowerCase();
@@ -129,21 +184,14 @@ function ReviewCenter() {
 
   const handleAction = () => {
     if (!action) return;
+    if ((action.type === "reject" || action.type === "remarks") && !remarks.trim()) {
+      toast.error("Remarks are required when rejecting or leaving remarks on a task.");
+      return;
+    }
     const isApproved = action.type === "approve";
-    logAudit({
-      category: "task",
-      action:
-        action.type === "approve" ? "Approved Submission"
-        : action.type === "reject" ? "Rejected Submission"
-        : "Sent Review Remarks",
-      target: action.task.title,
-      targetId: action.task.assigneeId || undefined,
-      details: remarks.trim() || (action.type === "approve" ? `Submission approved — ${action.task.points} points awarded.` : "Reviewed submission."),
-      status: action.type === "reject" ? "warning" : "success",
-    });
 
     reviewMutation.mutate({
-      id: action.task.id || action.task._id || "",
+      id: action.task._id || action.task.id || "",
       isApproved,
       feedback: remarks.trim() || undefined,
     });
@@ -245,12 +293,18 @@ function ReviewCenter() {
             <Button variant="outline" className="rounded-md" onClick={() => setAction(null)}>Cancel</Button>
             <Button
               className={`rounded-full ${action?.type === "reject" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : action?.type === "approve" ? "bg-success text-success-foreground hover:bg-success/90" : "shadow-glow"}`}
-              disabled={action?.type === "reject" && remarks.trim().length < 5}
+              disabled={(action?.type === "reject" && remarks.trim().length < 5) || reviewMutation.isPending}
               onClick={handleAction}
             >
-              {action?.type === "approve" && <><CheckCircle2 className="mr-1.5 h-4 w-4" /> Approve</>}
-              {action?.type === "reject" && <><XCircle className="mr-1.5 h-4 w-4" /> Reject</>}
-              {action?.type === "remarks" && <><MessageSquarePlus className="mr-1.5 h-4 w-4" /> Send remarks</>}
+              {reviewMutation.isPending ? (
+                "Submitting…"
+              ) : (
+                <>
+                  {action?.type === "approve" && <><CheckCircle2 className="mr-1.5 h-4 w-4" /> Approve</>}
+                  {action?.type === "reject" && <><XCircle className="mr-1.5 h-4 w-4" /> Reject</>}
+                  {action?.type === "remarks" && <><MessageSquarePlus className="mr-1.5 h-4 w-4" /> Send remarks</>}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -273,6 +327,10 @@ function ReviewCard({
   onAction: (type: ReviewAction) => void;
 }) {
   const emp = employees.find((e) => e.id === task.assigneeId);
+  const assigneeName = task.assignee || emp?.name || "Employee";
+  const avatarInitials = emp?.avatar || assigneeName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "EM";
+  const code = task.assigneeCode || emp?.code || "";
+
   const days = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
   const submittedOn = submission?.submittedAt
     ? new Date(submission.submittedAt)
@@ -308,13 +366,13 @@ function ReviewCard({
       <header className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-            {emp?.avatar ?? "?"}
+            {avatarInitials}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-medium">{emp?.name ?? task.assignee}</span>
-              {emp && <IdBadge id={emp.code} />}
-              <span className="text-[11px] text-muted-foreground">· {emp?.department ?? "—"}</span>
+              <span className="text-sm font-medium">{assigneeName}</span>
+              {code && <IdBadge id={code} />}
+              <span className="text-[11px] text-muted-foreground">· {emp?.department ?? "Team"}</span>
             </div>
             <h3 className="mt-0.5 line-clamp-1 font-display text-base font-semibold">{task.title}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -329,7 +387,7 @@ function ReviewCard({
           </div>
         </div>
         <span className="shrink-0 rounded-sm bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary">
-          Pending review
+          In Review
         </span>
       </header>
 

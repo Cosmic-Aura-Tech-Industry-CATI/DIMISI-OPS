@@ -56,7 +56,10 @@ export function useCreateTask(options?: {
     mutationFn: (input) => tasksService.createTask(input),
     onSuccess: (data, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
@@ -80,6 +83,8 @@ export function useUpdateTask(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       options?.onSuccess?.(data, variables);
     },
@@ -102,6 +107,8 @@ export function useDeleteTask(options?: {
     mutationFn: (id) => tasksService.deleteTask(id),
     onSuccess: (data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       options?.onSuccess?.(data, id);
     },
@@ -124,6 +131,7 @@ export function useRequestTask(options?: {
     mutationFn: (id) => tasksService.requestTask(id),
     onSuccess: (data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       options?.onSuccess?.(data, id);
     },
@@ -148,7 +156,9 @@ export function useAssignTask(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
@@ -171,7 +181,9 @@ export function useStartTask(options?: {
     onSuccess: (data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       options?.onSuccess?.(data, id);
     },
     onError: (error, id) => {
@@ -195,7 +207,13 @@ export function useSubmitTaskForReview(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "assigned"] });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "pending"] });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "review-center"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
@@ -219,12 +237,71 @@ export function useReviewTask(options?: {
       const { id } = variables;
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.reviews() });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "assigned"] });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "pending"] });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.all, "review-center"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       options?.onSuccess?.(data, variables);
     },
     onError: (error, variables) => {
       options?.onError?.(error, variables);
     },
+  });
+}
+
+/**
+ * Query hook for Admin Review Center overview and tasks.
+ */
+export function useReviewCenterQuery(
+  options?: Omit<UseQueryOptions<{ kpis: { pendingReview: number; highPriority: number; pointsAtStake: number }; tasks: Task[] }, ApiError>, "queryKey" | "queryFn">,
+) {
+  return useQuery<{ kpis: { pendingReview: number; highPriority: number; pointsAtStake: number }; tasks: Task[] }, ApiError>({
+    queryKey: [...queryKeys.tasks.all, "review-center"],
+    queryFn: () => tasksService.getReviewCenter(),
+    ...options,
+  });
+}
+
+/**
+ * Query hook for Employee Assigned Tasks.
+ */
+export function useAssignedTasksQuery(
+  options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
+) {
+  return useQuery<Task[], ApiError>({
+    queryKey: [...queryKeys.tasks.all, "assigned"],
+    queryFn: () => tasksService.getAssignedTasks(),
+    ...options,
+  });
+}
+
+/**
+ * Query hook for Employee Pending Tasks.
+ */
+export function usePendingTasksQuery(
+  options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
+) {
+  return useQuery<Task[], ApiError>({
+    queryKey: [...queryKeys.tasks.all, "pending"],
+    queryFn: () => tasksService.getPendingTasks(),
+    ...options,
+  });
+}
+
+/**
+ * Query hook for Employee Completed Tasks.
+ */
+export function useCompletedTasksQuery(
+  options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
+) {
+  return useQuery<Task[], ApiError>({
+    queryKey: [...queryKeys.tasks.all, "completed"],
+    queryFn: () => tasksService.getCompletedTasks(),
+    ...options,
   });
 }
 

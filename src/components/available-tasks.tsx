@@ -18,10 +18,9 @@ import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge } from "@/components/status-badge";
 import { IdBadge } from "@/components/id-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
-import type { Task } from "@/lib/mock-data";
 import { projectStats } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
-import { useTasksQuery, useRequestTask } from "@/features/tasks";
+import { useTasksQuery, useRequestTask, type Task } from "@/features/tasks";
 
 function PoolCard({
   task,
@@ -127,11 +126,25 @@ export function AvailableTasks() {
 
   const projects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
 
+  const isAvailableStatus = (t: Task) => {
+    if (t.assigneeId || t.assignee) return false;
+    const s = (t.status || "").toLowerCase();
+    const rs = (t.rawStatus || "").toLowerCase();
+    if (s === "assigned" || s === "in_progress" || s === "in_review" || s === "completed" || s === "overdue") return false;
+    if (rs === "assigned" || rs === "in_progress" || rs === "in_review" || rs === "completed" || rs === "overdue") return false;
+    if (t.dueDate && new Date(t.dueDate).getTime() < Date.now()) return false;
+    return true;
+  };
+
   const universal = allTasks.filter(
-    (t) => (t.taskType === "universal" || (t.taskType as string) === "Universal") && (t.status === "available" || (t.status as string) === "Open") && !t.assigneeId,
+    (t) =>
+      (t.taskType === "universal" || (t.taskType as string) === "Universal") &&
+      isAvailableStatus(t),
   );
   const projectPool = allTasks.filter(
-    (t) => (t.taskType === "project" || (t.taskType as string) === "Project") && (t.status === "available" || (t.status as string) === "Open") && !t.assigneeId,
+    (t) =>
+      (t.taskType === "project" || (t.taskType as string) === "Project") &&
+      isAvailableStatus(t),
   );
 
   const openProjectTasks = projectPool.filter((t) => t.projectId === openProject);

@@ -101,15 +101,13 @@ function SubmitProofPage() {
         files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
         checklist: checks,
       });
-      toast.success("Task submitted successfully", {
-        description: `${updated.title} is now in review with admins.`,
-      });
+      toast.success("Task submitted for review successfully.");
+      setConfirmOpen(false);
       navigate({ to: "/employee/pending-review" });
     },
     onError: (err) => {
-      toast.error("Failed to submit task", {
-        description: err.message || "An error occurred while submitting the task.",
-      });
+      setConfirmOpen(false);
+      toast.error(err.message || "Failed to submit task for review.");
     },
   });
 
@@ -158,19 +156,31 @@ function SubmitProofPage() {
     if (!task) return;
     const noteText = issues.trim() || "Task completed and submitted for review.";
     const targetId = task.id || task._id || id;
+    const normStatus = (task.rawStatus || task.status || "").toLowerCase();
 
-    if (task.status === "assigned" || task.status === "pending" || task.rawStatus === "Assigned") {
-      try {
-        await startTaskMutation.mutateAsync(targetId);
-      } catch {
-        // Continue to submit if already started
+    try {
+      // Step 1: Ensure task transitions to IN_PROGRESS on the backend first
+      if (
+        normStatus === "assigned" ||
+        normStatus === "pending" ||
+        normStatus === "open"
+      ) {
+        try {
+          await startTaskMutation.mutateAsync(targetId);
+        } catch (startErr) {
+          // If task was already started or transitioned, proceed to submit
+          console.warn("[submit] Auto-start step error:", startErr);
+        }
       }
-    }
 
-    submitMutation.mutate({
-      id: targetId,
-      notes: noteText,
-    });
+      // Step 2: Sequentially submit task for review now that backend status is in_progress
+      await submitMutation.mutateAsync({
+        id: targetId,
+        notes: noteText,
+      });
+    } catch (err: any) {
+      // Handled via submitMutation onError callback
+    }
   };
 
   const info: { label: string; value: React.ReactNode; icon?: typeof Trophy }[] = [
@@ -379,8 +389,8 @@ function SubmitProofPage() {
             <Button variant="outline" className="rounded-md" onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button className="rounded-md shadow-glow" disabled={submitMutation.isPending} onClick={handleSubmit}>
-              {submitMutation.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…</> : <><Send className="mr-1.5 h-4 w-4" /> Submit</>}
+            <Button className="rounded-md shadow-glow" disabled={submitMutation.isPending || startTaskMutation.isPending} onClick={handleSubmit}>
+              {submitMutation.isPending || startTaskMutation.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…</> : <><Send className="mr-1.5 h-4 w-4" /> Submit for Review</>}
             </Button>
           </DialogFooter>
         </DialogContent>

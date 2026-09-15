@@ -159,7 +159,13 @@ export const settingsService = {
     return res;
   },
 
-  updateProfile: async (payload: UpdateProfilePayload): Promise<any> => {
+  updateProfile: async (payload: UpdateProfilePayload | FormData): Promise<any> => {
+    if (payload instanceof FormData) {
+      const res = await http.patch<any>(API_ENDPOINTS.settings.profile, payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res;
+    }
     const res = await http.patch<any>(API_ENDPOINTS.settings.profile, {
       phone: payload.phone,
       avatar: payload.avatar || payload.avtar,

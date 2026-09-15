@@ -30,7 +30,7 @@ export const Route = createFileRoute("/employee/tasks/$id")({
   component: EmployeeTaskDetail,
 });
 
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0") || id.slice(-4)}`;
+const taskId = (id: string) => id;
 
 function EmployeeTaskDetail() {
   const { id } = useParams({ from: "/employee/tasks/$id" });
@@ -66,23 +66,23 @@ function EmployeeTaskDetail() {
   const days = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
   const remaining =
     days < 0 ? { label: `${-days}d overdue`, tone: "text-destructive" }
-    : days === 0 ? { label: "Due today", tone: "text-warning" }
-    : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
-    : { label: `${days}d left`, tone: "text-muted-foreground" };
+      : days === 0 ? { label: "Due today", tone: "text-warning" }
+        : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
+          : { label: `${days}d left`, tone: "text-muted-foreground" };
 
   const progress =
     task.status === "completed" ? 100
-    : task.status === "in_progress" ? 60
-    : task.status === "overdue" ? 45
-    : 15;
+      : task.status === "in_progress" ? 60
+        : task.status === "overdue" ? 45
+          : 15;
 
   const creator = task.createdBy || "Admin";
 
   const submissionState =
     task.reviewState === "approved" ? { label: "Approved", tone: "text-success", bg: "bg-success/15", ring: "ring-success/30" }
-    : task.reviewState === "rejected" ? { label: "Rejected", tone: "text-destructive", bg: "bg-destructive/15", ring: "ring-destructive/30" }
-    : task.reviewState === "in_review" ? { label: "In review", tone: "text-primary", bg: "bg-primary/15", ring: "ring-primary/30" }
-    : { label: "Not submitted", tone: "text-muted-foreground", bg: "bg-muted", ring: "ring-border" };
+      : task.reviewState === "rejected" ? { label: "Rejected", tone: "text-destructive", bg: "bg-destructive/15", ring: "ring-destructive/30" }
+        : task.reviewState === "in_review" ? { label: "In review", tone: "text-primary", bg: "bg-primary/15", ring: "ring-primary/30" }
+          : { label: "Not submitted", tone: "text-muted-foreground", bg: "bg-muted", ring: "ring-border" };
 
   const timeline = buildTimeline(task, creator);
 
@@ -90,10 +90,10 @@ function EmployeeTaskDetail() {
     task.reviewState === "in_review"
       ? { icon: Eye, label: "View submission", variant: "outline" as const }
       : task.reviewState === "rejected"
-      ? { icon: RotateCcw, label: "Resubmit task", variant: "default" as const }
-      : task.status === "completed"
-      ? { icon: CheckCircle2, label: "View details", variant: "outline" as const }
-      : { icon: Send, label: "Submit for review", variant: "default" as const };
+        ? { icon: RotateCcw, label: "Resubmit task", variant: "default" as const }
+        : task.status === "completed"
+          ? { icon: CheckCircle2, label: "View details", variant: "outline" as const }
+          : { icon: Send, label: "Submit for review", variant: "default" as const };
 
   const isAssignedNotStarted =
     (task.status === "assigned" || task.status === "pending" || task.rawStatus === "Assigned") &&
@@ -120,6 +120,12 @@ function EmployeeTaskDetail() {
               <PlayCircle className="mr-1.5 h-4 w-4" />
               {startTask.isPending ? "Starting…" : "Start task"}
             </Button>
+          ) : task.reviewState === "in_review" ? (
+            <Button asChild variant="outline" className="rounded-md">
+              <Link to="/employee/pending-review">
+                <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}
+              </Link>
+            </Button>
           ) : primaryAction.variant === "default" ? (
             <Button asChild className="rounded-md shadow-glow">
               <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
@@ -127,8 +133,10 @@ function EmployeeTaskDetail() {
               </Link>
             </Button>
           ) : (
-            <Button variant="outline" className="rounded-md">
-              <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}
+            <Button asChild variant="outline" className="rounded-md">
+              <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
+                <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}
+              </Link>
             </Button>
           )
         }

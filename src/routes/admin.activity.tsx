@@ -282,7 +282,7 @@ function ActivityPage() {
   const { user } = useAuth();
   const isDirector = String(user?.role || "").toLowerCase() === "director";
 
-  const [range, setRange] = useState<RangeKey>("week");
+  const [range, setRange] = useState<RangeKey>("all");
   const [employee, setEmployee] = useState<string>("all");
   const [type, setType] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -292,7 +292,15 @@ function ActivityPage() {
   const employeesQuery = useEmployeesQuery();
 
   const activeQuery = isDirector ? orgQuery : adminQuery;
-  const rawLogs: ActivityLog[] = activeQuery.data?.data || [];
+  const rawLogs: ActivityLog[] = useMemo(() => {
+    const d = activeQuery.data;
+    if (!d) return [];
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d.data)) return d.data;
+    if (Array.isArray((d as any).logs)) return (d as any).logs;
+    if (Array.isArray((d as any)?.data?.data)) return (d as any).data.data;
+    return [];
+  }, [activeQuery.data]);
 
   const employeesList = useMemo(() => {
     const list = employeesQuery.data?.employees || [];

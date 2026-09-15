@@ -28,7 +28,7 @@ export const Route = createFileRoute("/employee/tasks/$id/")({
   component: EmployeeTaskDetail,
 });
 
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0")}`;
+const taskId = (id: string) => id;
 
 function EmployeeTaskDetail() {
   const { id } = useParams({ from: "/employee/tasks/$id/" });
@@ -58,7 +58,7 @@ function EmployeeTaskDetail() {
     : task.status === "overdue" ? 45
     : 15;
 
-  const creator = task.createdBy ?? admins[+task.id.replace(/\D/g, "") % admins.length]?.name ?? "Elena Voss";
+  const creator = task.createdBy ?? "Admin";
 
   const submissionState =
     task.reviewState === "approved" ? { label: "Approved", tone: "text-success", bg: "bg-success/15", ring: "ring-success/30" }

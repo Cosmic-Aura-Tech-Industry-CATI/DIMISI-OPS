@@ -34,8 +34,8 @@ export function normalizeUser(raw: any): AuthUser {
   return {
     id: raw._id || raw.id || "",
     _id: raw._id || raw.id || "",
-    code: raw.empId || raw.code || "EMP",
-    empId: raw.empId || raw.code || "EMP",
+    code: raw.empId || raw.code || raw._id || raw.id || "",
+    empId: raw.empId || raw.code || raw._id || raw.id || "",
     name: raw.name || "User",
     email: raw.email || "",
     role: raw.role || "employee",

@@ -90,8 +90,14 @@ function AdminOverview() {
   // Real upcoming deadlines from live Tasks collection
   const upcomingTasks = useMemo(() => {
     if (tasksList.length === 0) return [];
+    const now = Date.now();
     return [...tasksList]
-      .filter((t) => t.status !== "completed")
+      .filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        if (s === "completed" || s === "overdue") return false;
+        if (t.dueDate && new Date(t.dueDate).getTime() < now) return false;
+        return true;
+      })
       .sort((a, b) => {
         const dateA = a.dueDate || "";
         const dateB = b.dueDate || "";

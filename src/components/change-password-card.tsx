@@ -154,22 +154,9 @@ export function ChangePasswordCard({
         description: `We emailed a 6-digit code to ${email}.`,
       });
     } catch (err: any) {
-      if (verifyCurrentPassword(email, current)) {
-        await sendPasswordOtp(email);
-        setCode("");
-        setOtpError("");
-        setLocked(false);
-        setAttemptsLeft(OTP_MAX_ATTEMPTS);
-        setSeconds(OTP_RESEND_SECONDS);
-        setStep("otp");
-        toast.success("Verification code sent", {
-          description: `We emailed a 6-digit code to ${email}.`,
-        });
-      } else {
-        const msg = err?.message || "Current password is incorrect.";
-        setError(msg);
-        audit("Password Change Failed", portal, "Incorrect current password.");
-      }
+      const msg = err?.message || "Current password is incorrect.";
+      setError(msg);
+      audit("Password Change Failed", portal, msg);
     } finally {
       setBusy(false);
     }
@@ -196,13 +183,7 @@ export function ChangePasswordCard({
       setSeconds(OTP_RESEND_SECONDS);
       toast.success("A new verification code has been sent to your email.");
     } catch (err: any) {
-      await sendPasswordOtp(email);
-      setCode("");
-      setOtpError("");
-      setLocked(false);
-      setAttemptsLeft(OTP_MAX_ATTEMPTS);
-      setSeconds(OTP_RESEND_SECONDS);
-      toast.success("A new verification code has been sent to your email.");
+      toast.error(err?.message || "Failed to resend verification code.");
     } finally {
       setResending(false);
     }

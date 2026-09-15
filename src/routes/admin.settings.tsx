@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   Bell,
   Check,
   Key,
@@ -11,6 +12,7 @@ import {
   Moon,
   Palette,
   QrCode,
+  RotateCcw,
   Save,
   Shield,
   ShieldAlert,
@@ -35,9 +37,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/audit-log";
+import { updateProfile as updateProfileStore } from "@/lib/profile-store";
+import { AvatarUpload } from "@/components/avatar-upload";
 import { ChangePasswordCard } from "@/components/change-password-card";
 import { useAuth } from "@/lib/auth";
 import {
@@ -70,20 +75,6 @@ export const Route = createFileRoute("/admin/settings")({
   }),
   component: AdminSettingsPage,
 });
-
-function saveToast(label: string) {
-  return () => {
-    logAudit({
-      category: "settings",
-      action: "Updated Personal Settings",
-      target: label,
-      details: `${label} settings saved.`,
-    });
-    toast.success(`${label} saved`, {
-      description: "Your changes are stored locally (demo).",
-    });
-  };
-}
 
 function AdminSettingsPage() {
   return (
@@ -202,13 +193,28 @@ function SecuritySection() {
   const { user } = useAuth();
   const isDirector = String(user?.role || "").toLowerCase() === "director";
 
-  const { data: preferences } = useUserPreferencesQuery();
+  const {
+    data: preferences,
+    isLoading: isLoadingPrefs,
+    isError: isErrorPrefs,
+    refetch: refetchPrefs,
+  } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
-  const { data: workspace } = useWorkspaceSettingsQuery();
+  const {
+    data: workspace,
+    isLoading: isLoadingWorkspace,
+    isError: isErrorWorkspace,
+    refetch: refetchWorkspace,
+  } = useWorkspaceSettingsQuery();
   const updateWorkspace = useUpdateWorkspaceSettingsMutation();
 
-  const { data: sessionsData } = useSessionsQuery();
+  const {
+    data: sessionsData,
+    isLoading: isLoadingSessions,
+    isError: isErrorSessions,
+    refetch: refetchSessions,
+  } = useSessionsQuery();
   const revokeSession = useRevokeSessionMutation();
   const revokeOtherSessions = useRevokeOtherSessionsMutation();
 
@@ -310,41 +316,63 @@ function SecuritySection() {
               size="sm"
               className="rounded-md"
               onClick={handleStartTotpSetup}
-              disabled={setup2Fa.isPending}
+              disabled={setup2Fa.isPending || isLoadingPrefs}
             >
               <QrCode className="mr-1.5 h-3.5 w-3.5" /> Setup App
             </Button>
           }
         >
-          <div className="space-y-3">
-            <ToggleRow
-              title="Authenticator app"
-              description={
-                isTotpConfigured
-                  ? "Active · Authenticator app enabled."
-                  : "Not configured · Scan QR to link."
-              }
-              icon={Smartphone}
-              checked={isTotpConfigured}
-              disabled
-            />
-            <ToggleRow
-              title="Email verification"
-              description="Confirm sign-ins and sensitive changes via one-time email OTP."
-              icon={Mail}
-              checked={isEmailOtpEnabled}
-              onChange={(checked) => {
-                updatePreferences.mutate(
-                  { security: { twoFactor: { emailVerification: checked } } },
-                  {
-                    onSuccess: () => toast.success("Email verification preference updated."),
-                    onError: (err: any) =>
-                      toast.error(err?.message || "Failed to update preference."),
-                  },
-                );
-              }}
-            />
-          </div>
+          {isLoadingPrefs ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+            </div>
+          ) : isErrorPrefs ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+              <span className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                Failed to load 2FA settings.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => refetchPrefs()}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" /> Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <ToggleRow
+                title="Authenticator app"
+                description={
+                  isTotpConfigured
+                    ? "Active · Authenticator app enabled."
+                    : "Not configured · Scan QR to link."
+                }
+                icon={Smartphone}
+                checked={isTotpConfigured}
+                disabled
+              />
+              <ToggleRow
+                title="Email verification"
+                description="Confirm sign-ins and sensitive changes via one-time email OTP."
+                icon={Mail}
+                checked={isEmailOtpEnabled}
+                onChange={(checked) => {
+                  updatePreferences.mutate(
+                    { security: { twoFactor: { emailVerification: checked } } },
+                    {
+                      onSuccess: () => toast.success("Email verification preference updated."),
+                      onError: (err: any) =>
+                        toast.error(err?.message || "Failed to update preference."),
+                    },
+                  );
+                }}
+              />
+            </div>
+          )}
         </SettingCard>
 
         <SettingCard
@@ -364,7 +392,27 @@ function SecuritySection() {
             ) : undefined
           }
         >
-          {allSessions.length === 0 ? (
+          {isLoadingSessions ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+          ) : isErrorSessions ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+              <span className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                Failed to load active sessions.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => refetchSessions()}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" /> Retry
+              </Button>
+            </div>
+          ) : allSessions.length === 0 ? (
             <div className="py-6 text-center text-xs text-muted-foreground">
               No active session records found
             </div>
@@ -417,38 +465,60 @@ function SecuritySection() {
 
         {isDirector && (
           <SettingCard title="Access & privacy" description="Workspace-level access controls.">
-            <div className="space-y-3">
-              <ToggleRow
-                title="Allow SSO sign-in"
-                description="Enable Google / Microsoft sign-in for employees."
-                checked={workspace?.allowSsoSignIn ?? true}
-                onChange={(checked) => {
-                  updateWorkspace.mutate(
-                    { allowSsoSignIn: checked },
-                    {
-                      onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) =>
-                        toast.error(err?.message || "Failed to update workspace setting."),
-                    },
-                  );
-                }}
-              />
-              <ToggleRow
-                title="Require 2FA for all admins"
-                description="Force every admin to enable two-factor sign-in."
-                checked={workspace?.require2FaForAdmins ?? false}
-                onChange={(checked) => {
-                  updateWorkspace.mutate(
-                    { require2FaForAdmins: checked },
-                    {
-                      onSuccess: () => toast.success("Workspace setting updated."),
-                      onError: (err: any) =>
-                        toast.error(err?.message || "Failed to update workspace setting."),
-                    },
-                  );
-                }}
-              />
-            </div>
+            {isLoadingWorkspace ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-16 w-full rounded-xl" />
+              </div>
+            ) : isErrorWorkspace ? (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+                <span className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Failed to load workspace settings.
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => refetchWorkspace()}
+                >
+                  <RotateCcw className="mr-1 h-3 w-3" /> Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <ToggleRow
+                  title="Allow SSO sign-in"
+                  description="Enable Google / Microsoft sign-in for employees."
+                  checked={workspace?.allowSsoSignIn ?? true}
+                  onChange={(checked) => {
+                    updateWorkspace.mutate(
+                      { allowSsoSignIn: checked },
+                      {
+                        onSuccess: () => toast.success("Workspace setting updated."),
+                        onError: (err: any) =>
+                          toast.error(err?.message || "Failed to update workspace setting."),
+                      },
+                    );
+                  }}
+                />
+                <ToggleRow
+                  title="Require 2FA for all admins"
+                  description="Force every admin to enable two-factor sign-in."
+                  checked={workspace?.require2FaForAdmins ?? false}
+                  onChange={(checked) => {
+                    updateWorkspace.mutate(
+                      { require2FaForAdmins: checked },
+                      {
+                        onSuccess: () => toast.success("Workspace setting updated."),
+                        onError: (err: any) =>
+                          toast.error(err?.message || "Failed to update workspace setting."),
+                      },
+                    );
+                  }}
+                />
+              </div>
+            )}
           </SettingCard>
         )}
       </div>
@@ -523,6 +593,12 @@ function SecuritySection() {
 
 export function ThemeSection() {
   const { theme, setTheme } = useTheme();
+  const {
+    data: preferences,
+    isLoading,
+    isError,
+    refetch,
+  } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
   const options: Array<{ value: "light" | "dark"; label: string; icon: typeof Sun }> = [
@@ -532,7 +608,12 @@ export function ThemeSection() {
 
   const handleSelectTheme = (val: "light" | "dark") => {
     setTheme(val);
-    updatePreferences.mutate({ theme: val });
+    updatePreferences.mutate(
+      { theme: val },
+      {
+        onError: (err: any) => toast.error(err?.message || "Failed to update theme preference."),
+      },
+    );
   };
 
   return (
@@ -541,41 +622,63 @@ export function ThemeSection() {
         title="Appearance"
         description="Choose how Dimisi Operations looks on this device."
       >
-        <div className="grid grid-cols-2 gap-4 sm:max-w-md">
-          {options.map((o) => {
-            const active = theme === o.value;
-            const Icon = o.icon;
-            return (
-              <button
-                key={o.value}
-                onClick={() => handleSelectTheme(o.value)}
-                className={cn(
-                  "group relative overflow-hidden rounded-xl border p-4 text-left transition",
-                  active
-                    ? "border-primary bg-primary/10 shadow-glow"
-                    : "border-border/60 bg-card/40 hover:border-primary/40",
-                )}
-              >
-                <div
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-4 sm:max-w-md">
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Failed to load appearance preferences.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => refetch()}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:max-w-md">
+            {options.map((o) => {
+              const active = theme === o.value;
+              const Icon = o.icon;
+              return (
+                <button
+                  key={o.value}
+                  onClick={() => handleSelectTheme(o.value)}
                   className={cn(
-                    "mb-3 grid h-10 w-10 place-items-center rounded-lg",
+                    "group relative overflow-hidden rounded-xl border p-4 text-left transition",
                     active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground",
+                      ? "border-primary bg-primary/10 shadow-glow"
+                      : "border-border/60 bg-card/40 hover:border-primary/40",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="text-sm font-medium">{o.label}</div>
-                {active && (
-                  <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-3 w-3" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  <div
+                    className={cn(
+                      "mb-3 grid h-10 w-10 place-items-center rounded-lg",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-medium">{o.label}</div>
+                  {active && (
+                    <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </SettingCard>
     </div>
   );
@@ -584,7 +687,12 @@ export function ThemeSection() {
 /* ---------------- Notifications ---------------- */
 
 export function NotificationsSection() {
-  const { data: preferences } = useUserPreferencesQuery();
+  const {
+    data: preferences,
+    isLoading,
+    isError,
+    refetch,
+  } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
   const emailNotifs = preferences?.notifications?.email;
@@ -644,6 +752,41 @@ export function NotificationsSection() {
       },
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
+        <SettingCard title="Email notifications" description="What we email you about.">
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </div>
+        </SettingCard>
+        <SettingCard title="In-app notifications" description="What shows in your notification tray.">
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </div>
+        </SettingCard>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-sm text-destructive">
+        <span className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          Failed to load notification settings. Please check your internet connection or try again.
+        </span>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RotateCcw className="mr-1.5 h-4 w-4" /> Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2 items-start">
@@ -746,50 +889,105 @@ export function NotificationsSection() {
 /* ---------------- Profile ---------------- */
 
 export function ProfileSection({ role }: { role: "admin" | "employee" }) {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const updateProfile = useUpdateProfileMutation();
-  const [phone, setPhone] = useState(user?.phone || "+1 (555) 214-8890");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [photo, setPhoto] = useState<string>(user?.avatar || (user as any)?.avtar || "");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      setPhone(user.phone || "");
+      setPhoto(user.avatar || (user as any)?.avtar || "");
+    }
+  }, [user]);
+
+  const onPickFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPG, PNG, GIF, WebP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5 MB.");
+      return;
+    }
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(String(reader.result));
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile.mutateAsync({ phone });
+      let payload: any;
+      if (selectedFile) {
+        payload = new FormData();
+        payload.append("avatar", selectedFile);
+        if (phone) payload.append("phone", phone);
+      } else {
+        payload = { phone, avatar: photo };
+      }
+
+      const res = await updateProfile.mutateAsync(payload);
+      const updatedUser = res?.user || res?.data?.user || res;
+
+      const newAvatar = updatedUser?.avatar || photo;
+      const newPhone = updatedUser?.phone ?? phone;
+
+      if (user) {
+        setUser({
+          ...user,
+          phone: newPhone,
+          avatar: newAvatar,
+        });
+      }
+
+      updateProfileStore({ phone: newPhone, photo: newAvatar });
+
       logAudit({
         category: "settings",
         action: "Updated Profile",
         target: "Personal Information",
-        details: "User updated contact details.",
+        details: "User updated contact details and profile picture.",
       });
       toast.success("Profile saved successfully.");
+      setSelectedFile(null);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update profile.");
     }
   };
 
   const name = user?.name || (role === "admin" ? "Admin User" : "Employee User");
-  const avatar = user?.avatar || (user as any)?.avtar || name.slice(0, 2).toUpperCase();
   const email = user?.email || "user@dimisi.com";
   const dept =
     typeof user?.department === "object" && user?.department !== null
       ? (user.department as any).name
       : user?.department || "Operations";
-  const code = (user as any)?.empId || user?.code || "EMP-01";
+  const code = (user as any)?.empId || user?.code || user?.id || (user as any)?._id || "—";
+
+  const getInitials = (n: string) => {
+    const parts = n.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const isImageAvatar =
+    Boolean(photo) &&
+    (photo.startsWith("data:") || photo.startsWith("http") || photo.startsWith("/") || photo.includes("/"));
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <SettingCard title="Avatar" description="Profile photo and visual identifier.">
-        <div className="flex flex-col items-center gap-4">
-          <div className="grid h-24 w-24 place-items-center rounded-full bg-linear-to-br from-primary to-accent font-display text-3xl font-bold shadow-glow">
-            {avatar}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="rounded-md">
-              <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
-            </Button>
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            JPG or PNG · square · up to 5MB
-          </p>
-        </div>
+        <AvatarUpload
+          value={photo}
+          name={name}
+          onChange={(photoUrl, file) => {
+            setPhoto(photoUrl || "");
+            setSelectedFile(file ?? null);
+          }}
+        />
       </SettingCard>
 
       <div className="lg:col-span-2">
