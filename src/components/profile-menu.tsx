@@ -15,7 +15,18 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
   if (!user) return null;
 
-  const settingsPath = user.role === "admin" ? "/admin/settings" : "/employee/profile";
+  const isAdmin = user.role === "admin" || user.role === "director";
+
+  const profilePath = isAdmin ? "/admin/profile" : "/employee/profile";
+  const settingsPath = isAdmin ? "/admin/settings" : "/employee/settings";
+  const supportPath = isAdmin ? "/admin/support" : "/employee/support";
+
+  const isImageAvatar =
+    Boolean(user.avatar) &&
+    (user.avatar.startsWith("data:") ||
+      user.avatar.startsWith("http") ||
+      user.avatar.startsWith("/") ||
+      user.avatar.includes("/"));
 
   return (
     <DropdownMenu>
@@ -24,8 +35,12 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           className="group flex items-center gap-2 rounded-full border border-border/60 bg-background/60 py-1 pl-1 pr-2 transition-colors hover:bg-accent/60"
           aria-label="Open profile menu"
         >
-          <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.22_320)] text-[11px] font-semibold text-primary-foreground shadow-glow">
-            {user.avatar}
+          <div className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.22_320)] text-[11px] font-semibold text-primary-foreground shadow-glow">
+            {isImageAvatar ? (
+              <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+            ) : (
+              user.avatar
+            )}
           </div>
           {!compact && (
             <div className="hidden min-w-0 flex-col text-left sm:flex">
@@ -38,8 +53,12 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60 rounded-2xl p-1.5">
         <DropdownMenuLabel className="flex items-center gap-3 rounded-xl p-2">
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.22_320)] text-xs font-semibold text-primary-foreground">
-            {user.avatar}
+          <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.22_320)] text-xs font-semibold text-primary-foreground">
+            {isImageAvatar ? (
+              <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+            ) : (
+              user.avatar
+            )}
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{user.name}</div>
@@ -47,13 +66,13 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate({ to: settingsPath })} className="cursor-pointer rounded-lg">
+        <DropdownMenuItem onClick={() => navigate({ to: profilePath })} className="cursor-pointer rounded-lg">
           <UserIcon className="mr-2 h-4 w-4" /> Profile
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate({ to: settingsPath })} className="cursor-pointer rounded-lg">
           <Settings className="mr-2 h-4 w-4" /> Settings
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer rounded-lg">
+        <DropdownMenuItem onClick={() => navigate({ to: supportPath })} className="cursor-pointer rounded-lg">
           <LifeBuoy className="mr-2 h-4 w-4" /> Help & support
         </DropdownMenuItem>
         <DropdownMenuSeparator />

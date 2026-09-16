@@ -101,17 +101,24 @@ export function RecentActivities({ items = [] }: { items?: DashboardActivityItem
 }
 
 export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
+  const activeDeadlines = tasks.filter((t) => {
+    const s = (t.status || "").toLowerCase();
+    if (s === "completed" || s === "overdue") return false;
+    if (t.dueDate && new Date(t.dueDate).getTime() < Date.now()) return false;
+    return true;
+  });
+
   return (
     <div className="glass rounded-2xl p-5">
       <WidgetHeader icon={CalendarClock} title="Upcoming deadlines" linkTo="/admin/tasks" linkLabel="All tasks" />
-      {tasks.length === 0 ? (
+      {activeDeadlines.length === 0 ? (
         <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
           <CalendarClock className="mb-2 h-6 w-6 opacity-40" />
           No upcoming task deadlines
         </div>
       ) : (
         <ul className="mt-4 space-y-3">
-          {tasks.map((t) => {
+          {activeDeadlines.map((t) => {
             const dueDate = t.dueDate || "";
             const days = dueDate
               ? Math.max(0, Math.ceil((+new Date(dueDate) - Date.now()) / (1000 * 60 * 60 * 24)))

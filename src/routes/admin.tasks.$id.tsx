@@ -35,7 +35,7 @@ export const Route = createFileRoute("/admin/tasks/$id")({
   component: TaskDetailPage,
 });
 
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0") || id.slice(-4)}`;
+const taskId = (id: string) => id;
 
 function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });

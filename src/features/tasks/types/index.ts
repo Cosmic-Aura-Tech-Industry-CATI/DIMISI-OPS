@@ -9,8 +9,8 @@ export type TaskPriority = MockTaskPriority;
 export type TaskStatus = MockTaskStatus;
 export type TaskType = MockTaskType;
 
-export type BackendTaskPriority = "Low" | "Medium" | "High" | "Urgent";
-export type BackendTaskType = "Universal" | "Direct" | "Project";
+export type BackendTaskPriority = "low" | "medium" | "high" | "urgent" | "Low" | "Medium" | "High" | "Urgent";
+export type BackendTaskType = "universal" | "direct" | "project" | "Universal" | "Direct" | "Project";
 export type BackendTaskStatus =
   | "Open"
   | "Requested"
@@ -18,7 +18,15 @@ export type BackendTaskStatus =
   | "In Progress"
   | "In Review"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | "open"
+  | "requested"
+  | "assigned"
+  | "in_progress"
+  | "in_review"
+  | "completed"
+  | "cancelled"
+  | "overdue";
 
 export interface BackendPopulatedUser {
   _id: string;
@@ -166,13 +174,13 @@ export interface ReviewTaskPayload {
 export function toBackendTaskPriority(priority?: string): BackendTaskPriority {
   switch ((priority || "").toLowerCase()) {
     case "low":
-      return "Low";
+      return "low";
     case "high":
     case "urgent":
-      return "High";
+      return "high";
     case "medium":
     default:
-      return "Medium";
+      return "medium";
   }
 }
 
@@ -192,12 +200,12 @@ export function toFrontendTaskPriority(priority?: string): MockTaskPriority {
 export function toBackendTaskType(type?: string): BackendTaskType {
   switch ((type || "").toLowerCase()) {
     case "universal":
-      return "Universal";
+      return "universal";
     case "project":
-      return "Project";
+      return "project";
     case "direct":
     default:
-      return "Direct";
+      return "direct";
   }
 }
 
@@ -214,20 +222,24 @@ export function toFrontendTaskType(type?: string): MockTaskType {
 }
 
 export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus; reviewState?: TaskReviewState } {
-  switch (status) {
-    case "Open":
+  const normalized = (status || "").toLowerCase().trim();
+  switch (normalized) {
+    case "open":
       return { status: "available" };
-    case "Requested":
+    case "requested":
       return { status: "pending" };
-    case "Assigned":
+    case "assigned":
       return { status: "assigned" };
-    case "In Progress":
+    case "in_progress":
+    case "in progress":
       return { status: "in_progress" };
-    case "In Review":
+    case "in_review":
+    case "in review":
       return { status: "in_progress", reviewState: "in_review" };
-    case "Completed":
+    case "completed":
       return { status: "completed", reviewState: "approved" };
-    case "Cancelled":
+    case "cancelled":
+    case "overdue":
       return { status: "overdue" };
     default:
       return { status: "pending" };
@@ -314,16 +326,49 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     rejectionReason = parts[parts.length - 1]?.trim();
   }
 
-  // Parse attachments
-  const rawAttachments = doc.attachments || [];
-  const attachments = rawAttachments.map((url) => {
-    const filename = url.split("/").pop() || "attachment";
-    return {
-      name: decodeURIComponent(filename),
-      size: "File",
-      url,
-    };
-  });
+  // Parse attachments safely handling strings, Cloudinary objects ({ url, publicId }), and edge case values
+  const rawAttachments = Array.isArray(doc.attachments) ? doc.attachments : [];
+  const rawAttachmentUrls: string[] = [];
+
+  const attachments = rawAttachments
+    .map((item: any) => {
+      if (!item) return null;
+
+      let fileUrl = "";
+      let fileName = "attachment";
+
+      if (typeof item === "string") {
+        fileUrl = item;
+      } else if (typeof item === "object" && item !== null) {
+        fileUrl = item.url || item.path || item.secure_url || item.link || "";
+        if (item.name || item.filename || item.originalName) {
+          fileName = String(item.name || item.filename || item.originalName);
+        }
+      }
+
+      if (!fileUrl || typeof fileUrl !== "string") return null;
+
+      rawAttachmentUrls.push(fileUrl);
+
+      if (fileName === "attachment") {
+        try {
+          const parts = fileUrl.split("/");
+          const lastPart = parts[parts.length - 1];
+          if (lastPart) {
+            fileName = decodeURIComponent(lastPart.split("?")[0]);
+          }
+        } catch {
+          fileName = "attachment";
+        }
+      }
+
+      return {
+        name: fileName,
+        size: item?.size ? (typeof item.size === "number" ? `${Math.round(item.size / 1024)} KB` : String(item.size)) : "File",
+        url: fileUrl,
+      };
+    })
+    .filter((att): att is { name: string; size: string; url: string } => att !== null);
 
   const dueDate = doc.deadline
     ? new Date(doc.deadline).toISOString().slice(0, 10)
@@ -352,7 +397,7 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     creatorId,
     notes: doc.notes,
     attachments,
-    rawAttachmentUrls: rawAttachments,
+    rawAttachmentUrls,
     reviewState: defaultReviewState,
     rejectionReason,
     projectId,
@@ -386,10 +431,11 @@ export function buildCreateTaskFormData(input: CreateTaskInput): FormData {
   if (input.estimatedTime) {
     fd.append("estimatedTime", input.estimatedTime.trim());
   }
-  if (input.taskType === "project" && input.projectId) {
+  const normalizedType = toBackendTaskType(input.taskType);
+  if (normalizedType === "project" && input.projectId) {
     fd.append("projectId", input.projectId);
   }
-  if (input.taskType === "direct" && input.assigneeId) {
+  if (normalizedType === "direct" && input.assigneeId) {
     fd.append("assignedTo", input.assigneeId);
   }
 

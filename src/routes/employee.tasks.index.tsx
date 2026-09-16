@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { TaskCardGrid } from "@/components/task-card";
-import { useTasksQuery, type TaskPriority } from "@/features/tasks";
+import { useTasksQuery, useAssignedTasksQuery, type Task, type TaskPriority } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import { applySubmissions, useSubmissionMap } from "@/lib/submission-store";
 import { applyReviewDecisions, useReviewMap } from "@/lib/review-store";
@@ -35,9 +35,18 @@ function AssignedTasksPage() {
   const auth = useAuth();
   const subs = useSubmissionMap();
   const reviewMap = useReviewMap();
-  const { data: rawTasks = [], isLoading } = useTasksQuery();
-  const tasks = applyReviewDecisions(applySubmissions(rawTasks, subs), reviewMap);
+  const { data: rawTasks = [] } = useTasksQuery();
+  const { data: assignedBucket = [] } = useAssignedTasksQuery();
 
+  const taskMap = new Map<string, Task>();
+  for (const t of rawTasks) {
+    taskMap.set(t.id || t._id, t);
+  }
+  for (const t of assignedBucket) {
+    taskMap.set(t.id || t._id, t);
+  }
+
+  const tasks = applyReviewDecisions(applySubmissions(Array.from(taskMap.values()), subs), reviewMap);
   const currentUserId = auth.user?.id || auth.user?._id || "";
 
   const mine = useMemo(() => {
@@ -47,14 +56,14 @@ function AssignedTasksPage() {
         (auth.user?.name && t.assignee === auth.user.name) ||
         (auth.user?.email && t.assignee === auth.user.email);
 
-      if (!isMine && rawTasks.length > 0 && t.assigneeId) return false;
+      if (!isMine && tasks.length > 0 && t.assigneeId) return false;
       if (t.status === "completed" || t.reviewState) return false;
       if (priority !== "all" && t.priority !== priority) return false;
       const q = query.trim().toLowerCase();
       if (!q) return true;
       return t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
     });
-  }, [tasks, query, priority, currentUserId, auth.user, rawTasks.length]);
+  }, [tasks, query, priority, currentUserId, auth.user]);
 
   return (
     <>

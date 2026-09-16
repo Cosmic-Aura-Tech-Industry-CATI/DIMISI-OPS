@@ -8,8 +8,19 @@ export const notificationsService = {
     const res = await http.get<NotificationItem[] | { data: NotificationItem[] }>(
       API_ENDPOINTS.notifications.list,
     );
-    if (Array.isArray(res)) return res;
-    return (res as any)?.data || [];
+    const items = Array.isArray(res) ? res : (res as any)?.data || [];
+    return items.map((item: any) => ({
+      _id: item._id || item.id || "",
+      id: item.id || item._id || "",
+      recipientId: item.recipientId || "",
+      title: item.title || "Notification",
+      message: item.message || "",
+      type: item.type || "notification",
+      isRead: Boolean(item.isRead),
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt,
+      taskId: item.taskId || item.metadata?.taskId || item.dynamicData?.taskId || undefined,
+    }));
   },
 
   markAsRead: async (notificationId: string): Promise<{ message: string }> => {

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Key, Monitor, Palette, Trash2, UserCircle } from "lucide-react";
+import { AlertCircle, Bell, Key, Monitor, Palette, RotateCcw, Trash2, UserCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   NotificationsSection,
   ProfileSection,
@@ -82,10 +83,20 @@ function EmployeeSettingsPage() {
 }
 
 function PasswordSection() {
-  const { data: preferences } = useUserPreferencesQuery();
+  const {
+    data: preferences,
+    isLoading: isLoadingPrefs,
+    isError: isErrorPrefs,
+    refetch: refetchPrefs,
+  } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
-  const { data: sessionsData } = useSessionsQuery();
+  const {
+    data: sessionsData,
+    isLoading: isLoadingSessions,
+    isError: isErrorSessions,
+    refetch: refetchSessions,
+  } = useSessionsQuery();
   const revokeSession = useRevokeSessionMutation();
   const revokeOtherSessions = useRevokeOtherSessionsMutation();
 
@@ -128,23 +139,43 @@ function PasswordSection() {
       />
 
       <SettingCard title="Sign-in security" description="Extra protection on your account.">
-        <div className="space-y-3">
-          <ToggleRow
-            title="Email verification on sign-in"
-            description="Send an email OTP code to verify new sign-ins."
-            checked={isEmailVerificationEnabled}
-            onChange={(checked) => {
-              updatePreferences.mutate(
-                { security: { twoFactor: { emailVerification: checked } } },
-                {
-                  onSuccess: () => toast.success("Sign-in security preference updated."),
-                  onError: (err: any) => toast.error(err?.message || "Failed to update preference."),
-                },
-              );
-            }}
-          />
-        </div >
-      </SettingCard >
+        {isLoadingPrefs ? (
+          <Skeleton className="h-16 w-full rounded-xl" />
+        ) : isErrorPrefs ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Failed to load security settings.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => refetchPrefs()}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ToggleRow
+              title="Email verification on sign-in"
+              description="Send an email OTP code to verify new sign-ins."
+              checked={isEmailVerificationEnabled}
+              onChange={(checked) => {
+                updatePreferences.mutate(
+                  { security: { twoFactor: { emailVerification: checked } } },
+                  {
+                    onSuccess: () => toast.success("Sign-in security preference updated."),
+                    onError: (err: any) =>
+                      toast.error(err?.message || "Failed to update preference."),
+                  },
+                );
+              }}
+            />
+          </div>
+        )}
+      </SettingCard>
 
       <SettingCard
         title="Sessions"
@@ -163,7 +194,27 @@ function PasswordSection() {
           ) : undefined
         }
       >
-        {allSessions.length === 0 ? (
+        {isLoadingSessions ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+        ) : isErrorSessions ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Failed to load active sessions.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => refetchSessions()}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        ) : allSessions.length === 0 ? (
           <div className="py-6 text-center text-xs text-muted-foreground">
             No active session records found
           </div>
@@ -213,6 +264,6 @@ function PasswordSection() {
           </ul>
         )}
       </SettingCard>
-    </div >
+    </div>
   );
 }

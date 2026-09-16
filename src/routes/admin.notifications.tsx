@@ -56,11 +56,12 @@ function AdminNotificationsPage() {
   const markReadMutation = useMarkNotificationReadMutation();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
-  const [tab, setTab] = useState<"unread" | "read">("unread");
+  const [tab, setTab] = useState<"all" | "unread" | "read">("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const counts = useMemo(
     () => ({
+      all: notifications.length,
       unread: notifications.filter((n) => !n.isRead).length,
       read: notifications.filter((n) => n.isRead).length,
     }),
@@ -70,7 +71,11 @@ function AdminNotificationsPage() {
   const filtered = useMemo(
     () =>
       notifications
-        .filter((n) => (tab === "unread" ? !n.isRead : n.isRead))
+        .filter((n) => {
+          if (tab === "unread") return !n.isRead;
+          if (tab === "read") return n.isRead;
+          return true;
+        })
         .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
     [notifications, tab, typeFilter],
@@ -139,8 +144,12 @@ function AdminNotificationsPage() {
         })}
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "unread" | "read")}>
-        <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread" | "read")}>
+        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="all" className="gap-1.5 sm:gap-2">
+            All
+            <span className="text-xs text-muted-foreground">{counts.all}</span>
+          </TabsTrigger>
           <TabsTrigger value="unread" className="gap-1.5 sm:gap-2">
             Unread
             {counts.unread > 0 && (
@@ -160,11 +169,23 @@ function AdminNotificationsPage() {
         <div className="py-16 text-center text-sm text-muted-foreground">
           Loading notifications…
         </div>
-      ) : filtered.length === 0 ? (
+      ) : notifications.length === 0 ? (
         <EmptyState
           icon={BellOff}
           title="You're all caught up"
           description="Nothing to show in this view. New notifications will appear here."
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={BellOff}
+          title={
+            tab === "unread"
+              ? "No unread notifications"
+              : tab === "read"
+              ? "No read notifications"
+              : "No matching notifications"
+          }
+          description="No notifications match your current filter selection."
         />
       ) : (
         <div className="space-y-3">

@@ -84,16 +84,38 @@ function EmployeeOverview() {
   const pending = mine.filter((t) => t.status === "pending" || t.status === "in_progress" || (t.status as string) === "In Progress" || (t.status as string) === "Assigned");
   
   const displayToday = useMemo(() => {
-    if (tasksDeadlines?.todayTasks) return tasksDeadlines.todayTasks;
+    if (tasksDeadlines?.todayTasks) {
+      return tasksDeadlines.todayTasks.filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        return s !== "completed" && s !== "overdue";
+      });
+    }
+    const now = Date.now();
     return mine
-      .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed")
+      .filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        if (s === "completed" || s === "overdue") return false;
+        if (t.dueDate && new Date(t.dueDate).getTime() < now) return false;
+        return true;
+      })
       .slice(0, 3);
   }, [tasksDeadlines?.todayTasks, mine]);
 
   const displayDeadlines = useMemo(() => {
-    if (tasksDeadlines?.upcomingDeadlines) return tasksDeadlines.upcomingDeadlines;
+    if (tasksDeadlines?.upcomingDeadlines) {
+      return tasksDeadlines.upcomingDeadlines.filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        return s !== "completed" && s !== "overdue";
+      });
+    }
+    const now = Date.now();
     return [...mine]
-      .filter((t) => t.status !== "completed" && (t.status as string) !== "Completed" && t.dueDate)
+      .filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        if (s === "completed" || s === "overdue") return false;
+        if (t.dueDate && new Date(t.dueDate).getTime() < now) return false;
+        return true;
+      })
       .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
       .slice(0, 4);
   }, [tasksDeadlines?.upcomingDeadlines, mine]);

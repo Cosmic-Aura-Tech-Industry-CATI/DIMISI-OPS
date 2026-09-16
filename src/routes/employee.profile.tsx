@@ -103,7 +103,7 @@ function ProfilePage() {
     if (user) {
       return {
         id: user.id || user._id || currentEmployee.id,
-        code: user.code || user.empId || currentEmployee.code,
+        code: user.empId || user.code || user.id || user._id || currentEmployee.code,
         name: user.name || currentEmployee.name,
         email: user.email || currentEmployee.email,
         role: (user.role as "employee" | "admin") || "employee",

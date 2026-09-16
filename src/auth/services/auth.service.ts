@@ -103,6 +103,16 @@ export async function oauthLogin(payload: OAuthLoginRequest) {
   return res;
 }
 
+/** POST /api/v1/auth/microsoft-login — exchanges Microsoft OAuth token for user session. */
+export async function microsoftOAuthLogin(payload: OAuthLoginRequest) {
+  const res = await http.post<OAuthLoginResponse>(auth.microsoftLogin, payload, { authMode: "none" });
+  const token = res?.accessToken || res?.data?.accessToken;
+  if (token) {
+    setAccessToken(token);
+  }
+  return res;
+}
+
 export const authService = {
   getHealth,
   login,
@@ -115,5 +125,7 @@ export const authService = {
   verifyResetOtp,
   resetPassword,
   oauthLogin,
+  microsoftOAuthLogin,
 };
+
 
