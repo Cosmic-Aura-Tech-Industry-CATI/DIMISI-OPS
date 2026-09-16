@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
     verifyResetOtp: "/auth/verify-reset-otp",
     resetPassword: "/auth/reset-password",
     oauthLogin: "/auth/oauth-login",
+    microsoftLogin: "/auth/microsoft-login",
   },
   departments: {
     list: "/departments",

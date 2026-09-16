@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signOut as firebaseSignOut,
   type Auth,
@@ -40,6 +41,11 @@ export { app as firebaseApp, auth as firebaseAuth };
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
+  prompt: "select_account",
+});
+
+const microsoftProvider = new OAuthProvider("microsoft.com");
+microsoftProvider.setCustomParameters({
   prompt: "select_account",
 });
 
@@ -88,6 +94,50 @@ export async function signInWithGoogleOAuth(): Promise<{
 }
 
 /**
+ * Initiates Microsoft OAuth popup flow using Firebase Auth.
+ * Returns the Firebase ID token and user object.
+ */
+export async function signInWithMicrosoftOAuth(): Promise<{
+  idToken: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}> {
+  if (!auth) {
+    if (!isFirebaseConfigured()) {
+      throw new Error(
+        "Firebase is not configured. Please provide VITE_FIREBASE_API_KEY and related variables in your .env file."
+      );
+    }
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+  }
+
+  try {
+    const result: UserCredential = await signInWithPopup(auth, microsoftProvider);
+    const idToken = await result.user.getIdToken(true);
+
+    return {
+      idToken,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      photoURL: result.user.photoURL,
+    };
+  } catch (err: any) {
+    if (err?.code === "auth/popup-closed-by-user") {
+      throw new Error("Sign-in cancelled. You closed the Microsoft login popup.");
+    }
+    if (err?.code === "auth/popup-blocked") {
+      throw new Error("Popup was blocked by your browser. Please allow popups for this site.");
+    }
+    if (err?.code === "auth/cancelled-popup-request") {
+      throw new Error("Popup request was cancelled.");
+    }
+    throw err;
+  }
+}
+
+/**
  * Signs out from client-side Firebase session.
  */
 export async function signOutFirebase(): Promise<void> {
@@ -99,3 +149,4 @@ export async function signOutFirebase(): Promise<void> {
     }
   }
 }
+
