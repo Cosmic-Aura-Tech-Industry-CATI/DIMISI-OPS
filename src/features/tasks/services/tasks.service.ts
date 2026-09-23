@@ -1,75 +1,48 @@
 /**
  * Tasks API Service Layer
- * Centralizes all communication with backend task endpoints with seamless payload unwrapping & seed fallbacks.
+ * Centralizes all communication with backend task endpoints using standard Axios client.
  */
 
 import { http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
-import { tasks as mockTasks } from "@/lib/mock-data";
 import {
   buildCreateTaskFormData,
   buildUpdateTaskFormData,
   mapTaskResponse,
   type CreateTaskInput,
+  type ReviewCenterResponse,
+  type ReviewTaskPayload,
+  type SubmitTaskPayload,
   type Task,
   type TaskQueryFilters,
   type UpdateTaskInput,
 } from "../types";
-
-const fallbackTasks: Task[] = mockTasks.map((t) => ({
-  ...t,
-  _id: t._id || t.id || "",
-  id: t.id || t._id || "",
-  title: t.title || "",
-  description: t.description || "",
-  category: t.category || "General",
-  priority: (t.priority as any) || "medium",
-  status: (t.status as any) || "pending",
-  taskType: t.taskType || "direct",
-  points: Number(t.points || 0),
-  dueDate: t.dueDate || "",
-  createdAt: t.createdAt || "",
-  assignee: t.assignee || "",
-  assigneeId: t.assigneeId || "",
-}));
 
 export const tasksService = {
   /**
    * Fetch all tasks (Smart endpoint: returns unmasked tasks for Admin/Director or masked for Employee).
    */
   async getTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.list, {
-        params: filters,
-      });
-      const rawList = Array.isArray(res)
-        ? res
-        : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
-      if (Array.isArray(rawList)) {
-        return rawList.map(mapTaskResponse);
-      }
-    } catch (err) {
-      console.warn("[tasksService.getTasks] API call failed, using fallback:", err);
+    const res = await http.get<any>(API_ENDPOINTS.tasks.list, {
+      params: filters,
+    });
+    const rawList = Array.isArray(res)
+      ? res
+      : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
+
+    if (Array.isArray(rawList)) {
+      return rawList.map(mapTaskResponse);
     }
-    return fallbackTasks;
+    return [];
   },
 
   /**
    * Fetch single task details by ID.
    */
   async getTaskById(id: string): Promise<Task> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.detail(id));
-      const raw = res?.task || res?.data?.task || res;
-      if (raw && (raw._id || raw.id || raw.title)) {
-        return mapTaskResponse(raw);
-      }
-    } catch (err) {
-      console.warn(`[tasksService.getTaskById] Failed to fetch task ${id}, using fallback:`, err);
-    }
-    const found = fallbackTasks.find((t) => t.id === id || t._id === id);
-    if (found) return found;
-    throw new Error("Task not found");
+    const res = await http.get<any>(API_ENDPOINTS.tasks.detail(id));
+    const raw = res?.task || res?.data?.task || res;
+    return mapTaskResponse(raw);
   },
 
   /**
@@ -100,14 +73,7 @@ export const tasksService = {
   },
 
   /**
-   * Employee places a request (bid) on an open Universal/Project task.
-   */
-  async requestTask(id: string): Promise<void> {
-    await http.post(API_ENDPOINTS.tasks.request(id));
-  },
-
-  /**
-   * Admin assigns a task to an employee (Approving a bid or direct assign).
+   * Admin assigns a task to an employee.
    */
   async assignTask(id: string, employeeId: string): Promise<Task> {
     const res = await http.patch<any>(API_ENDPOINTS.tasks.assign(id), {
@@ -129,24 +95,58 @@ export const tasksService = {
   /**
    * Employee submits an in-progress task for Admin review (IN_PROGRESS -> IN_REVIEW).
    */
+  async submitTask(id: string, payload: SubmitTaskPayload | { notes?: string } | string): Promise<Task> {
+    const body = typeof payload === "string" ? { notes: payload } : payload;
+    try {
+      const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+      const raw = res?.task || res?.data?.task || res;
+      return mapTaskResponse(raw);
+    } catch (err: any) {
+      // If backend throws error stating task must be 'In Progress' first or not assigned, auto-start and retry
+      const errMsg = err?.message || err?.response?.data?.message || "";
+      const status = err?.status || err?.response?.status;
+      if (
+        typeof errMsg === "string" &&
+        (errMsg.toLowerCase().includes("in progress") ||
+          errMsg.toLowerCase().includes("in_progress") ||
+          errMsg.toLowerCase().includes("assigned") ||
+          status === 400 ||
+          status === 403)
+      ) {
+        try {
+          await http.patch<any>(API_ENDPOINTS.tasks.start(id));
+          const retryRes = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+          const raw = retryRes?.task || retryRes?.data?.task || retryRes;
+          return mapTaskResponse(raw);
+        } catch {
+          // If retry fails, throw original error
+        }
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Alias for submitTask matching existing codebase usages.
+   */
   async submitTaskForReview(id: string, notes?: string): Promise<Task> {
-    const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), {
-      notes,
-    });
-    const raw = res?.task || res?.data?.task || res;
-    return mapTaskResponse(raw);
+    return this.submitTask(id, { notes: notes || "" });
   },
 
   /**
    * Admin reviews a submitted task (IN_REVIEW -> COMPLETED if approved or IN_PROGRESS if rejected).
    */
-  async reviewTask(id: string, isApproved: boolean, feedback?: string): Promise<Task> {
-    const res = await http.patch<any>(API_ENDPOINTS.tasks.review(id), {
-      isApproved,
-      feedback,
-      action: isApproved ? "APPROVED" : "REJECTED",
-      remarks: feedback,
-    });
+  async reviewTask(
+    id: string,
+    payloadOrIsApproved: ReviewTaskPayload | boolean,
+    feedback?: string,
+  ): Promise<Task> {
+    const body: ReviewTaskPayload =
+      typeof payloadOrIsApproved === "boolean"
+        ? { isApproved: payloadOrIsApproved, feedback }
+        : payloadOrIsApproved;
+
+    const res = await http.patch<any>(API_ENDPOINTS.tasks.review(id), body);
     const raw = res?.task || res?.data?.task || res;
     return mapTaskResponse(raw);
   },
@@ -154,90 +154,72 @@ export const tasksService = {
   /**
    * Admin fetches the Review Center overview with KPIs and pending review tasks.
    */
-  async getReviewCenter(): Promise<{ kpis: { pendingReview: number; highPriority: number; pointsAtStake: number }; tasks: Task[] }> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.reviewCenter);
-      const rawList = Array.isArray(res)
-        ? res
-        : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
-      const tasks = (rawList || []).map(mapTaskResponse);
-      const kpis = res?.kpis || res?.data?.kpis || { pendingReview: tasks.length, highPriority: 0, pointsAtStake: 0 };
-      if (Array.isArray(rawList)) {
-        const tasks = rawList.map(mapTaskResponse);
-        const kpis = res?.kpis || res?.data?.kpis || {
-          pendingReview: tasks.length,
-          highPriority: tasks.filter((t) => t.priority === "high").length,
-          pointsAtStake: tasks.reduce((sum, t) => sum + t.points, 0),
-        };
-        return { kpis, tasks };
-      }
-    } catch (err) {
-      console.warn("[tasksService.getReviewCenter] API call failed, using fallback:", err);
-    }
-    const mockInReview = fallbackTasks.filter(
-      (t) => t.reviewState === "in_review" || (t.status as string) === "In Review",
-    );
-    return {
-      kpis: {
-        pendingReview: mockInReview.length,
-        highPriority: mockInReview.filter((t) => t.priority === "high").length,
-        pointsAtStake: mockInReview.reduce((sum, t) => sum + t.points, 0),
-      },
-      tasks: mockInReview,
+  async getReviewCenter(): Promise<ReviewCenterResponse> {
+    const res = await http.get<any>(API_ENDPOINTS.tasks.reviewCenter);
+    const rawList = res?.tasks || res?.data?.tasks || (Array.isArray(res) ? res : []);
+    const tasks = Array.isArray(rawList) ? rawList.map(mapTaskResponse) : [];
+
+    const kpis = res?.kpis || res?.data?.kpis || {
+      pendingReview: tasks.length,
+      highPriority: tasks.filter((t) => t.priority === "high").length,
+      pointsAtStake: tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0),
     };
+
+    return { kpis, tasks };
   },
 
   /**
-   * Employee fetches assigned tasks bucket.
+   * Employee fetches assigned tasks bucket (GET /tasks/assigned).
    */
   async getAssignedTasks(): Promise<Task[]> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.assigned);
-      const rawList = Array.isArray(res)
-        ? res
-        : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
-      if (Array.isArray(rawList)) {
-        return rawList.map(mapTaskResponse);
-      }
-    } catch (err) {
-      console.warn("[tasksService.getAssignedTasks] API call failed, using fallback:", err);
+    const res = await http.get<any>(API_ENDPOINTS.tasks.assigned);
+    const rawList = Array.isArray(res)
+      ? res
+      : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
+
+    if (Array.isArray(rawList)) {
+      return rawList.map(mapTaskResponse);
     }
-    return fallbackTasks.filter((t) => t.status === "assigned" || t.status === "pending" || t.status === "in_progress");
+    return [];
   },
 
   /**
-   * Employee fetches pending tasks bucket.
+   * Employee fetches pending tasks bucket (GET /tasks/pending).
    */
   async getPendingTasks(): Promise<Task[]> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.pending);
-      const rawList = Array.isArray(res)
-        ? res
-        : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
-      if (Array.isArray(rawList)) {
-        return rawList.map(mapTaskResponse);
-      }
-    } catch (err) {
-      console.warn("[tasksService.getPendingTasks] API call failed, using fallback:", err);
+    const res = await http.get<any>(API_ENDPOINTS.tasks.pending);
+    const rawList = Array.isArray(res)
+      ? res
+      : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
+
+    if (Array.isArray(rawList)) {
+      return rawList.map(mapTaskResponse);
     }
-    return fallbackTasks.filter((t) => t.reviewState === "in_review" || (t.status as string) === "In Review");
+    return [];
   },
 
   /**
-   * Employee fetches completed tasks bucket.
+   * Employee fetches completed tasks bucket (GET /tasks/completed).
    */
   async getCompletedTasks(): Promise<Task[]> {
-    try {
-      const res = await http.get<any>(API_ENDPOINTS.tasks.completed);
-      const rawList = Array.isArray(res)
-        ? res
-        : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
-      if (Array.isArray(rawList)) {
-        return rawList.map(mapTaskResponse);
-      }
-    } catch (err) {
-      console.warn("[tasksService.getCompletedTasks] API call failed, using fallback:", err);
+    const res = await http.get<any>(API_ENDPOINTS.tasks.completed);
+    const rawList = Array.isArray(res)
+      ? res
+      : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
+
+    if (Array.isArray(rawList)) {
+      return rawList.map(mapTaskResponse);
     }
-    return fallbackTasks.filter((t) => t.status === "completed" || t.reviewState === "approved");
+    return [];
   },
 };
+
+// Aliases for direct functional imports
+export const getAssignedTasks = tasksService.getAssignedTasks.bind(tasksService);
+export const getPendingTasks = tasksService.getPendingTasks.bind(tasksService);
+export const getCompletedTasks = tasksService.getCompletedTasks.bind(tasksService);
+export const getReviewCenter = tasksService.getReviewCenter.bind(tasksService);
+export const getTaskById = tasksService.getTaskById.bind(tasksService);
+export const startTask = tasksService.startTask.bind(tasksService);
+export const submitTask = tasksService.submitTask.bind(tasksService);
+export const reviewTask = tasksService.reviewTask.bind(tasksService);

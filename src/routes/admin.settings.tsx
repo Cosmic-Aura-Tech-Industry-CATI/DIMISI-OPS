@@ -983,9 +983,33 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
         <AvatarUpload
           value={photo}
           name={name}
-          onChange={(photoUrl, file) => {
-            setPhoto(photoUrl || "");
+          onChange={async (photoUrl, file) => {
+            const nextPhoto = photoUrl || "";
+            setPhoto(nextPhoto);
             setSelectedFile(file ?? null);
+            try {
+              let payload: any;
+              if (file) {
+                payload = new FormData();
+                payload.append("avatar", file);
+                if (phone) payload.append("phone", phone);
+              } else {
+                payload = { phone, avatar: nextPhoto };
+              }
+              const res = await updateProfile.mutateAsync(payload);
+              const updatedUser = res?.user || res?.data?.user || res;
+              const newAvatar = updatedUser?.avatar || nextPhoto;
+              if (user) {
+                setUser({
+                  ...user,
+                  avatar: newAvatar,
+                });
+              }
+              updateProfileStore({ photo: newAvatar });
+              toast.success("Profile photo updated successfully.");
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to update profile photo.");
+            }
           }}
         />
       </SettingCard>

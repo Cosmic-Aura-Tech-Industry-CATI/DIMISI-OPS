@@ -42,6 +42,14 @@ export async function verifyLogin(payload: VerifyLoginRequest) {
   const res = await http.post<VerifyLoginResponse>(auth.verifyLogin, payload, {
     authMode: "none",
   });
+  const token =
+    (res as any)?.accessToken ||
+    (res as any)?.data?.accessToken ||
+    (res as any)?.token ||
+    (res as any)?.data?.token;
+  if (token) {
+    setAccessToken(token);
+  }
   return res;
 }
 
@@ -53,6 +61,14 @@ export function resendOtp(payload: ResendOtpRequest) {
 /** POST /api/v1/auth/refresh — uses the httpOnly refresh-token cookie. */
 export async function refreshSession() {
   const res = await http.post<RefreshResponse>(auth.refresh, undefined, { authMode: "none" });
+  const token =
+    (res as any)?.accessToken ||
+    (res as any)?.data?.accessToken ||
+    (res as any)?.token ||
+    (res as any)?.data?.token;
+  if (token) {
+    setAccessToken(token);
+  }
   return res;
 }
 

@@ -35,7 +35,7 @@ import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
 import { type Task } from "@/features/tasks";
 import { useTaskQuery, useSubmitTaskForReview, useStartTask } from "@/features/tasks";
 import { useProjectsQuery } from "@/features/projects";
-import { saveDraft, useSubmission } from "@/lib/submission-store";
+import { saveDraft, submitForReview, useSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/employee/tasks/$id/submit")({
@@ -81,23 +81,29 @@ function SubmitProofPage() {
   const currentUserCode = auth.user?.empId || auth.user?.code || "";
 
   const [files, setFiles] = useState<ProofFile[]>(existing?.files ?? []);
+  const [workSummary, setWorkSummary] = useState(existing?.workSummary ?? "");
+  const [deliverableLinks, setDeliverableLinks] = useState(existing?.deliverableLinks ?? "");
   const [issues, setIssues] = useState(existing?.issues ?? "");
+  const [additionalRemarks, setAdditionalRemarks] = useState(existing?.additionalRemarks ?? "");
   const [checks, setChecks] = useState({
-    completed: existing?.checklist.completed ?? false,
-    proof: existing?.checklist.proof ?? false,
-    verified: existing?.checklist.verified ?? false,
+    completed: existing?.checklist.completed ?? true,
+    proof: existing?.checklist.proof ?? true,
+    verified: existing?.checklist.verified ?? true,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const startTaskMutation = useStartTask();
   const submitMutation = useSubmitTaskForReview({
     onSuccess: (updated) => {
-      saveDraft({
+      submitForReview({
         taskId: updated.id || id,
         employeeId: currentUserId,
         employeeName: currentUserName,
         employeeCode: currentUserCode,
+        workSummary: workSummary.trim(),
+        deliverableLinks: deliverableLinks.trim(),
         issues: issues.trim(),
+        additionalRemarks: additionalRemarks.trim(),
         files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
         checklist: checks,
       });
@@ -135,17 +141,30 @@ function SubmitProofPage() {
   const currentStatus = task.reviewState === "in_review" ? "Pending Review" : statusLabel[task.status];
 
   const packageInput = () => ({
-    taskId: task.id,
+    taskId: task.id || task._id || id,
     employeeId: currentUserId,
     employeeName: currentUserName,
     employeeCode: currentUserCode,
+    workSummary: workSummary.trim(),
+    deliverableLinks: deliverableLinks.trim(),
     issues: issues.trim(),
+    additionalRemarks: additionalRemarks.trim(),
     files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
     checklist: checks,
   });
 
   const allChecked = checks.completed && checks.proof && checks.verified;
-  const canSubmit = allChecked && !submitMutation.isPending && !startTaskMutation.isPending;
+  const isPending = submitMutation.isPending || startTaskMutation.isPending;
+
+  const handleOpenConfirm = () => {
+    if (!workSummary.trim() && !deliverableLinks.trim() && files.length === 0) {
+      toast.error("Proof or Work Summary required", {
+        description: "Please enter a work summary, deliverable link, or attach proof files before submitting.",
+      });
+      return;
+    }
+    setConfirmOpen(true);
+  };
 
   const handleSaveDraft = () => {
     saveDraft(packageInput());
@@ -154,12 +173,20 @@ function SubmitProofPage() {
 
   const handleSubmit = async () => {
     if (!task) return;
-    const noteText = issues.trim() || "Task completed and submitted for review.";
+    const fileSummary = files.length > 0 ? `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}` : "";
+    const formattedNotes = [
+      workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
+      deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
+      fileSummary ? fileSummary : "",
+      issues.trim() ? `Issues & Blockers:\n${issues.trim()}` : "",
+      additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
+    ].filter(Boolean).join("\n\n") || "Task completed and submitted for review.";
+
     const targetId = task.id || task._id || id;
     const normStatus = (task.rawStatus || task.status || "").toLowerCase();
 
     try {
-      // Step 1: Ensure task transitions to IN_PROGRESS on the backend first
+      // Step 1: Ensure task transitions to IN_PROGRESS on backend if ASSIGNED
       if (
         normStatus === "assigned" ||
         normStatus === "pending" ||
@@ -168,15 +195,14 @@ function SubmitProofPage() {
         try {
           await startTaskMutation.mutateAsync(targetId);
         } catch (startErr) {
-          // If task was already started or transitioned, proceed to submit
           console.warn("[submit] Auto-start step error:", startErr);
         }
       }
 
-      // Step 2: Sequentially submit task for review now that backend status is in_progress
+      // Step 2: Submit task for review (IN_PROGRESS -> IN_REVIEW)
       await submitMutation.mutateAsync({
         id: targetId,
-        notes: noteText,
+        notes: formattedNotes,
       });
     } catch (err: any) {
       // Handled via submitMutation onError callback
@@ -209,13 +235,19 @@ function SubmitProofPage() {
 
       <PageHeader
         title="Task Submission"
-        subtitle="Complete your task submission before sending it for admin review."
+        subtitle="Complete your task proof submission before sending it for admin review."
       />
 
       {task.rejectionReason && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-destructive">Previous rejection</p>
-          <p className="mt-1 text-sm text-destructive">{task.rejectionReason}</p>
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 shadow-sm animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">!</span>
+            <p className="text-xs font-bold uppercase tracking-wider text-destructive">Revision Required</p>
+          </div>
+          <p className="mt-2 text-sm font-medium text-destructive">
+            <span className="font-semibold">Admin Feedback:</span> {task.rejectionReason}
+          </p>
+          <p className="mt-1 text-xs text-destructive/80">Please review the feedback above, update your proof or notes, and resubmit.</p>
         </div>
       )}
 
@@ -255,36 +287,81 @@ function SubmitProofPage() {
             )}
           </section>
 
-          {/* Section 3 — Issues faced */}
+          {/* Section 3 — Work Summary */}
+          <section className="glass rounded-md p-5 sm:p-6">
+            <Label htmlFor="workSummary" className="font-display text-base font-semibold">
+              Work Summary <span className="text-xs font-normal text-muted-foreground">(key deliverables & results)</span>
+            </Label>
+            <Textarea
+              id="workSummary"
+              value={workSummary}
+              onChange={(e) => setWorkSummary(e.target.value)}
+              placeholder="Summarize the work completed, key features implemented, or technical changes made..."
+              rows={4}
+              className="mt-3 resize-none rounded-md"
+            />
+          </section>
+
+          {/* Section 4 — Deliverables & Links */}
+          <section className="glass rounded-md p-5 sm:p-6">
+            <Label htmlFor="deliverableLinks" className="font-display text-base font-semibold">
+              Deliverables & Links <span className="text-xs font-normal text-muted-foreground">(URLs, PRs, docs, live previews)</span>
+            </Label>
+            <Textarea
+              id="deliverableLinks"
+              value={deliverableLinks}
+              onChange={(e) => setDeliverableLinks(e.target.value)}
+              placeholder="Paste links to Pull Requests, GitHub repos, Figma designs, staging deployments, or documentation..."
+              rows={3}
+              className="mt-3 resize-none rounded-md"
+            />
+          </section>
+
+          {/* Section 5 — Issues Faced */}
           <section className="glass rounded-md p-5 sm:p-6">
             <Label htmlFor="issues" className="font-display text-base font-semibold">
-              Issues Faced <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+              Issues Faced <span className="text-xs font-normal text-muted-foreground">(optional challenges/blockers)</span>
             </Label>
             <Textarea
               id="issues"
               value={issues}
               onChange={(e) => setIssues(e.target.value)}
-              placeholder="Describe any challenges, blockers, assumptions, or additional notes for the reviewer..."
-              rows={5}
+              placeholder="Describe any challenges, blockers, technical debt, or edge cases encountered during development..."
+              rows={3}
               className="mt-3 resize-none rounded-md"
             />
           </section>
 
-          {/* Section 4 — Proof */}
+          {/* Section 6 — Additional Remarks */}
+          <section className="glass rounded-md p-5 sm:p-6">
+            <Label htmlFor="additionalRemarks" className="font-display text-base font-semibold">
+              Additional Remarks <span className="text-xs font-normal text-muted-foreground">(optional notes for reviewer)</span>
+            </Label>
+            <Textarea
+              id="additionalRemarks"
+              value={additionalRemarks}
+              onChange={(e) => setAdditionalRemarks(e.target.value)}
+              placeholder="Any extra comments, handover instructions, or notes for the reviewer..."
+              rows={3}
+              className="mt-3 resize-none rounded-md"
+            />
+          </section>
+
+          {/* Section 7 — Proof Attachments */}
           <section className="glass rounded-md p-5 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <UploadCloud className="h-4 w-4 text-primary" />
-                <h2 className="font-display text-base font-semibold">Upload Proof</h2>
+                <h2 className="font-display text-base font-semibold">Upload Proof Files</h2>
               </div>
               <span className="rounded-sm bg-secondary/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {files.length} file{files.length === 1 ? "" : "s"}
+                {files.length} file{files.length === 1 ? "" : "s"} attached
               </span>
             </div>
             <ProofUploader files={files} onChange={setFiles} />
           </section>
 
-          {/* Section 5 — Checklist */}
+          {/* Section 8 — Checklist */}
           <section className="glass rounded-md p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-primary" />
@@ -292,9 +369,9 @@ function SubmitProofPage() {
             </div>
             <div className="mt-4 space-y-2">
               {[
-                { key: "completed" as const, label: "Task completed." },
-                { key: "proof" as const, label: "Proof attached." },
-                { key: "verified" as const, label: "Information verified." },
+                { key: "completed" as const, label: "Task completed according to requirements." },
+                { key: "proof" as const, label: "Proof files or deliverable links provided." },
+                { key: "verified" as const, label: "Deliverables tested and verified before submission." },
               ].map((row) => (
                 <label
                   key={row.key}
@@ -303,7 +380,7 @@ function SubmitProofPage() {
                   <Checkbox
                     checked={checks[row.key]}
                     onCheckedChange={(v) => setChecks((c) => ({ ...c, [row.key]: v === true }))}
-                    disabled={row.key === "proof" && files.length === 0}
+                    disabled={row.key === "proof" && files.length === 0 && !deliverableLinks.trim()}
                   />
                   <span>{row.label}</span>
                 </label>
@@ -311,12 +388,12 @@ function SubmitProofPage() {
             </div>
             {!allChecked && (
               <p className="mt-3 text-xs text-muted-foreground">
-                All items must be confirmed before you can submit.
+                All checklist items must be confirmed before you can submit for review.
               </p>
             )}
           </section>
 
-          {/* Section 6 — Buttons */}
+          {/* Section 9 — Buttons */}
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button asChild type="button" variant="outline" className="rounded-md">
               <Link to="/employee/tasks">Cancel</Link>
@@ -326,9 +403,9 @@ function SubmitProofPage() {
             </Button>
             <Button
               type="button"
-              disabled={!canSubmit}
+              disabled={isPending}
               className="rounded-md shadow-glow"
-              onClick={() => setConfirmOpen(true)}
+              onClick={handleOpenConfirm}
             >
               <Send className="mr-1.5 h-4 w-4" /> Submit for Review
             </Button>

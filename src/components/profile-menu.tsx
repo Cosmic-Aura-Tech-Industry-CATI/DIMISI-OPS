@@ -1,5 +1,5 @@
 import { ChevronsUpDown, LogOut, Settings, User as UserIcon, LifeBuoy } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,14 +66,20 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate({ to: profilePath })} className="cursor-pointer rounded-lg">
-          <UserIcon className="mr-2 h-4 w-4" /> Profile
+        <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
+          <Link to={profilePath as any}>
+            <UserIcon className="mr-2 h-4 w-4" /> Profile
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate({ to: settingsPath })} className="cursor-pointer rounded-lg">
-          <Settings className="mr-2 h-4 w-4" /> Settings
+        <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
+          <Link to={settingsPath as any}>
+            <Settings className="mr-2 h-4 w-4" /> Settings
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate({ to: supportPath })} className="cursor-pointer rounded-lg">
-          <LifeBuoy className="mr-2 h-4 w-4" /> Help & support
+        <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
+          <Link to={supportPath as any}>
+            <LifeBuoy className="mr-2 h-4 w-4" /> Help & support
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
