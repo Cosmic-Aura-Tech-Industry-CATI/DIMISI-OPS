@@ -20,7 +20,7 @@ import { IdBadge } from "@/components/id-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { projectStats } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
-import { useTasksQuery, useRequestTask, type Task } from "@/features/tasks";
+import { useTasksQuery, type Task } from "@/features/tasks";
 
 function PoolCard({
   task,
@@ -111,18 +111,12 @@ export function AvailableTasks() {
   const [openProject, setOpenProject] = useState<string | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
   const { data: allTasks = [] } = useTasksQuery();
-  const requestTask = useRequestTask({
-    onSuccess: () => {
-      toast.success("Task requested successfully", {
-        description: "Your request has been submitted. Awaiting admin assignment.",
-      });
+  const requestTask = {
+    mutate: (id: string) => {
+      toast.info(`Task assignment requested for ${id}. Admins assign tasks directly.`);
     },
-    onError: (err) => {
-      toast.error("Failed to request task", {
-        description: err.message || "An error occurred.",
-      });
-    },
-  });
+    isPending: false,
+  };
 
   const projects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
 
@@ -147,7 +141,9 @@ export function AvailableTasks() {
       isAvailableStatus(t),
   );
 
-  const openProjectTasks = projectPool.filter((t) => t.projectId === openProject);
+  const openProjectTasks = projectPool.filter(
+    (t) => t.projectId === openProject || (typeof t.projectId === "string" && openProject && t.projectId === openProject),
+  );
 
   return (
     <section className="space-y-4">

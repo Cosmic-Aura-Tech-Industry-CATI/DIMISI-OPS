@@ -3,7 +3,12 @@
  * Bridges frontend Task models with backend Mongoose models.
  */
 
-import type { TaskPriority as MockTaskPriority, TaskStatus as MockTaskStatus, TaskType as MockTaskType, TaskReviewState } from "@/lib/mock-data";
+import type {
+  TaskPriority as MockTaskPriority,
+  TaskStatus as MockTaskStatus,
+  TaskType as MockTaskType,
+  TaskReviewState,
+} from "@/lib/mock-data";
 
 export type TaskPriority = MockTaskPriority;
 export type TaskStatus = MockTaskStatus;
@@ -26,9 +31,10 @@ export type BackendTaskStatus =
   | "in_review"
   | "completed"
   | "cancelled"
-  | "overdue";
+  | "overdue"
+  | "rejected";
 
-export interface BackendPopulatedUser {
+export interface PopulatedUser {
   _id: string;
   name: string;
   email: string;
@@ -36,6 +42,8 @@ export interface BackendPopulatedUser {
   code?: string;
   designation?: unknown;
 }
+
+export type BackendPopulatedUser = PopulatedUser;
 
 export interface BackendPopulatedProject {
   _id: string;
@@ -45,7 +53,7 @@ export interface BackendPopulatedProject {
 }
 
 export interface BackendTaskRequest {
-  employeeId: BackendPopulatedUser | string;
+  employeeId: PopulatedUser | string;
   requestedAt: string;
 }
 
@@ -59,14 +67,15 @@ export interface BackendTask {
   type: BackendTaskType;
   status: BackendTaskStatus;
   projectId?: BackendPopulatedProject | string;
-  assignedTo?: BackendPopulatedUser | string;
+  assignedTo?: PopulatedUser | string;
   requests?: BackendTaskRequest[];
-  createdBy?: BackendPopulatedUser | string;
+  createdBy?: PopulatedUser | string;
   notes?: string;
   estimatedTime?: string;
   rewardPoints: number;
   deadline?: string;
-  attachments?: string[];
+  dueDate?: string;
+  attachments?: string[] | { publicId?: string; url?: string; name?: string; size?: number | string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -79,40 +88,57 @@ export interface BackendMaskedTask {
 export type RawTaskResponse = BackendTask | BackendMaskedTask;
 
 /**
- * Normalized Frontend Task Model
+ * Standard Normalized Task Interface
  */
 export interface Task {
   _id: string;
   id: string;
   title: string;
   description: string;
-  category: string;
   priority: MockTaskPriority;
   status: MockTaskStatus;
-  taskType?: MockTaskType;
-  points: number;
   dueDate: string;
-  createdAt: string;
-  updatedAt?: string;
+  deadline?: string;
+  rewardPoints?: number;
+  points: number;
+  assignedTo?: PopulatedUser | string;
   assignee: string;
   assigneeId: string;
   assigneeCode?: string;
+  assigneeEmail?: string;
   assignedAt?: string;
   createdBy?: string;
   creatorId?: string;
+  creatorUser?: PopulatedUser;
   notes?: string;
+  projectId?: string;
+  projectName?: string;
+  projectCode?: string;
+  category: string;
+  taskType?: MockTaskType;
+  estimatedTime?: string;
   attachments?: { name: string; size: string; url?: string }[];
   rawAttachmentUrls?: string[];
   reviewState?: TaskReviewState;
   rejectionReason?: string;
-  projectId?: string;
-  projectName?: string;
-  projectCode?: string;
-  estimatedTime?: string;
   rawStatus?: BackendTaskStatus;
   isRequestedByMe?: boolean;
   requestsCount?: number;
   requests?: Array<{ employeeId: string; employeeName?: string; employeeCode?: string; requestedAt: string }>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * Review Center Response structure returned by GET /tasks/review-center
+ */
+export interface ReviewCenterResponse {
+  kpis: {
+    pendingReview: number;
+    highPriority: number;
+    pointsAtStake: number;
+  };
+  tasks: Task[];
 }
 
 export interface TaskQueryFilters {
@@ -161,7 +187,7 @@ export interface AssignTaskPayload {
 }
 
 export interface SubmitTaskPayload {
-  notes?: string;
+  notes: string;
 }
 
 export interface ReviewTaskPayload {
@@ -222,22 +248,23 @@ export function toFrontendTaskType(type?: string): MockTaskType {
 }
 
 export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus; reviewState?: TaskReviewState } {
-  const normalized = (status || "").toLowerCase().trim();
+  const normalized = (status || "").toLowerCase().trim().replace(/[\s_-]+/g, "_");
   switch (normalized) {
     case "open":
+    case "available":
       return { status: "available" };
     case "requested":
       return { status: "pending" };
     case "assigned":
       return { status: "assigned" };
     case "in_progress":
-    case "in progress":
       return { status: "in_progress" };
     case "in_review":
-    case "in review":
       return { status: "in_progress", reviewState: "in_review" };
     case "completed":
       return { status: "completed", reviewState: "approved" };
+    case "rejected":
+      return { status: "in_progress", reviewState: "rejected" };
     case "cancelled":
     case "overdue":
       return { status: "overdue" };
@@ -249,7 +276,25 @@ export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus;
 /**
  * Normalizes any backend task response (ITask or IMaskedTask) into frontend Task format.
  */
-export function mapTaskResponse(raw: RawTaskResponse): Task {
+export function mapTaskResponse(raw: RawTaskResponse | any): Task {
+  if (!raw) {
+    return {
+      _id: "",
+      id: "",
+      title: "",
+      description: "",
+      category: "General",
+      priority: "medium",
+      status: "assigned",
+      points: 0,
+      dueDate: "",
+      createdAt: "",
+      updatedAt: "",
+      assignee: "",
+      assigneeId: "",
+    };
+  }
+
   let doc: Partial<BackendTask>;
   let isRequestedByMe = false;
 
@@ -281,10 +326,12 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
   let assigneeId = "";
   let assignee = "";
   let assigneeCode: string | undefined;
+  let assigneeEmail: string | undefined;
   if (doc.assignedTo) {
     if (typeof doc.assignedTo === "object") {
       assigneeId = doc.assignedTo._id;
       assignee = doc.assignedTo.name || "";
+      assigneeEmail = doc.assignedTo.email;
       assigneeCode = doc.assignedTo.code || doc.assignedTo.empId;
     } else {
       assigneeId = String(doc.assignedTo);
@@ -294,12 +341,15 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
   // Parse creator info
   let creatorId = "";
   let createdBy = "";
+  let creatorUser: PopulatedUser | undefined;
   if (doc.createdBy) {
     if (typeof doc.createdBy === "object") {
+      creatorUser = doc.createdBy;
       creatorId = doc.createdBy._id;
       createdBy = doc.createdBy.name || "";
     } else {
       creatorId = String(doc.createdBy);
+      createdBy = String(doc.createdBy);
     }
   }
 
@@ -326,7 +376,7 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     rejectionReason = parts[parts.length - 1]?.trim();
   }
 
-  // Parse attachments safely handling strings, Cloudinary objects ({ url, publicId }), and edge case values
+  // Parse attachments
   const rawAttachments = Array.isArray(doc.attachments) ? doc.attachments : [];
   const rawAttachmentUrls: string[] = [];
 
@@ -372,9 +422,13 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
 
   const dueDate = doc.deadline
     ? new Date(doc.deadline).toISOString().slice(0, 10)
-    : doc.createdAt
-      ? new Date(doc.createdAt).toISOString().slice(0, 10)
-      : "";
+    : doc.dueDate
+      ? new Date(doc.dueDate).toISOString().slice(0, 10)
+      : doc.createdAt
+        ? new Date(doc.createdAt).toISOString().slice(0, 10)
+        : "";
+
+  const points = Number(doc.rewardPoints ?? 0);
 
   return {
     _id: id,
@@ -386,15 +440,20 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     status: frontendStatus,
     rawStatus: doc.status,
     taskType: toFrontendTaskType(doc.type),
-    points: Number(doc.rewardPoints ?? 0),
+    rewardPoints: points,
+    points,
     dueDate,
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : "",
-    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
+    deadline: doc.deadline,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : new Date().toISOString(),
+    assignedTo: doc.assignedTo,
     assignee,
     assigneeId,
     assigneeCode,
+    assigneeEmail,
     createdBy,
     creatorId,
+    creatorUser,
     notes: doc.notes,
     attachments,
     rawAttachmentUrls,
