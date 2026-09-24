@@ -27,7 +27,10 @@ export interface Submission {
   employeeId: string;
   employeeName: string;
   employeeCode?: string;
+  workSummary?: string;
+  deliverableLinks?: string;
   issues: string;
+  additionalRemarks?: string;
   files: SubmissionFile[];
   checklist: SubmissionChecklist;
   status: "draft" | "submitted";
@@ -121,9 +124,9 @@ export function submitForReview(input: Omit<Submission, "status" | "updatedAt" |
  */
 export function applySubmissions(list: Task[], map: Record<string, Submission>): Task[] {
   return list.map((t) => {
-    const s = map[t.id];
+    const s = map[t.id] || (t._id ? map[t._id] : undefined);
     if (!s || s.status !== "submitted") return t;
-    return { ...t, reviewState: "in_review" as const, rejectionReason: undefined };
+    return { ...t, status: "in_progress", reviewState: "in_review" as const, rejectionReason: undefined };
   });
 }
 

@@ -1,9 +1,11 @@
+import { Link } from "@tanstack/react-router";
 import {
   CalendarClock,
   Clock,
   ExternalLink,
   FileText,
   Paperclip,
+  Send,
   Tag,
   Trophy,
   User,
@@ -12,11 +14,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { PriorityBadge } from "@/components/status-badge";
-import type { Task } from "@/lib/mock-data";
+import type { Task } from "@/features/tasks";
 
 const statusLabel: Record<Task["status"], string> = {
   pending: "Pending",
@@ -166,6 +170,22 @@ export function TaskDetailDialog({
             </div>
           )}
         </div>
+
+        <DialogFooter className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
+          {task.reviewState === "in_review" ? (
+            <Button asChild variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>
+              <Link to="/employee/pending-review">
+                <Send className="mr-1.5 h-4 w-4" /> View in pending review
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild className="rounded-md shadow-glow" onClick={() => onOpenChange(false)}>
+              <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
+                <Send className="mr-1.5 h-4 w-4" /> Submit for review
+              </Link>
+            </Button>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

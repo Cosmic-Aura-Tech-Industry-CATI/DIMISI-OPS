@@ -98,7 +98,7 @@ function EmployeesPage() {
 
       return {
         id: e._id || e.id || "",
-        code: e.empId || "—",
+        code: e.empId || e.code || e._id || e.id || "—",
         name: e.name || "Employee",
         email: e.email || "",
         jobTitle: titleName,

@@ -37,7 +37,7 @@ export const Route = createFileRoute("/employee/notifications")({
   component: NotificationsPage,
 });
 
-type State = "unread" | "read";
+type State = "all" | "unread" | "read";
 
 const meta: Record<string, { label: string; Icon: typeof Bell; tone: string; ring: string }> = {
   task_assignment:   { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
@@ -71,11 +71,12 @@ function NotificationsPage() {
   const markReadMutation = useMarkNotificationReadMutation();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
-  const [tab, setTab] = useState<State>("unread");
+  const [tab, setTab] = useState<State>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const counts = useMemo(
     () => ({
+      all: notifications.length,
       unread: notifications.filter((n) => !n.isRead).length,
       read: notifications.filter((n) => n.isRead).length,
     }),
@@ -84,7 +85,11 @@ function NotificationsPage() {
 
   const filtered = useMemo(() => {
     return notifications
-      .filter((n) => (tab === "unread" ? !n.isRead : n.isRead))
+      .filter((n) => {
+        if (tab === "unread") return !n.isRead;
+        if (tab === "read") return n.isRead;
+        return true;
+      })
       .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }, [notifications, tab, typeFilter]);
@@ -155,7 +160,11 @@ function NotificationsPage() {
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as State)}>
-        <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="all" className="gap-1.5 sm:gap-2">
+            All
+            <span className="text-xs text-muted-foreground">{counts.all}</span>
+          </TabsTrigger>
           <TabsTrigger value="unread" className="gap-1.5 sm:gap-2">
             Unread
             {counts.unread > 0 && (
@@ -176,11 +185,23 @@ function NotificationsPage() {
         <div className="py-16 text-center text-sm text-muted-foreground">
           Loading notifications…
         </div>
-      ) : filtered.length === 0 ? (
+      ) : notifications.length === 0 ? (
         <EmptyState
           icon={BellOff}
           title="You're all caught up"
           description="Nothing to show in this view. New notifications will appear here."
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={BellOff}
+          title={
+            tab === "unread"
+              ? "No unread notifications"
+              : tab === "read"
+              ? "No read notifications"
+              : "No matching notifications"
+          }
+          description="No notifications match your current filter selection."
         />
       ) : (
         <div className="space-y-3">

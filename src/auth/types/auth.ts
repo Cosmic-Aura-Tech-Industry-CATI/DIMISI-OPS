@@ -120,4 +120,23 @@ export interface ResetPasswordRequest {
   resetToken: string;
 }
 
+/* ----------------------------- firebase oauth ------------------------------ */
+
+export interface OAuthLoginRequest {
+  idToken: string;
+}
+
+export interface OAuthLoginResponse {
+  status?: string;
+  message?: string;
+  user?: AuthUser;
+  accessToken?: string;
+  refreshToken?: string;
+  data?: {
+    user: AuthUser;
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
 

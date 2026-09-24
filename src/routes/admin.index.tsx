@@ -52,7 +52,10 @@ function AdminOverview() {
 
   // Derived metrics from live collections (used if dashboard aggregate is 0 or loading)
   const derivedActiveTasks = useMemo(
-    () => tasksList.filter((t) => t.status !== "completed").length,
+    () => tasksList.filter((t) => {
+      const s = (t.status || "").toLowerCase();
+      return s !== "completed" && s !== "cancelled";
+    }).length,
     [tasksList],
   );
   const derivedPendingReviews = useMemo(
@@ -60,7 +63,7 @@ function AdminOverview() {
     [tasksList],
   );
   const derivedCompletedTasks = useMemo(
-    () => tasksList.filter((t) => t.status === "completed").length,
+    () => tasksList.filter((t) => (t.status || "").toLowerCase() === "completed").length,
     [tasksList],
   );
   const derivedTotalPoints = useMemo(
@@ -90,8 +93,14 @@ function AdminOverview() {
   // Real upcoming deadlines from live Tasks collection
   const upcomingTasks = useMemo(() => {
     if (tasksList.length === 0) return [];
+    const now = Date.now();
     return [...tasksList]
-      .filter((t) => t.status !== "completed")
+      .filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        if (s === "completed" || s === "overdue" || s === "cancelled") return false;
+        if (t.dueDate && new Date(t.dueDate).getTime() < now) return false;
+        return true;
+      })
       .sort((a, b) => {
         const dateA = a.dueDate || "";
         const dateB = b.dueDate || "";

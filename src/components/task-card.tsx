@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Eye,
+  Hand,
   PlayCircle,
   RotateCcw,
   Send,
@@ -61,7 +62,7 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
           </div>
           <Link
             to="/employee/tasks/$id"
-            params={{ id: task.id }}
+            params={{ id: task.id || task._id }}
             className="line-clamp-2 font-display text-base font-semibold leading-snug hover:text-primary"
           >
             {task.title}
@@ -155,10 +156,21 @@ function ActionButton({
   });
 
   if (bucket === "assigned") {
+    const rawSt = (task.rawStatus || task.status || "").toLowerCase().trim();
+    const isInProgress =
+      task.status === "in_progress" ||
+      rawSt === "in_progress" ||
+      rawSt === "in progress";
+
     const isAssignedNotStarted =
-      task.status === "assigned" ||
-      task.status === "pending" ||
-      task.rawStatus === "Assigned";
+      !isInProgress &&
+      (task.status === "assigned" ||
+        rawSt === "assigned" ||
+        task.status === "available" ||
+        rawSt === "available" ||
+        rawSt === "open" ||
+        task.status === "pending" ||
+        rawSt === "pending");
 
     if (isAssignedNotStarted) {
       return (
@@ -173,11 +185,24 @@ function ActionButton({
       );
     }
 
+    if (isInProgress) {
+      return (
+        <Button asChild className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
+            <Send className="mr-1.5 h-4 w-4" /> Submit for review
+          </Link>
+        </Button>
+      );
+    }
+
     return (
-      <Button asChild className="w-full rounded-md shadow-glow">
-        <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
-          <Send className="mr-1.5 h-4 w-4" /> Submit for review
-        </Link>
+      <Button
+        className="w-full rounded-md shadow-glow"
+        disabled={startTask.isPending}
+        onClick={() => startTask.mutate(task.id || task._id || "")}
+      >
+        <PlayCircle className="mr-1.5 h-4 w-4" />
+        {startTask.isPending ? "Starting…" : "Start task"}
       </Button>
     );
   }
@@ -191,7 +216,7 @@ function ActionButton({
   if (bucket === "rejected") {
     return (
       <Button asChild className="w-full rounded-md shadow-glow">
-        <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
+        <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
           <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit
         </Link>
       </Button>
