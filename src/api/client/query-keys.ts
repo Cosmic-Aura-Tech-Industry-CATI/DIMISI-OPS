@@ -45,6 +45,12 @@ export const queryKeys = {
     all: ["leaderboard"] as const,
     get: (limit?: number) => ["leaderboard", limit] as const,
   },
+  accounts: {
+    all: ["accounts"] as const,
+    list: (filters?: Record<string, unknown>) => ["accounts", "list", filters] as const,
+    stats: () => ["accounts", "stats"] as const,
+    detail: (id: string) => ["accounts", "detail", id] as const,
+  },
   notices: {
     all: ["notices"] as const,
     list: (filters?: Record<string, unknown>) => ["notices", "list", filters] as const,

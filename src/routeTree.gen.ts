@@ -16,6 +16,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAccountsRouteImport } from './routes/admin.accounts'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin.audit-logs'
 import { Route as AdminDepartmentsRouteImport } from './routes/admin.departments'
@@ -92,6 +93,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAccountsRoute = AdminAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminActivityRoute = AdminActivityRouteImport.update({
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/accounts': typeof AdminAccountsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/departments': typeof AdminDepartmentsRoute
@@ -362,6 +369,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/accounts': typeof AdminAccountsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/departments': typeof AdminDepartmentsRoute
@@ -412,6 +420,7 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/accounts': typeof AdminAccountsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/departments': typeof AdminDepartmentsRoute
@@ -465,6 +474,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/admin/accounts'
     | '/admin/activity'
     | '/admin/audit-logs'
     | '/admin/departments'
@@ -514,6 +524,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/admin/accounts'
     | '/admin/activity'
     | '/admin/audit-logs'
     | '/admin/departments'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/admin/accounts'
     | '/admin/activity'
     | '/admin/audit-logs'
     | '/admin/departments'
@@ -666,6 +678,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/accounts': {
+      id: '/admin/accounts'
+      path: '/accounts'
+      fullPath: '/admin/accounts'
+      preLoaderRoute: typeof AdminAccountsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/activity': {
@@ -1001,6 +1020,7 @@ const AdminTasksIdRouteWithChildren = AdminTasksIdRoute._addFileChildren(
 )
 
 interface AdminRouteChildren {
+  AdminAccountsRoute: typeof AdminAccountsRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
   AdminDepartmentsRoute: typeof AdminDepartmentsRoute
@@ -1024,6 +1044,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountsRoute: AdminAccountsRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
   AdminDepartmentsRoute: AdminDepartmentsRoute,
