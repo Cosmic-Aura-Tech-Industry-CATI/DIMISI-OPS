@@ -55,6 +55,15 @@ export const API_ENDPOINTS = {
     completed: "/tasks/completed",
     reviewCenter: "/tasks/review-center",
   },
+  accounts: {
+    list: "/accounts",
+    stats: "/accounts/stats",
+    detail: (id: string) => `/accounts/${id}`,
+    create: "/accounts",
+    update: (id: string) => `/accounts/${id}`,
+    delete: (id: string) => `/accounts/${id}`,
+    upload: "/accounts/upload",
+  },
   leaderboard: {
     get: "/leaderboard",
   },

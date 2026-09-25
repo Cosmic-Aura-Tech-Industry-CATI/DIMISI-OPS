@@ -5,6 +5,7 @@ import {
   Users,
   ShieldCheck,
   Building2,
+  Landmark,
   ListTodo,
   FolderKanban,
   ClipboardCheck,
@@ -46,6 +47,7 @@ const adminNav = {
     { title: "Employees", url: "/admin/employees", icon: Users },
     { title: "Admins", url: "/admin/admins", icon: ShieldCheck },
     { title: "Departments", url: "/admin/departments", icon: Building2 },
+    { title: "Accounts", url: "/admin/accounts", icon: Landmark },
   ],
   work: [
     { title: "Tasks", url: "/admin/tasks", icon: ListTodo },

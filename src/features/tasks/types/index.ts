@@ -124,7 +124,15 @@ export interface Task {
   rawStatus?: BackendTaskStatus;
   isRequestedByMe?: boolean;
   requestsCount?: number;
-  requests?: Array<{ employeeId: string; employeeName?: string; employeeCode?: string; requestedAt: string }>;
+  requests?: Array<{
+    _id?: string;
+    employeeId: BackendPopulatedUser | string;
+    employeeName?: string;
+    employeeCode?: string;
+    employeeEmail?: string;
+    requestedAt: string;
+    status?: string;
+  }>;
   createdAt: string;
   updatedAt?: string;
 }
@@ -354,18 +362,16 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
   }
 
   // Parse requests
-  const requests = (doc.requests || []).map((req) => {
-    if (typeof req.employeeId === "object" && req.employeeId) {
-      return {
-        employeeId: req.employeeId._id,
-        employeeName: req.employeeId.name,
-        employeeCode: req.employeeId.code || req.employeeId.empId,
-        requestedAt: req.requestedAt,
-      };
-    }
+  const requests = (doc.requests || []).map((req: any) => {
+    const isPopulated = typeof req.employeeId === "object" && req.employeeId !== null;
     return {
-      employeeId: String(req.employeeId || ""),
+      _id: req._id ? String(req._id) : undefined,
+      employeeId: req.employeeId,
+      employeeName: isPopulated ? req.employeeId.name : undefined,
+      employeeCode: isPopulated ? (req.employeeId.code || req.employeeId.empId) : undefined,
+      employeeEmail: isPopulated ? req.employeeId.email : undefined,
       requestedAt: req.requestedAt,
+      status: req.status,
     };
   });
 

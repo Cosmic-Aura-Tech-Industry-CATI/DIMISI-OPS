@@ -3,18 +3,23 @@ import { useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
+  Check,
   FileQuestion,
   FileText,
+  Loader2,
   Paperclip,
   Pencil,
   StickyNote,
   Trash2,
   Trophy,
   User,
+  Users,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import {
@@ -28,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { admins, employees } from "@/lib/mock-data";
-import { useTaskQuery, useDeleteTask } from "@/features/tasks";
+import { useTaskQuery, useDeleteTask, useAssignTask, type Task } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
@@ -37,10 +42,57 @@ export const Route = createFileRoute("/admin/tasks/$id")({
 
 const taskId = (id: string) => id;
 
+function formatRequestedAt(dateStr?: string) {
+  if (!dateStr) return "Recently";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+const DUMMY_REQUESTS: NonNullable<Task["requests"]> = [
+  {
+    _id: "req_dummy_1",
+    employeeId: {
+      _id: "emp_dummy_1",
+      name: "Mridul Mishra",
+      email: "2022bds017@axiscolleges.in",
+    },
+    employeeName: "Mridul Mishra",
+    employeeEmail: "2022bds017@axiscolleges.in",
+    requestedAt: "2026-09-25T07:36:33.937Z",
+  },
+  {
+    _id: "req_dummy_2",
+    employeeId: {
+      _id: "emp_dummy_2",
+      name: "Priya Nair",
+      email: "priya@poll.io",
+    },
+    employeeName: "Priya Nair",
+    employeeEmail: "priya@poll.io",
+    requestedAt: "2026-09-25T08:15:20.100Z",
+  },
+];
+
 function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
+  const [rejectedIds, setRejectedIds] = useState<string[]>([]);
+  const [processing, setProcessing] = useState<{ id: string; action: "accept" | "reject" } | null>(
+    null,
+  );
+
   const { data: task, isLoading } = useTaskQuery(id);
   const deleteTask = useDeleteTask({
     onSuccess: () => {
@@ -54,6 +106,8 @@ function TaskDetailPage() {
     },
   });
 
+  const assignTaskMutation = useAssignTask();
+
   if (isLoading) {
     return (
       <div className="glass flex flex-col items-center justify-center rounded-2xl py-20 text-muted-foreground">
@@ -63,13 +117,97 @@ function TaskDetailPage() {
   }
 
   if (!task) {
-    return <EmptyState icon={FileQuestion} title="Task not found" description="This task may have been deleted."
-      action={<Button asChild><Link to="/admin/tasks">Back to tasks</Link></Button>} />;
+    return (
+      <EmptyState
+        icon={FileQuestion}
+        title="Task not found"
+        description="This task may have been deleted."
+        action={
+          <Button asChild>
+            <Link to="/admin/tasks">Back to tasks</Link>
+          </Button>
+        }
+      />
+    );
   }
 
-  const assignee = employees.find((e) => e.id === task.assigneeId) || (task.assignee ? { name: task.assignee, avatar: task.assignee.slice(0, 2).toUpperCase() } : undefined);
+  const assignee =
+    employees.find((e) => e.id === task.assigneeId) ||
+    (task.assignee ? { name: task.assignee, avatar: task.assignee.slice(0, 2).toUpperCase() } : undefined);
   const creator = task.createdBy || "Admin";
   const daysLeft = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
+
+  // Resolve employee requests directly from task.requests API payload or dummy demo requests
+  const rawRequests =
+    Array.isArray(task.requests) && task.requests.length > 0
+      ? task.requests
+      : DUMMY_REQUESTS;
+
+  const pendingRequests = rawRequests
+    .filter((r) => {
+      const empObj = typeof r.employeeId === "object" && r.employeeId !== null ? r.employeeId : null;
+      const empId = empObj?._id || (typeof r.employeeId === "string" ? r.employeeId : "") || r._id || "";
+      return !rejectedIds.includes(empId) && !rejectedIds.includes(r._id || "");
+    })
+    .map((req) => {
+      const empObj = typeof req.employeeId === "object" && req.employeeId !== null ? req.employeeId : null;
+      const name = empObj?.name || req.employeeName || "Employee";
+      const email = empObj?.email || req.employeeEmail || "—";
+      const employeeId = empObj?._id || (typeof req.employeeId === "string" ? req.employeeId : "") || req._id || "";
+      const avatar = name
+        ? name
+            .split(" ")
+            .map((part: string) => part[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()
+        : "EM";
+
+      return {
+        _id: req._id,
+        employeeId,
+        name,
+        email,
+        avatar,
+        requestedAt: req.requestedAt,
+      };
+    });
+
+  const handleAccept = async (req: (typeof pendingRequests)[number]) => {
+    const targetId = req.employeeId || req._id;
+    if (!targetId) return;
+    setProcessing({ id: targetId, action: "accept" });
+    try {
+      if (targetId.startsWith("emp_dummy_") || req._id?.startsWith("req_dummy_")) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+        toast.success(`Request accepted! Task assigned to ${req.name}.`);
+      } else {
+        await assignTaskMutation.mutateAsync({
+          id: task.id || task._id,
+          employeeId: req.employeeId,
+        });
+        toast.success(`Request accepted! Task assigned to ${req.name}.`);
+      }
+    } catch (err: any) {
+      toast.error("Failed to accept request", {
+        description: err?.message || "An error occurred while assigning the task.",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleReject = (req: (typeof pendingRequests)[number]) => {
+    const targetId = req.employeeId || req._id;
+    if (!targetId) return;
+    setProcessing({ id: targetId, action: "reject" });
+    setTimeout(() => {
+      setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+      setProcessing(null);
+      toast.info(`Request from ${req.name} rejected.`);
+    }, 250);
+  };
 
   return (
     <>
@@ -143,6 +281,108 @@ function TaskDetailPage() {
               </ul>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No attachments.</p>
+            )}
+          </div>
+
+          {/* Employee Requests */}
+          <div className="glass rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-display font-semibold">Employee Requests</h3>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Employees who requested to work on this task
+                </p>
+              </div>
+              <Badge
+                variant="outline"
+                className="border-border/60 bg-secondary/50 font-medium text-xs text-muted-foreground"
+              >
+                {pendingRequests.length} pending
+              </Badge>
+            </div>
+
+            {pendingRequests.length > 0 ? (
+              <div className="mt-4 overflow-x-auto rounded-xl border border-border/60 bg-card/40">
+                <table className="w-full whitespace-nowrap text-left text-sm">
+                  <thead className="border-b border-border/60 bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Employee</th>
+                      <th className="px-4 py-3 font-medium">Email</th>
+                      <th className="px-4 py-3 font-medium">Requested</th>
+                      <th className="px-4 py-3 text-right font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {pendingRequests.map((req) => {
+                      const isAccepting =
+                        processing?.id === req.employeeId && processing?.action === "accept";
+                      const isRejecting =
+                        processing?.id === req.employeeId && processing?.action === "reject";
+                      const isBusy = Boolean(processing?.id === req.employeeId);
+
+                      return (
+                        <tr
+                          key={req._id || req.employeeId}
+                          className="transition-colors hover:bg-muted/30"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">
+                                {req.avatar}
+                              </span>
+                              <span className="font-medium text-foreground">{req.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {req.email}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {formatRequestedAt(req.requestedAt)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                disabled={isBusy || assignTaskMutation.isPending}
+                                className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-500 shadow-sm transition-colors"
+                                onClick={() => handleAccept(req)}
+                              >
+                                {isAccepting ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isBusy || assignTaskMutation.isPending}
+                                className="h-8 gap-1.5 border-destructive/40 px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
+                                onClick={() => handleReject(req)}
+                              >
+                                {isRejecting ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <X className="h-3.5 w-3.5" />
+                                )}
+                                Reject
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No employee requests yet.
+              </p>
             )}
           </div>
         </div>
