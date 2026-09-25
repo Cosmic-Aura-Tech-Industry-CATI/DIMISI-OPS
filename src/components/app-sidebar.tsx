@@ -66,7 +66,7 @@ const adminNav = {
 const employeeNav = {
   main: [
     { title: "Dashboard", url: "/employee", icon: LayoutDashboard },
-    { title: "Assigned Tasks", url: "/employee/tasks", icon: ListTodo },
+    { title: "Tasks", url: "/employee/tasks", icon: ListTodo },
     { title: "Pending Review", url: "/employee/pending-review", icon: ClipboardCheck },
     { title: "Completed Tasks", url: "/employee/completed", icon: CheckCircle2 },
     { title: "Rejected Tasks", url: "/employee/rejected", icon: XCircle },

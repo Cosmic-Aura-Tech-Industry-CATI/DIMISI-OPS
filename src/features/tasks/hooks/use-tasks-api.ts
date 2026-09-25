@@ -175,6 +175,35 @@ export function useStartTaskMutation(
 export const useStartTask = useStartTaskMutation;
 
 /**
+ * Mutation hook for an employee to request assignment on an available task
+ * (POST /tasks/:id/request).
+ */
+export function useRequestTaskMutation(
+  options?: UseMutationOptions<{ status: string; message: string }, ApiError, string>,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ status: string; message: string }, ApiError, string>({
+    mutationFn: (id: string) => tasksService.requestTask(id),
+    onSuccess: (...args) => {
+      const [res, id] = args;
+      invalidateAllTaskQueries(queryClient, id);
+      toast.success(res?.message || "Task request submitted! Awaiting admin approval.");
+      options?.onSuccess?.(...args);
+    },
+    onError: (...args) => {
+      const [error] = args;
+      const msg = error?.message || "Failed to submit task request.";
+      toast.error(msg);
+      options?.onError?.(...args);
+    },
+    ...options,
+  });
+}
+
+export const useRequestTask = useRequestTaskMutation;
+
+/**
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
 export function useSubmitTaskMutation(
