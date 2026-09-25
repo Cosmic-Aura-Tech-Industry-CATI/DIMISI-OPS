@@ -68,7 +68,7 @@ const adminNav = {
 const employeeNav = {
   main: [
     { title: "Dashboard", url: "/employee", icon: LayoutDashboard },
-    { title: "Assigned Tasks", url: "/employee/tasks", icon: ListTodo },
+    { title: "Tasks", url: "/employee/tasks", icon: ListTodo },
     { title: "Pending Review", url: "/employee/pending-review", icon: ClipboardCheck },
     { title: "Completed Tasks", url: "/employee/completed", icon: CheckCircle2 },
     { title: "Rejected Tasks", url: "/employee/rejected", icon: XCircle },
@@ -184,8 +184,16 @@ export function AppSidebar({ role }: { role: Role }) {
 
       <SidebarFooter className="border-t border-sidebar-border/60">
         <div className="flex items-center gap-2 px-1 py-1">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/40 to-accent text-xs font-semibold">
-            {user?.avatar}
+          <div className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/40 to-accent text-xs font-semibold">
+            {user?.avatar &&
+            (user.avatar.startsWith("data:") ||
+              user.avatar.startsWith("http") ||
+              user.avatar.startsWith("/") ||
+              user.avatar.includes("/")) ? (
+              <img src={user.avatar} alt={user.name || "User"} className="h-full w-full object-cover" />
+            ) : (
+              user?.avatar || (user?.name ? user.name.slice(0, 2).toUpperCase() : "U")
+            )}
           </div>
           <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <div className="truncate text-xs font-medium">{user?.name}</div>

@@ -58,3 +58,6 @@ export function TaskTypeBadge({ type = "direct" }: { type?: TaskType }) {
     </span>
   );
 }
+
+export { TaskStatusBadge, TaskPriorityBadge } from "./task-status-badge";
+

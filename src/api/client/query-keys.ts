@@ -1,4 +1,19 @@
-/** Centralised query keys — keeps invalidation predictable. */
+/**
+ * Centralised query keys — keeps invalidation predictable.
+ */
+
+export const taskKeys = {
+  all: ["tasks"] as const,
+  lists: () => ["tasks", "list"] as const,
+  list: (filters?: Record<string, unknown>) => ["tasks", "list", filters] as const,
+  assigned: ["tasks", "assigned"] as const,
+  pending: ["tasks", "pending"] as const,
+  completed: ["tasks", "completed"] as const,
+  reviewCenter: ["tasks", "review-center"] as const,
+  details: () => ["tasks", "detail"] as const,
+  detail: (id: string) => ["tasks", "detail", id] as const,
+};
+
 export const queryKeys = {
   health: ["health"] as const,
   auth: {
@@ -23,12 +38,13 @@ export const queryKeys = {
     detail: (id: string) => ["projects", "detail", id] as const,
   },
   tasks: {
-    all: ["tasks"] as const,
-    list: (filters?: Record<string, unknown>) => ["tasks", "list", filters] as const,
-    detail: (id: string) => ["tasks", "detail", id] as const,
-    available: (filters?: Record<string, unknown>) => ["tasks", "available", filters] as const,
-    employee: (employeeId?: string) => ["tasks", "employee", employeeId] as const,
-    reviews: () => ["tasks", "reviews"] as const,
+    all: taskKeys.all,
+    list: (filters?: Record<string, unknown>) => taskKeys.list(filters),
+    detail: (id: string) => taskKeys.detail(id),
+    assigned: () => taskKeys.assigned,
+    pending: () => taskKeys.pending,
+    completed: () => taskKeys.completed,
+    reviewCenter: () => taskKeys.reviewCenter,
   },
   admins: {
     all: ["admins"] as const,

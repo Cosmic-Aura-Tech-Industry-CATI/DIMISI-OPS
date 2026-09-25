@@ -23,9 +23,11 @@ import { Route as AdminDepartmentsRouteImport } from './routes/admin.departments
 import { Route as AdminLeaderboardRouteImport } from './routes/admin.leaderboard'
 import { Route as AdminNoticesRouteImport } from './routes/admin.notices'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTaskReviewsRouteImport } from './routes/admin.task-reviews'
 import { Route as EmployeeIndexRouteImport } from './routes/employee.index'
 import { Route as EmployeeCompletedRouteImport } from './routes/employee.completed'
@@ -41,6 +43,7 @@ import { Route as EmployeeProfileRouteImport } from './routes/employee.profile'
 import { Route as EmployeeRejectedRouteImport } from './routes/employee.rejected'
 import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
 import { Route as EmployeeStatisticsRouteImport } from './routes/employee.statistics'
+import { Route as EmployeeSupportRouteImport } from './routes/employee.support'
 import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
 import { Route as AdminAdminsIndexRouteImport } from './routes/admin.admins.index'
 import { Route as AdminAdminsIdRouteImport } from './routes/admin.admins.$id'
@@ -130,6 +133,11 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminProfileRoute = AdminProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProjectsRoute = AdminProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -143,6 +151,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminTaskReviewsRoute = AdminTaskReviewsRouteImport.update({
@@ -218,6 +231,11 @@ const EmployeeSettingsRoute = EmployeeSettingsRouteImport.update({
 const EmployeeStatisticsRoute = EmployeeStatisticsRouteImport.update({
   id: '/statistics',
   path: '/statistics',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeSupportRoute = EmployeeSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => EmployeeRoute,
 } as any)
 const EmployeeTasksRoute = EmployeeTasksRouteImport.update({
@@ -326,9 +344,11 @@ export interface FileRoutesByFullPath {
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
   '/admin/task-reviews': typeof AdminTaskReviewsRoute
   '/employee/completed': typeof EmployeeCompletedRoute
   '/employee/history': typeof EmployeeHistoryRoute
@@ -343,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/employee/rejected': typeof EmployeeRejectedRoute
   '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/statistics': typeof EmployeeStatisticsRoute
+  '/employee/support': typeof EmployeeSupportRoute
   '/employee/tasks': typeof EmployeeTasksRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
@@ -376,9 +397,11 @@ export interface FileRoutesByTo {
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
   '/admin/task-reviews': typeof AdminTaskReviewsRoute
   '/employee/completed': typeof EmployeeCompletedRoute
   '/employee/history': typeof EmployeeHistoryRoute
@@ -393,6 +416,7 @@ export interface FileRoutesByTo {
   '/employee/rejected': typeof EmployeeRejectedRoute
   '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/statistics': typeof EmployeeStatisticsRoute
+  '/employee/support': typeof EmployeeSupportRoute
   '/admin': typeof AdminIndexRoute
   '/employee': typeof EmployeeIndexRoute
   '/admin/admins/$id': typeof AdminAdminsIdRouteWithChildren
@@ -427,9 +451,11 @@ export interface FileRoutesById {
   '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/notices': typeof AdminNoticesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
   '/admin/task-reviews': typeof AdminTaskReviewsRoute
   '/employee/completed': typeof EmployeeCompletedRoute
   '/employee/history': typeof EmployeeHistoryRoute
@@ -444,6 +470,7 @@ export interface FileRoutesById {
   '/employee/rejected': typeof EmployeeRejectedRoute
   '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/statistics': typeof EmployeeStatisticsRoute
+  '/employee/support': typeof EmployeeSupportRoute
   '/employee/tasks': typeof EmployeeTasksRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
@@ -481,9 +508,11 @@ export interface FileRouteTypes {
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
+    | '/admin/profile'
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/support'
     | '/admin/task-reviews'
     | '/employee/completed'
     | '/employee/history'
@@ -498,6 +527,7 @@ export interface FileRouteTypes {
     | '/employee/rejected'
     | '/employee/settings'
     | '/employee/statistics'
+    | '/employee/support'
     | '/employee/tasks'
     | '/admin/'
     | '/employee/'
@@ -531,9 +561,11 @@ export interface FileRouteTypes {
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
+    | '/admin/profile'
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/support'
     | '/admin/task-reviews'
     | '/employee/completed'
     | '/employee/history'
@@ -548,6 +580,7 @@ export interface FileRouteTypes {
     | '/employee/rejected'
     | '/employee/settings'
     | '/employee/statistics'
+    | '/employee/support'
     | '/admin'
     | '/employee'
     | '/admin/admins/$id'
@@ -581,9 +614,11 @@ export interface FileRouteTypes {
     | '/admin/leaderboard'
     | '/admin/notices'
     | '/admin/notifications'
+    | '/admin/profile'
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/support'
     | '/admin/task-reviews'
     | '/employee/completed'
     | '/employee/history'
@@ -598,6 +633,7 @@ export interface FileRouteTypes {
     | '/employee/rejected'
     | '/employee/settings'
     | '/employee/statistics'
+    | '/employee/support'
     | '/employee/tasks'
     | '/admin/'
     | '/employee/'
@@ -729,6 +765,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/profile': {
+      id: '/admin/profile'
+      path: '/profile'
+      fullPath: '/admin/profile'
+      preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/projects': {
       id: '/admin/projects'
       path: '/projects'
@@ -748,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/task-reviews': {
@@ -853,6 +903,13 @@ declare module '@tanstack/react-router' {
       path: '/statistics'
       fullPath: '/employee/statistics'
       preLoaderRoute: typeof EmployeeStatisticsRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/support': {
+      id: '/employee/support'
+      path: '/support'
+      fullPath: '/employee/support'
+      preLoaderRoute: typeof EmployeeSupportRouteImport
       parentRoute: typeof EmployeeRoute
     }
     '/employee/tasks': {
@@ -1027,9 +1084,11 @@ interface AdminRouteChildren {
   AdminLeaderboardRoute: typeof AdminLeaderboardRoute
   AdminNoticesRoute: typeof AdminNoticesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminProfileRoute: typeof AdminProfileRoute
   AdminProjectsRoute: typeof AdminProjectsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
   AdminTaskReviewsRoute: typeof AdminTaskReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminAdminsIdRoute: typeof AdminAdminsIdRouteWithChildren
@@ -1051,9 +1110,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLeaderboardRoute: AdminLeaderboardRoute,
   AdminNoticesRoute: AdminNoticesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminProfileRoute: AdminProfileRoute,
   AdminProjectsRoute: AdminProjectsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminSupportRoute: AdminSupportRoute,
   AdminTaskReviewsRoute: AdminTaskReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminAdminsIdRoute: AdminAdminsIdRouteWithChildren,
@@ -1113,6 +1174,7 @@ interface EmployeeRouteChildren {
   EmployeeRejectedRoute: typeof EmployeeRejectedRoute
   EmployeeSettingsRoute: typeof EmployeeSettingsRoute
   EmployeeStatisticsRoute: typeof EmployeeStatisticsRoute
+  EmployeeSupportRoute: typeof EmployeeSupportRoute
   EmployeeTasksRoute: typeof EmployeeTasksRouteWithChildren
   EmployeeIndexRoute: typeof EmployeeIndexRoute
 }
@@ -1131,6 +1193,7 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeRejectedRoute: EmployeeRejectedRoute,
   EmployeeSettingsRoute: EmployeeSettingsRoute,
   EmployeeStatisticsRoute: EmployeeStatisticsRoute,
+  EmployeeSupportRoute: EmployeeSupportRoute,
   EmployeeTasksRoute: EmployeeTasksRouteWithChildren,
   EmployeeIndexRoute: EmployeeIndexRoute,
 }

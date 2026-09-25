@@ -70,7 +70,7 @@ type SortKey = "title" | "priority" | "points" | "dueDate";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 8;
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0") || id.slice(-4)}`;
+const taskId = (id: string) => id;
 const priorityRank: Record<TaskPriority, number> = { low: 0, medium: 1, high: 2 };
 const createdByFor = (t: Task) => t.createdBy || "Admin";
 

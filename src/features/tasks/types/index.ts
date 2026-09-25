@@ -3,14 +3,19 @@
  * Bridges frontend Task models with backend Mongoose models.
  */
 
-import type { TaskPriority as MockTaskPriority, TaskStatus as MockTaskStatus, TaskType as MockTaskType, TaskReviewState } from "@/lib/mock-data";
+import type {
+  TaskPriority as MockTaskPriority,
+  TaskStatus as MockTaskStatus,
+  TaskType as MockTaskType,
+  TaskReviewState,
+} from "@/lib/mock-data";
 
 export type TaskPriority = MockTaskPriority;
 export type TaskStatus = MockTaskStatus;
 export type TaskType = MockTaskType;
 
-export type BackendTaskPriority = "Low" | "Medium" | "High" | "Urgent";
-export type BackendTaskType = "Universal" | "Direct" | "Project";
+export type BackendTaskPriority = "low" | "medium" | "high" | "urgent" | "Low" | "Medium" | "High" | "Urgent";
+export type BackendTaskType = "universal" | "direct" | "project" | "Universal" | "Direct" | "Project";
 export type BackendTaskStatus =
   | "Open"
   | "Requested"
@@ -18,9 +23,18 @@ export type BackendTaskStatus =
   | "In Progress"
   | "In Review"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | "open"
+  | "requested"
+  | "assigned"
+  | "in_progress"
+  | "in_review"
+  | "completed"
+  | "cancelled"
+  | "overdue"
+  | "rejected";
 
-export interface BackendPopulatedUser {
+export interface PopulatedUser {
   _id: string;
   name: string;
   email: string;
@@ -28,6 +42,8 @@ export interface BackendPopulatedUser {
   code?: string;
   designation?: unknown;
 }
+
+export type BackendPopulatedUser = PopulatedUser;
 
 export interface BackendPopulatedProject {
   _id: string;
@@ -37,7 +53,7 @@ export interface BackendPopulatedProject {
 }
 
 export interface BackendTaskRequest {
-  employeeId: BackendPopulatedUser | string;
+  employeeId: PopulatedUser | string;
   requestedAt: string;
 }
 
@@ -51,14 +67,15 @@ export interface BackendTask {
   type: BackendTaskType;
   status: BackendTaskStatus;
   projectId?: BackendPopulatedProject | string;
-  assignedTo?: BackendPopulatedUser | string;
+  assignedTo?: PopulatedUser | string;
   requests?: BackendTaskRequest[];
-  createdBy?: BackendPopulatedUser | string;
+  createdBy?: PopulatedUser | string;
   notes?: string;
   estimatedTime?: string;
   rewardPoints: number;
   deadline?: string;
-  attachments?: string[];
+  dueDate?: string;
+  attachments?: string[] | { publicId?: string; url?: string; name?: string; size?: number | string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -71,36 +88,39 @@ export interface BackendMaskedTask {
 export type RawTaskResponse = BackendTask | BackendMaskedTask;
 
 /**
- * Normalized Frontend Task Model
+ * Standard Normalized Task Interface
  */
 export interface Task {
   _id: string;
   id: string;
   title: string;
   description: string;
-  category: string;
   priority: MockTaskPriority;
   status: MockTaskStatus;
-  taskType?: MockTaskType;
-  points: number;
   dueDate: string;
-  createdAt: string;
-  updatedAt?: string;
+  deadline?: string;
+  rewardPoints?: number;
+  points: number;
+  assignedTo?: PopulatedUser | string;
   assignee: string;
   assigneeId: string;
   assigneeCode?: string;
+  assigneeEmail?: string;
   assignedAt?: string;
   createdBy?: string;
   creatorId?: string;
+  creatorUser?: PopulatedUser;
   notes?: string;
+  projectId?: string;
+  projectName?: string;
+  projectCode?: string;
+  category: string;
+  taskType?: MockTaskType;
+  estimatedTime?: string;
   attachments?: { name: string; size: string; url?: string }[];
   rawAttachmentUrls?: string[];
   reviewState?: TaskReviewState;
   rejectionReason?: string;
-  projectId?: string;
-  projectName?: string;
-  projectCode?: string;
-  estimatedTime?: string;
   rawStatus?: BackendTaskStatus;
   isRequestedByMe?: boolean;
   requestsCount?: number;
@@ -113,6 +133,20 @@ export interface Task {
     requestedAt: string;
     status?: string;
   }>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * Review Center Response structure returned by GET /tasks/review-center
+ */
+export interface ReviewCenterResponse {
+  kpis: {
+    pendingReview: number;
+    highPriority: number;
+    pointsAtStake: number;
+  };
+  tasks: Task[];
 }
 
 export interface TaskQueryFilters {
@@ -161,7 +195,7 @@ export interface AssignTaskPayload {
 }
 
 export interface SubmitTaskPayload {
-  notes?: string;
+  notes: string;
 }
 
 export interface ReviewTaskPayload {
@@ -174,13 +208,13 @@ export interface ReviewTaskPayload {
 export function toBackendTaskPriority(priority?: string): BackendTaskPriority {
   switch ((priority || "").toLowerCase()) {
     case "low":
-      return "Low";
+      return "low";
     case "high":
     case "urgent":
-      return "High";
+      return "high";
     case "medium":
     default:
-      return "Medium";
+      return "medium";
   }
 }
 
@@ -200,12 +234,12 @@ export function toFrontendTaskPriority(priority?: string): MockTaskPriority {
 export function toBackendTaskType(type?: string): BackendTaskType {
   switch ((type || "").toLowerCase()) {
     case "universal":
-      return "Universal";
+      return "universal";
     case "project":
-      return "Project";
+      return "project";
     case "direct":
     default:
-      return "Direct";
+      return "direct";
   }
 }
 
@@ -222,20 +256,25 @@ export function toFrontendTaskType(type?: string): MockTaskType {
 }
 
 export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus; reviewState?: TaskReviewState } {
-  switch (status) {
-    case "Open":
+  const normalized = (status || "").toLowerCase().trim().replace(/[\s_-]+/g, "_");
+  switch (normalized) {
+    case "open":
+    case "available":
       return { status: "available" };
-    case "Requested":
+    case "requested":
       return { status: "pending" };
-    case "Assigned":
+    case "assigned":
       return { status: "assigned" };
-    case "In Progress":
+    case "in_progress":
       return { status: "in_progress" };
-    case "In Review":
+    case "in_review":
       return { status: "in_progress", reviewState: "in_review" };
-    case "Completed":
+    case "completed":
       return { status: "completed", reviewState: "approved" };
-    case "Cancelled":
+    case "rejected":
+      return { status: "in_progress", reviewState: "rejected" };
+    case "cancelled":
+    case "overdue":
       return { status: "overdue" };
     default:
       return { status: "pending" };
@@ -245,7 +284,25 @@ export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus;
 /**
  * Normalizes any backend task response (ITask or IMaskedTask) into frontend Task format.
  */
-export function mapTaskResponse(raw: RawTaskResponse): Task {
+export function mapTaskResponse(raw: RawTaskResponse | any): Task {
+  if (!raw) {
+    return {
+      _id: "",
+      id: "",
+      title: "",
+      description: "",
+      category: "General",
+      priority: "medium",
+      status: "assigned",
+      points: 0,
+      dueDate: "",
+      createdAt: "",
+      updatedAt: "",
+      assignee: "",
+      assigneeId: "",
+    };
+  }
+
   let doc: Partial<BackendTask>;
   let isRequestedByMe = false;
 
@@ -277,10 +334,12 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
   let assigneeId = "";
   let assignee = "";
   let assigneeCode: string | undefined;
+  let assigneeEmail: string | undefined;
   if (doc.assignedTo) {
     if (typeof doc.assignedTo === "object") {
       assigneeId = doc.assignedTo._id;
       assignee = doc.assignedTo.name || "";
+      assigneeEmail = doc.assignedTo.email;
       assigneeCode = doc.assignedTo.code || doc.assignedTo.empId;
     } else {
       assigneeId = String(doc.assignedTo);
@@ -290,12 +349,15 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
   // Parse creator info
   let creatorId = "";
   let createdBy = "";
+  let creatorUser: PopulatedUser | undefined;
   if (doc.createdBy) {
     if (typeof doc.createdBy === "object") {
+      creatorUser = doc.createdBy;
       creatorId = doc.createdBy._id;
       createdBy = doc.createdBy.name || "";
     } else {
       creatorId = String(doc.createdBy);
+      createdBy = String(doc.createdBy);
     }
   }
 
@@ -321,21 +383,58 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
   }
 
   // Parse attachments
-  const rawAttachments = doc.attachments || [];
-  const attachments = rawAttachments.map((url) => {
-    const filename = url.split("/").pop() || "attachment";
-    return {
-      name: decodeURIComponent(filename),
-      size: "File",
-      url,
-    };
-  });
+  const rawAttachments = Array.isArray(doc.attachments) ? doc.attachments : [];
+  const rawAttachmentUrls: string[] = [];
+
+  const attachments = rawAttachments
+    .map((item: any) => {
+      if (!item) return null;
+
+      let fileUrl = "";
+      let fileName = "attachment";
+
+      if (typeof item === "string") {
+        fileUrl = item;
+      } else if (typeof item === "object" && item !== null) {
+        fileUrl = item.url || item.path || item.secure_url || item.link || "";
+        if (item.name || item.filename || item.originalName) {
+          fileName = String(item.name || item.filename || item.originalName);
+        }
+      }
+
+      if (!fileUrl || typeof fileUrl !== "string") return null;
+
+      rawAttachmentUrls.push(fileUrl);
+
+      if (fileName === "attachment") {
+        try {
+          const parts = fileUrl.split("/");
+          const lastPart = parts[parts.length - 1];
+          if (lastPart) {
+            fileName = decodeURIComponent(lastPart.split("?")[0]);
+          }
+        } catch {
+          fileName = "attachment";
+        }
+      }
+
+      return {
+        name: fileName,
+        size: item?.size ? (typeof item.size === "number" ? `${Math.round(item.size / 1024)} KB` : String(item.size)) : "File",
+        url: fileUrl,
+      };
+    })
+    .filter((att): att is { name: string; size: string; url: string } => att !== null);
 
   const dueDate = doc.deadline
     ? new Date(doc.deadline).toISOString().slice(0, 10)
-    : doc.createdAt
-      ? new Date(doc.createdAt).toISOString().slice(0, 10)
-      : "";
+    : doc.dueDate
+      ? new Date(doc.dueDate).toISOString().slice(0, 10)
+      : doc.createdAt
+        ? new Date(doc.createdAt).toISOString().slice(0, 10)
+        : "";
+
+  const points = Number(doc.rewardPoints ?? 0);
 
   return {
     _id: id,
@@ -347,18 +446,23 @@ export function mapTaskResponse(raw: RawTaskResponse): Task {
     status: frontendStatus,
     rawStatus: doc.status,
     taskType: toFrontendTaskType(doc.type),
-    points: Number(doc.rewardPoints ?? 0),
+    rewardPoints: points,
+    points,
     dueDate,
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : "",
-    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
+    deadline: doc.deadline,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : new Date().toISOString(),
+    assignedTo: doc.assignedTo,
     assignee,
     assigneeId,
     assigneeCode,
+    assigneeEmail,
     createdBy,
     creatorId,
+    creatorUser,
     notes: doc.notes,
     attachments,
-    rawAttachmentUrls: rawAttachments,
+    rawAttachmentUrls,
     reviewState: defaultReviewState,
     rejectionReason,
     projectId,
@@ -392,10 +496,11 @@ export function buildCreateTaskFormData(input: CreateTaskInput): FormData {
   if (input.estimatedTime) {
     fd.append("estimatedTime", input.estimatedTime.trim());
   }
-  if (input.taskType === "project" && input.projectId) {
+  const normalizedType = toBackendTaskType(input.taskType);
+  if (normalizedType === "project" && input.projectId) {
     fd.append("projectId", input.projectId);
   }
-  if (input.taskType === "direct" && input.assigneeId) {
+  if (normalizedType === "direct" && input.assigneeId) {
     fd.append("assignedTo", input.assigneeId);
   }
 

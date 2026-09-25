@@ -1,29 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  CalendarClock,
-  CheckCircle2,
-  Download,
   ClipboardCheck,
-  FileText,
-  Filter,
-  MessageSquarePlus,
-  Paperclip,
   Search,
+  Filter,
   StickyNote,
+  Calendar,
   Trophy,
-  XCircle,
+  ShieldCheck,
+  User,
+  Mail,
 } from "lucide-react";
-import { toast } from "sonner";
-import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
-import { EmptyState } from "@/components/empty-state";
-import { PriorityBadge } from "@/components/status-badge";
 import { StatCard } from "@/components/stat-card";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { ErrorState } from "@/components/error-state";
+import { StatCardsSkeleton, TableSkeleton } from "@/components/skeletons";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -31,25 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { employees, type Task } from "@/lib/mock-data";
-import { logAudit } from "@/lib/audit-log";
-import { useProjectsQuery } from "@/features/projects";
-import { useTasksQuery, useReviewTask } from "@/features/tasks";
-import {
-  applySubmissions,
-  downloadSubmissionFile,
-  formatFileSize,
-  useSubmissionMap,
-  type Submission,
-} from "@/lib/submission-store";
+import { TaskStatusBadge, TaskPriorityBadge } from "@/components/task-status-badge";
+import { TaskReviewModal } from "@/features/task-reviews/components/task-review-modal";
+import { useReviewCenter, type Task } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/task-reviews")({
   head: () => ({
@@ -60,395 +38,268 @@ export const Route = createFileRoute("/admin/task-reviews")({
       { property: "og:description", content: "Approve, reject, or comment on employee task submissions." },
     ],
   }),
-  component: ReviewCenter,
+  component: ReviewCenterPage,
 });
 
-type ReviewAction = "approve" | "reject" | "remarks";
-
-const mockProofs: Record<string, { name: string; size: string; type: "image" | "pdf" | "doc" }[]> = {
-  t11: [
-    { name: "rate-limit-dashboard.png", size: "842 KB", type: "image" },
-    { name: "runbook.pdf", size: "1.2 MB", type: "pdf" },
-  ],
-  t12: [
-    { name: "retry-flow.pdf", size: "620 KB", type: "pdf" },
-    { name: "dlq-metrics.png", size: "480 KB", type: "image" },
-    { name: "postmortem.docx", size: "88 KB", type: "doc" },
-  ],
-  t13: [{ name: "cleanup-diff.txt", size: "12 KB", type: "doc" }],
-  t14: [
-    { name: "q2-uptime.pdf", size: "2.1 MB", type: "pdf" },
-    { name: "incident-timeline.png", size: "710 KB", type: "image" },
-  ],
-};
-
-const mockNotes: Record<string, string> = {
-  t11: "Dashboard live at /internal/rate-limits. Grafana source pushed. Requires SRE alert wiring next sprint.",
-  t12: "Backoff steps: 30s, 2m, 10m then DLQ. Load-tested at 3× peak; no drops.",
-  t13: "Removed 7 crons, kept 2 with README references for finance exports.",
-  t14: "Draft report attached. Waiting on final numbers from infra for the June 14 outage.",
-};
-
-function ReviewCenter() {
+function ReviewCenterPage() {
   const [query, setQuery] = useState("");
-  const [priority, setPriority] = useState<string>("all");
-  const [action, setAction] = useState<{ type: ReviewAction; task: Task } | null>(null);
-  const [remarks, setRemarks] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const subs = useSubmissionMap();
-  const { data: projects = [] } = useProjectsQuery();
-  const { data: allTasks = [], isLoading } = useTasksQuery();
-  const reviewMutation = useReviewTask({
-    onSuccess: (updated, variables) => {
-      const label = variables.isApproved ? "Submission approved" : "Submission rejected";
-      toast.success(label, { description: updated.title });
-      setAction(null);
-      setRemarks("");
-    },
-    onError: (err) => {
-      toast.error("Failed to submit review", {
-        description: err.message || "Please try again.",
-      });
-    },
-  });
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useReviewCenter();
 
-  const submissions = useMemo(
-    () => applySubmissions(allTasks, subs).filter((t) => t.reviewState === "in_review" || (t.status as string) === "In Review"),
-    [allTasks, subs],
-  );
-
-  const filtered = submissions.filter((t) => {
-    const q = query.trim().toLowerCase();
-    const matchesQ = !q || t.title.toLowerCase().includes(q) || t.assignee.toLowerCase().includes(q) || (employees.find((e) => e.id === t.assigneeId)?.code.toLowerCase().includes(q) ?? false);
-    const matchesP = priority === "all" || t.priority === priority;
-    return matchesQ && matchesP;
-  });
-
-  const totalPoints = submissions.reduce((s, t) => s + t.points, 0);
-  const highPriority = submissions.filter((t) => t.priority === "high").length;
-
-  const handleAction = () => {
-    if (!action) return;
-    const isApproved = action.type === "approve";
-    logAudit({
-      category: "task",
-      action:
-        action.type === "approve" ? "Approved Submission"
-        : action.type === "reject" ? "Rejected Submission"
-        : "Sent Review Remarks",
-      target: action.task.title,
-      targetId: action.task.assigneeId || undefined,
-      details: remarks.trim() || (action.type === "approve" ? `Submission approved — ${action.task.points} points awarded.` : "Reviewed submission."),
-      status: action.type === "reject" ? "warning" : "success",
-    });
-
-    reviewMutation.mutate({
-      id: action.task.id || action.task._id || "",
-      isApproved,
-      feedback: remarks.trim() || undefined,
-    });
+  const kpis = data?.kpis ?? {
+    pendingReview: 0,
+    highPriority: 0,
+    pointsAtStake: 0,
   };
+  const tasks = data?.tasks ?? [];
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const q = query.trim().toLowerCase();
+      const matchesQuery =
+        !q ||
+        t.title.toLowerCase().includes(q) ||
+        t.assignee.toLowerCase().includes(q) ||
+        (t.assigneeEmail && t.assigneeEmail.toLowerCase().includes(q)) ||
+        (t.notes && t.notes.toLowerCase().includes(q)) ||
+        (t.category && t.category.toLowerCase().includes(q));
+
+      const matchesPriority =
+        priorityFilter === "all" ||
+        t.priority.toLowerCase() === priorityFilter.toLowerCase();
+
+      return matchesQuery && matchesPriority;
+    });
+  }, [tasks, query, priorityFilter]);
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader
+          title="Review Center"
+          subtitle="Evaluate employee task submissions, approve points, or request changes."
+        />
+        <div className="space-y-5">
+          <StatCardsSkeleton count={3} />
+          <div className="h-12 w-full rounded-2xl bg-card/40 animate-pulse" />
+          <TableSkeleton rows={5} cols={7} />
+        </div>
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <>
+        <PageHeader
+          title="Review Center"
+          subtitle="Evaluate employee task submissions, approve points, or request changes."
+        />
+        <ErrorState
+          title="Could not load Review Center"
+          description={error?.message || "Failed to fetch task submissions awaiting review."}
+          onRetry={() => refetch()}
+        />
+      </>
+    );
+  }
 
   return (
     <>
       <PageHeader
         title="Review Center"
-        subtitle="Approve, reject, or leave remarks on employee task submissions."
+        subtitle="Evaluate employee task submissions, approve points, or request changes."
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="Pending review" value={submissions.length} icon={ClipboardCheck} accent="primary" />
-        <StatCard label="High priority" value={highPriority} icon={Trophy} accent="warning" />
-        <StatCard label="Points at stake" value={totalPoints} icon={Trophy} accent="success" />
+      {/* KPI Dashboard Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Pending Reviews"
+          value={kpis.pendingReview}
+          icon={ClipboardCheck}
+          accent="primary"
+        />
+        <StatCard
+          label="High Priority Reviews"
+          value={kpis.highPriority}
+          icon={Trophy}
+          accent="warning"
+        />
+        <StatCard
+          label="Points At Stake"
+          value={kpis.pointsAtStake}
+          icon={Trophy}
+          accent="success"
+        />
       </div>
 
-      <div className="glass flex flex-wrap items-center gap-2 rounded-2xl p-3">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      {/* Search and Filters Toolbar */}
+      <div className="glass flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-2xl p-4">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by task or employee…"
-            className="rounded-full pl-9"
+            placeholder="Search by task title, employee name, or submission notes…"
+            className="h-10 rounded-full pl-9"
           />
         </div>
+
         <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger className="w-[160px] rounded-full"><SelectValue /></SelectTrigger>
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="h-10 w-40 rounded-full">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All priorities</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="high">High Priority</SelectItem>
+              <SelectItem value="medium">Medium Priority</SelectItem>
+              <SelectItem value="low">Low Priority</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {/* Review Table */}
+      {filteredTasks.length === 0 ? (
         <EmptyState
           icon={ClipboardCheck}
-          title="Nothing to review"
-          description="You're all caught up. New submissions will appear here as employees send them for review."
+          title="No Tasks Pending Review"
+          description="You're all caught up! New employee submissions will appear here for verification."
         />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {filtered.map((task, i) => (
-            <ReviewCard
-              key={task.id}
-              task={task}
-              index={i}
-              submission={subs[task.id]}
-              projectName={task.projectId ? projects.find((p) => p.id === task.projectId || p._id === task.projectId)?.name : undefined}
-              onAction={(type) => setAction({ type, task })}
-            />
-          ))}
+        <div className="glass overflow-hidden rounded-2xl border border-border/60">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border/60 bg-muted/20 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3.5 font-semibold">Task Name</th>
+                  <th className="px-5 py-3.5 font-semibold">Employee</th>
+                  <th className="px-5 py-3.5 font-semibold">Priority</th>
+                  <th className="px-5 py-3.5 font-semibold">Reward Points</th>
+                  <th className="px-5 py-3.5 font-semibold">Submitted Notes</th>
+                  <th className="px-5 py-3.5 font-semibold">Date</th>
+                  <th className="px-5 py-3.5 font-semibold">Status</th>
+                  <th className="px-5 py-3.5 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {filteredTasks.map((task, idx) => {
+                  const taskId = task._id || task.id;
+                  return (
+                    <tr
+                      key={taskId || idx}
+                      className="transition-colors hover:bg-muted/30 animate-in fade-in"
+                    >
+                      {/* Task Name */}
+                      <td className="px-5 py-4 max-w-xs">
+                        <Link
+                          to="/admin/tasks/$id"
+                          params={{ id: taskId }}
+                          className="font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {task.title}
+                        </Link>
+                        {task.category && (
+                          <span className="mt-1 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+                            {task.category}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Employee */}
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                            <User className="h-3.5 w-3.5" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-xs text-foreground">
+                              {task.assignee || "Assigned Employee"}
+                            </div>
+                            {task.assigneeEmail && (
+                              <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <Mail className="h-2.5 w-2.5" /> {task.assigneeEmail}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Priority */}
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <TaskPriorityBadge priority={task.priority} />
+                      </td>
+
+                      {/* Reward Points */}
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 font-bold text-xs text-warning">
+                          <Trophy className="h-3.5 w-3.5" />
+                          {task.points || task.rewardPoints || 0} pts
+                        </span>
+                      </td>
+
+                      {/* Submitted Notes */}
+                      <td className="px-5 py-4 max-w-xs">
+                        <div className="flex items-start gap-1.5 text-xs text-foreground/90 bg-muted/40 p-2 rounded-xl border border-border/40">
+                          <StickyNote className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">
+                            {task.notes || "No notes provided."}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Submitted / Due Date */}
+                      <td className="px-5 py-4 whitespace-nowrap text-muted-foreground">
+                        <div className="inline-flex items-center gap-1.5 text-xs">
+                          <Calendar className="h-3.5 w-3.5 text-primary" />
+                          <span>
+                            {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "Pending"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <TaskStatusBadge status="IN_REVIEW" />
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          onClick={() => setSelectedTask(task)}
+                          className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                        >
+                          <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Review
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      <Dialog open={!!action} onOpenChange={(o) => { if (!o) { setAction(null); setRemarks(""); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {action?.type === "approve" && "Approve submission"}
-              {action?.type === "reject" && "Reject submission"}
-              {action?.type === "remarks" && "Add remarks"}
-            </DialogTitle>
-            <DialogDescription>
-              {action?.task.title}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="remarks">
-              {action?.type === "reject" ? "Reason (required)" : "Remarks (optional)"}
-            </Label>
-            <Textarea
-              id="remarks"
-              rows={4}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder={
-                action?.type === "approve" ? "Great work! Anything to highlight?"
-                : action?.type === "reject" ? "Explain what needs to change before resubmission…"
-                : "Share a note with the employee…"
-              }
-              className="resize-none rounded-xl"
-            />
-            {action?.type === "approve" && (
-              <p className="rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
-                {action.task.points} points will be awarded to {action.task.assignee}.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" className="rounded-md" onClick={() => setAction(null)}>Cancel</Button>
-            <Button
-              className={`rounded-full ${action?.type === "reject" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : action?.type === "approve" ? "bg-success text-success-foreground hover:bg-success/90" : "shadow-glow"}`}
-              disabled={action?.type === "reject" && remarks.trim().length < 5}
-              onClick={handleAction}
-            >
-              {action?.type === "approve" && <><CheckCircle2 className="mr-1.5 h-4 w-4" /> Approve</>}
-              {action?.type === "reject" && <><XCircle className="mr-1.5 h-4 w-4" /> Reject</>}
-              {action?.type === "remarks" && <><MessageSquarePlus className="mr-1.5 h-4 w-4" /> Send remarks</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Task Review Modal */}
+      <TaskReviewModal
+        task={selectedTask}
+        open={Boolean(selectedTask)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTask(null);
+        }}
+      />
     </>
-  );
-}
-
-function ReviewCard({
-  task,
-  index,
-  submission,
-  projectName,
-  onAction,
-}: {
-  task: Task;
-  index: number;
-  submission?: Submission;
-  projectName?: string;
-  onAction: (type: ReviewAction) => void;
-}) {
-  const emp = employees.find((e) => e.id === task.assigneeId);
-  const days = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
-  const submittedOn = submission?.submittedAt
-    ? new Date(submission.submittedAt)
-    : new Date(new Date(task.dueDate).getTime() - 86400000);
-  const proofs =
-    task.attachments && task.attachments.length > 0
-      ? task.attachments.map((a) => ({
-          name: a.name,
-          size: a.size,
-          type: (a.name.endsWith(".png") || a.name.endsWith(".jpg") || a.name.endsWith(".jpeg") ? "image" : a.name.endsWith(".pdf") ? "pdf" : "doc") as "image" | "pdf" | "doc",
-        }))
-      : submission?.files && submission.files.length > 0
-        ? submission.files.map((f) => ({
-            name: f.name,
-            size: formatFileSize(f.size),
-            type: (f.type.startsWith("image/") ? "image" : f.type.includes("pdf") ? "pdf" : "doc") as "image" | "pdf" | "doc",
-          }))
-        : [];
-  const note =
-    submission?.issues?.trim() || task.notes || "Submitted for review — see details.";
-
-  const deadlineTone =
-    days < 0 ? "text-destructive"
-    : days <= 3 ? "text-warning"
-    : "text-muted-foreground";
-
-  return (
-    <article
-      className="glass flex flex-col rounded-2xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-glow animate-in fade-in slide-in-from-bottom-2"
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      {/* Header: employee + task */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-            {emp?.avatar ?? "?"}
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-medium">{emp?.name ?? task.assignee}</span>
-              {emp && <IdBadge id={emp.code} />}
-              <span className="text-[11px] text-muted-foreground">· {emp?.department ?? "—"}</span>
-            </div>
-            <h3 className="mt-0.5 line-clamp-1 font-display text-base font-semibold">{task.title}</h3>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <PriorityBadge priority={task.priority} />
-              <span className="rounded-sm bg-secondary/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {task.category}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-2 py-0.5 text-[10px] font-medium text-warning">
-                <Trophy className="h-2.5 w-2.5" /> {task.points} pts
-              </span>
-            </div>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-sm bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary">
-          Pending review
-        </span>
-      </header>
-
-      {/* Meta rows */}
-      <dl className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-card/40 p-3 text-xs">
-        <div>
-          <dt className="flex items-center gap-1 text-muted-foreground">
-            <FileText className="h-3 w-3" /> Submission
-          </dt>
-          <dd className="mt-0.5 font-medium">
-            {submittedOn.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-          </dd>
-        </div>
-        <div>
-          <dt className="flex items-center gap-1 text-muted-foreground">
-            <CalendarClock className="h-3 w-3" /> Deadline
-          </dt>
-          <dd className={`mt-0.5 font-medium ${deadlineTone}`}>
-            {new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-            <span className="ml-1 text-[10px]">
-              ({days < 0 ? `${-days}d late` : days === 0 ? "today" : `${days}d left`})
-            </span>
-          </dd>
-        </div>
-        <div>
-          <dt className="flex items-center gap-1 text-muted-foreground">
-            <FileText className="h-3 w-3" /> Project
-          </dt>
-          <dd className="mt-0.5 font-medium">{projectName ?? "General"}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Status</dt>
-          <dd className="mt-0.5 font-medium text-primary">Submitted</dd>
-        </div>
-      </dl>
-
-      {/* Notes */}
-      <div className="mt-3">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <StickyNote className="h-3 w-3" /> Issues faced
-        </div>
-        <p className="mt-1 line-clamp-2 text-sm">{note}</p>
-      </div>
-
-      {/* Proof */}
-      <div className="mt-3">
-        <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Paperclip className="h-3 w-3" /> Proof ({submission?.files?.length ?? proofs.length})
-        </div>
-        {submission?.files?.length ? (
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {submission.files.map((f) => {
-              const tone =
-                f.type === "application/pdf" ? "bg-destructive/15 text-destructive"
-                : f.type.startsWith("image/") ? "bg-primary/15 text-primary"
-                : "bg-secondary/70 text-foreground";
-              return (
-                <li key={f.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-card/40 px-2.5 py-1.5 text-xs">
-                  <span className={`grid h-6 w-6 place-items-center rounded-md ${tone}`}>
-                    <FileText className="h-3 w-3" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{formatFileSize(f.size)}</span>
-                  <button
-                    type="button"
-                    onClick={() => downloadSubmissionFile(f)}
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                    aria-label={`Download ${f.name}`}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-        <ul className="grid gap-1.5 sm:grid-cols-2">
-          {proofs.map((p, i) => {
-            const tone =
-              p.type === "pdf" ? "bg-destructive/15 text-destructive"
-              : p.type === "image" ? "bg-primary/15 text-primary"
-              : "bg-secondary/70 text-foreground";
-            return (
-              <li key={i} className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-2.5 py-1.5 text-xs">
-                <span className={`grid h-6 w-6 place-items-center rounded-md ${tone}`}>
-                  <FileText className="h-3 w-3" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{p.size}</span>
-              </li>
-            );
-          })}
-        </ul>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <Button
-          className="rounded-full bg-success text-success-foreground hover:bg-success/90"
-          onClick={() => onAction("approve")}
-        >
-          <CheckCircle2 className="mr-1.5 h-4 w-4" /> Approve
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          onClick={() => onAction("reject")}
-        >
-          <XCircle className="mr-1.5 h-4 w-4" /> Reject
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-full"
-          onClick={() => onAction("remarks")}
-        >
-          <MessageSquarePlus className="mr-1.5 h-4 w-4" /> Remarks
-        </Button>
-      </div>
-    </article>
   );
 }

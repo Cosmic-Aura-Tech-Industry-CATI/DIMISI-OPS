@@ -143,23 +143,52 @@ export const settingsService = {
   checkPassword: async (
     payload: CheckPasswordPayload,
   ): Promise<{ message: string; email?: string }> => {
-    const res = await http.post<{ message: string; email?: string }>(
-      API_ENDPOINTS.settings.checkPassword,
-      { currentPassword: payload.currentPassword || payload.password },
-    );
-    return res;
+    try {
+      const res = await http.post<{ message: string; email?: string }>(
+        API_ENDPOINTS.settings.checkPassword,
+        { currentPassword: payload.currentPassword || payload.password },
+      );
+      return res;
+    } catch (err: any) {
+      try {
+        const fallbackRes = await http.post<{ message: string; email?: string }>(
+          "/settings/password/check",
+          { currentPassword: payload.currentPassword || payload.password },
+        );
+        return fallbackRes;
+      } catch {
+        throw err;
+      }
+    }
   },
 
   updatePassword: async (payload: UpdatePasswordPayload): Promise<{ message: string }> => {
-    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, {
-      otp: payload.otp,
-      newPassword: payload.newPassword,
-      refreshToken: payload.refreshToken,
-    });
-    return res;
+    try {
+      const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, {
+        otp: payload.otp,
+        newPassword: payload.newPassword,
+        refreshToken: payload.refreshToken,
+      });
+      return res;
+    } catch (err: any) {
+      try {
+        const fallbackRes = await http.post<{ message: string }>("/settings/password/update", {
+          otp: payload.otp,
+          newPassword: payload.newPassword,
+          refreshToken: payload.refreshToken,
+        });
+        return fallbackRes;
+      } catch {
+        throw err;
+      }
+    }
   },
 
-  updateProfile: async (payload: UpdateProfilePayload): Promise<any> => {
+  updateProfile: async (payload: UpdateProfilePayload | FormData): Promise<any> => {
+    if (payload instanceof FormData) {
+      const res = await http.patch<any>(API_ENDPOINTS.settings.profile, payload);
+      return res;
+    }
     const res = await http.patch<any>(API_ENDPOINTS.settings.profile, {
       phone: payload.phone,
       avatar: payload.avatar || payload.avtar,

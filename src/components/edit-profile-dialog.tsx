@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Camera, Trash2, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,7 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AvatarUpload } from "@/components/avatar-upload";
 import { useEditableProfile, updateProfile } from "@/lib/profile-store";
+import { useAuth } from "@/lib/auth";
+import { useUpdateProfileMutation } from "@/features/settings";
 
 type Props = {
   open: boolean;
@@ -25,37 +28,50 @@ type Props = {
 };
 
 export function EditProfileDialog({ open, onOpenChange, initials, readOnly, currentPhone }: Props) {
+  const { user, setUser } = useAuth();
+  const updateProfileMutation = useUpdateProfileMutation();
   const profile = useEditableProfile();
-  const [phone, setPhone] = useState(profile.phone ?? currentPhone ?? "");
-  const [photo, setPhoto] = useState<string | null>(profile.photo);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [phone, setPhone] = useState(profile.phone ?? currentPhone ?? user?.phone ?? "");
+  const [photo, setPhoto] = useState<string | null>(profile.photo ?? user?.avatar ?? null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (open) {
-      setPhone(profile.phone ?? currentPhone ?? "");
-      setPhoto(profile.photo);
+      setPhone(profile.phone ?? currentPhone ?? user?.phone ?? "");
+      setPhoto(profile.photo ?? user?.avatar ?? null);
+      setSelectedFile(null);
     }
-  }, [open, profile.phone, profile.photo, currentPhone]);
+  }, [open, profile.phone, profile.photo, currentPhone, user]);
 
-  const onPick = (file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be smaller than 2 MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(String(reader.result));
-    reader.readAsDataURL(file);
-  };
+  const save = async () => {
+    try {
+      let payload: any;
+      if (selectedFile) {
+        payload = new FormData();
+        payload.append("avatar", selectedFile);
+        if (phone.trim()) payload.append("phone", phone.trim());
+      } else {
+        payload = { phone: phone.trim(), avatar: photo || "" };
+      }
 
-  const save = () => {
-    updateProfile({ phone: phone.trim(), photo });
-    toast.success("Profile updated");
-    onOpenChange(false);
+      const res = await updateProfileMutation.mutateAsync(payload);
+      const updatedUser = res?.user || res?.data?.user || res;
+      const newAvatar = updatedUser?.avatar || photo || user?.avatar || "";
+      const newPhone = updatedUser?.phone ?? phone.trim();
+
+      if (user) {
+        setUser({
+          ...user,
+          phone: newPhone,
+          avatar: newAvatar,
+        });
+      }
+      updateProfile({ phone: newPhone, photo: newAvatar });
+      toast.success("Profile updated");
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update profile");
+    }
   };
 
   return (
@@ -70,34 +86,14 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly, curr
 
         <div className="space-y-6">
           {/* Photo */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-muted text-xl font-display font-semibold">
-                {photo ? (
-                  <img src={photo} alt="Profile preview" className="h-full w-full object-cover" />
-                ) : (
-                  initials
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(ev) => onPick(ev.target.files?.[0])}
-              />
-              <Button type="button" variant="outline" className="rounded-md" onClick={() => fileRef.current?.click()}>
-                <Camera className="mr-2 h-4 w-4" /> Upload photo
-              </Button>
-              {photo && (
-                <Button type="button" variant="ghost" className="rounded-md" onClick={() => setPhoto(null)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Remove
-                </Button>
-              )}
-            </div>
-          </div>
+          <AvatarUpload
+            value={photo}
+            name={user?.name || "User"}
+            onChange={(photoUrl, file) => {
+              setPhoto(photoUrl);
+              setSelectedFile(file ?? null);
+            }}
+          />
 
           {/* Phone Number */}
           <div className="space-y-2">
@@ -131,8 +127,8 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly, curr
           <Button variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button className="rounded-md shadow-glow" onClick={save}>
-            Save changes
+          <Button className="rounded-md shadow-glow" onClick={save} disabled={updateProfileMutation.isPending}>
+            {updateProfileMutation.isPending ? "Saving…" : "Save changes"}
           </Button>
         </DialogFooter>
       </DialogContent>
