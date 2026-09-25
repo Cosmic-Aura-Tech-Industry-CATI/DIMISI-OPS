@@ -73,6 +73,15 @@ export const tasksService = {
   },
 
   /**
+   * Employee requests assignment on an available task (POST /tasks/:id/request).
+   * Returns { status, message } from backend.
+   */
+  async requestTask(id: string): Promise<{ status: string; message: string }> {
+    const res = await http.post<any>(API_ENDPOINTS.tasks.request(id));
+    return res ?? { status: "success", message: "Task request submitted successfully." };
+  },
+
+  /**
    * Admin assigns a task to an employee.
    */
   async assignTask(id: string, employeeId: string): Promise<Task> {
@@ -223,3 +232,4 @@ export const getTaskById = tasksService.getTaskById.bind(tasksService);
 export const startTask = tasksService.startTask.bind(tasksService);
 export const submitTask = tasksService.submitTask.bind(tasksService);
 export const reviewTask = tasksService.reviewTask.bind(tasksService);
+export const requestTask = tasksService.requestTask.bind(tasksService);

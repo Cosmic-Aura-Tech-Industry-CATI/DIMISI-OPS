@@ -13,6 +13,8 @@ import {
   List,
   Eye,
   Clock,
+  UserCheck,
+  Layers,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { TableSkeleton } from "@/components/skeletons";
@@ -34,6 +37,7 @@ import {
   useAssignedTasks,
   useTasksQuery,
   useStartTaskMutation,
+  useRequestTaskMutation,
   type Task,
   type TaskPriority,
 } from "@/features/tasks";
@@ -41,23 +45,26 @@ import {
 export const Route = createFileRoute("/employee/tasks/")({
   head: () => ({
     meta: [
-      { title: "Assigned Tasks — Poll" },
-      { name: "description", content: "Everything currently on your plate." },
-      { property: "og:title", content: "Assigned Tasks — Poll" },
-      { property: "og:description", content: "Active work assigned to you." },
+      { title: "Tasks — Dimisi Operations" },
+      { name: "description", content: "View assigned work and available organization tasks." },
+      { property: "og:title", content: "Tasks — Dimisi Operations" },
+      { property: "og:description", content: "Active and available tasks." },
     ],
   }),
-  component: AssignedTasksPage,
+  component: EmployeeTasksPage,
 });
 
-function AssignedTasksPage() {
+function EmployeeTasksPage() {
+  const [activeTab, setActiveTab] = useState<"assigned" | "all">("assigned");
   const [query, setQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [submissionTask, setSubmissionTask] = useState<Task | null>(null);
   const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
+  const [requestingTaskId, setRequestingTaskId] = useState<string | null>(null);
 
+  // Endpoint 1: GET /api/v1/tasks/assigned
   const {
     data: assignedTasks = [],
     isLoading: isLoadingAssigned,
@@ -66,6 +73,7 @@ function AssignedTasksPage() {
     refetch: refetchAssigned,
   } = useAssignedTasks();
 
+  // Endpoint 2: GET /api/v1/tasks
   const {
     data: allTasks = [],
     isLoading: isLoadingAll,
@@ -80,40 +88,33 @@ function AssignedTasksPage() {
     },
   });
 
+  const requestTaskMutation = useRequestTaskMutation({
+    onSettled: () => {
+      setRequestingTaskId(null);
+    },
+  });
+
   const handleStartTask = (task: Task) => {
     const id = task._id || task.id;
     setStartingTaskId(id);
     startTaskMutation.mutate(id);
   };
 
-  // Merge explicitly assigned tasks and available/open tasks
-  const combinedTasks = useMemo(() => {
-    const map = new Map<string, Task>();
-    for (const t of assignedTasks) {
-      const id = t._id || t.id;
-      if (id) map.set(id, t);
-    }
-    for (const t of allTasks) {
-      const id = t._id || t.id;
-      if (!id) continue;
-      if (!map.has(id)) {
-        const s = (t.status || "").toLowerCase().trim();
-        const rs = (t.rawStatus || "").toLowerCase().trim();
-        if (
-          s !== "completed" &&
-          rs !== "completed" &&
-          t.reviewState !== "in_review" &&
-          t.reviewState !== "approved"
-        ) {
-          map.set(id, t);
-        }
-      }
-    }
-    return Array.from(map.values());
-  }, [assignedTasks, allTasks]);
+  const handleRequestTask = (task: Task) => {
+    const id = task._id || task.id;
+    setRequestingTaskId(id);
+    requestTaskMutation.mutate(id);
+  };
+
+  // Switch active dataset strictly based on tab selected
+  const activeRawTasks = activeTab === "assigned" ? assignedTasks : allTasks;
+  const isLoading = activeTab === "assigned" ? isLoadingAssigned : isLoadingAll;
+  const isError = activeTab === "assigned" ? isErrorAssigned : isErrorAll;
+  const error = activeTab === "assigned" ? errorAssigned : errorAll;
+  const refetch = activeTab === "assigned" ? refetchAssigned : refetchAll;
 
   const filteredTasks = useMemo(() => {
-    return combinedTasks.filter((t) => {
+    return activeRawTasks.filter((t) => {
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -140,17 +141,18 @@ function AssignedTasksPage() {
 
       return matchesQuery && matchesPriority && matchesStatus;
     });
-  }, [combinedTasks, query, priorityFilter, statusFilter]);
-
-  const isLoading = isLoadingAssigned && isLoadingAll;
-  const isError = isErrorAssigned && isErrorAll && combinedTasks.length === 0;
+  }, [activeRawTasks, query, priorityFilter, statusFilter]);
 
   if (isLoading) {
     return (
       <>
         <PageHeader
-          title="Assigned Tasks"
-          subtitle="Active work assigned to you — submit for review when completed."
+          title={activeTab === "assigned" ? "Assigned Tasks" : "All Tasks"}
+          subtitle={
+            activeTab === "assigned"
+              ? "Active work assigned directly to you — submit for review when completed."
+              : "All organization tasks available across departments."
+          }
         />
         <div className="space-y-4">
           <div className="h-14 w-full rounded-2xl bg-card/40 animate-pulse" />
@@ -164,19 +166,18 @@ function AssignedTasksPage() {
     return (
       <>
         <PageHeader
-          title="Assigned Tasks"
-          subtitle="Active work assigned to you — submit for review when completed."
+          title={activeTab === "assigned" ? "Assigned Tasks" : "All Tasks"}
+          subtitle={
+            activeTab === "assigned"
+              ? "Active work assigned directly to you — submit for review when completed."
+              : "All organization tasks available across departments."
+          }
         />
         <ErrorState
-          title="Could not load assigned tasks"
-          description={
-            errorAssigned?.message ||
-            errorAll?.message ||
-            "There was a problem communicating with the server."
-          }
+          title={activeTab === "assigned" ? "Could not load assigned tasks" : "Could not load all tasks"}
+          description={error?.message || "There was a problem communicating with the server."}
           onRetry={() => {
-            void refetchAssigned();
-            void refetchAll();
+            void refetch();
           }}
         />
       </>
@@ -186,9 +187,39 @@ function AssignedTasksPage() {
   return (
     <>
       <PageHeader
-        title="Assigned tasks"
-        subtitle="Active work assigned to you — submit for review when done."
+        title={activeTab === "assigned" ? "Assigned Tasks" : "All Tasks"}
+        subtitle={
+          activeTab === "assigned"
+            ? "Active work assigned directly to you — submit for review when done."
+            : "All organization tasks available across departments."
+        }
       />
+
+      {/* Tabs Bar for switching between Assigned Tasks (/api/v1/tasks/assigned) & All Tasks (/api/v1/tasks) */}
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "assigned" | "all")} className="w-full">
+        <TabsList className="glass h-12 w-full max-w-md justify-start rounded-2xl p-1 bg-card/60 border border-border/60">
+          <TabsTrigger
+            value="assigned"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-medium transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+          >
+            <UserCheck className="h-4 w-4" />
+            <span>Assigned Tasks</span>
+            <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
+              {assignedTasks.length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="all"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-medium transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+          >
+            <Layers className="h-4 w-4" />
+            <span>All Tasks</span>
+            <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
+              {allTasks.length}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Filter and Search Toolbar */}
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center">
@@ -197,7 +228,7 @@ function AssignedTasksPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tasks…"
+            placeholder={activeTab === "assigned" ? "Search assigned tasks…" : "Search all tasks…"}
             className="h-10 rounded-full pl-9"
           />
         </div>
@@ -259,9 +290,13 @@ function AssignedTasksPage() {
       {/* Main Content */}
       {filteredTasks.length === 0 ? (
         <EmptyState
-          icon={ListTodo}
-          title="Inbox zero"
-          description="No active tasks matching your criteria — enjoy the calm."
+          icon={activeTab === "assigned" ? ListTodo : Layers}
+          title={activeTab === "assigned" ? "No assigned tasks" : "No tasks found"}
+          description={
+            activeTab === "assigned"
+              ? "No tasks currently assigned to you matching your filter criteria."
+              : "No organization tasks found matching your filter criteria."
+          }
         />
       ) : viewMode === "cards" ? (
         /* Card Grid View */
@@ -277,6 +312,7 @@ function AssignedTasksPage() {
               rawStatus === "in progress";
 
             const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
+            const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
 
             const days = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
             const remaining =
@@ -365,14 +401,25 @@ function AssignedTasksPage() {
 
                   <div className="w-full min-w-0 lg:flex-1">
                     {!isInProgress ? (
-                      <Button
-                        disabled={isStarting}
-                        onClick={() => handleStartTask(task)}
-                        className="w-full rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        <PlayCircle className="mr-1.5 h-4 w-4" />
-                        {isStarting ? "Starting…" : "Start Task"}
-                      </Button>
+                      activeTab === "all" ? (
+                        <Button
+                          disabled={isRequesting}
+                          onClick={() => handleRequestTask(task)}
+                          className="w-full rounded-md shadow-glow bg-violet-600 hover:bg-violet-700 text-white"
+                        >
+                          <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                          {isRequesting ? "Requesting…" : "Request Task"}
+                        </Button>
+                      ) : (
+                        <Button
+                          disabled={isStarting}
+                          onClick={() => handleStartTask(task)}
+                          className="w-full rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          <PlayCircle className="mr-1.5 h-4 w-4" />
+                          {isStarting ? "Starting…" : "Start Task"}
+                        </Button>
+                      )
                     ) : (
                       <Button
                         onClick={() => setSubmissionTask(task)}
@@ -415,6 +462,7 @@ function AssignedTasksPage() {
                     rawStatus === "in progress";
 
                   const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
+                  const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
 
                   return (
                     <tr
@@ -471,15 +519,27 @@ function AssignedTasksPage() {
                       {/* Actions */}
                       <td className="px-5 py-4 text-right whitespace-nowrap">
                         {!isInProgress ? (
-                          <Button
-                            size="sm"
-                            disabled={isStarting}
-                            onClick={() => handleStartTask(task)}
-                            className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                          >
-                            <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-                            {isStarting ? "Starting…" : "Start Task"}
-                          </Button>
+                          activeTab === "all" ? (
+                            <Button
+                              size="sm"
+                              disabled={isRequesting}
+                              onClick={() => handleRequestTask(task)}
+                              className="rounded-full bg-violet-600 text-white hover:bg-violet-700 shadow-sm"
+                            >
+                              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                              {isRequesting ? "Requesting…" : "Request Task"}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled={isStarting}
+                              onClick={() => handleStartTask(task)}
+                              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                            >
+                              <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                              {isStarting ? "Starting…" : "Start Task"}
+                            </Button>
+                          )
                         ) : (
                           <Button
                             size="sm"
@@ -512,4 +572,5 @@ function AssignedTasksPage() {
     </>
   );
 }
+
 
