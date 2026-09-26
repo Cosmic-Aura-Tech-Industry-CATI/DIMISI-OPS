@@ -26,7 +26,7 @@ export function hydrateTokens() {
     if (stored && !accessToken) {
       accessToken = stored;
     }
-  } catch {}
+  } catch { }
   listeners.forEach((l) => l(accessToken));
 }
 
@@ -34,7 +34,7 @@ export function getAccessToken() {
   if (!accessToken) {
     try {
       accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || sessionStorage.getItem(ACCESS_TOKEN_KEY) || null;
-    } catch {}
+    } catch { }
   }
   return accessToken;
 }
@@ -48,7 +48,7 @@ export function setAccessToken(token: string | null) {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     }
-  } catch {}
+  } catch { }
   listeners.forEach((l) => l(token));
 }
 
