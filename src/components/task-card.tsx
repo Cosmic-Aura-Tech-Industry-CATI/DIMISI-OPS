@@ -41,9 +41,9 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
   const days = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
   const remaining =
     days < 0 ? { label: `${-days}d overdue`, tone: "text-destructive" }
-    : days === 0 ? { label: "Due today", tone: "text-warning" }
-    : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
-    : { label: `${days}d left`, tone: "text-muted-foreground" };
+      : days === 0 ? { label: "Due today", tone: "text-warning" }
+        : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
+          : { label: `${days}d left`, tone: "text-muted-foreground" };
 
   const pill = task.reviewState ? reviewLabel[task.reviewState] : statusPill[task.status];
 

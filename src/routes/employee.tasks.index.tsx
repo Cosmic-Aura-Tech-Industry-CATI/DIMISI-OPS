@@ -262,11 +262,10 @@ function EmployeeTasksPage() {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`rounded-full p-2 transition-colors ${
-                viewMode === "cards"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-full p-2 transition-colors ${viewMode === "cards"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
               title="Card Grid View"
             >
               <LayoutGrid className="h-4 w-4" />
@@ -274,11 +273,10 @@ function EmployeeTasksPage() {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`rounded-full p-2 transition-colors ${
-                viewMode === "table"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-full p-2 transition-colors ${viewMode === "table"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
               title="Table View"
             >
               <List className="h-4 w-4" />
