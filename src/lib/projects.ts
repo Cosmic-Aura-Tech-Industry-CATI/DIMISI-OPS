@@ -24,8 +24,8 @@ export interface ProjectStats {
 }
 
 /** Live counters for a project derived from the task list. */
-export function projectStats(tasks: Task[], projectId: string): ProjectStats {
-  const list = tasks.filter((t) => t.projectId === projectId);
+export function projectStats(tasks: Task[] = [], projectId: string): ProjectStats {
+  const list = (tasks || []).filter((t) => t.projectId === projectId);
   const completed = list.filter((t) => t.status === "completed" || t.reviewState === "approved");
   const inReview = list.filter((t) => t.reviewState === "in_review");
   const available = list.filter((t) => t.status === "available" && !t.assigneeId);

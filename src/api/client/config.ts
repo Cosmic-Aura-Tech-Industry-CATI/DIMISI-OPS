@@ -8,10 +8,6 @@
 
 let rawBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
-// In production builds, avoid pointing to localhost
-if (import.meta.env.PROD && rawBaseUrl.includes("localhost")) {
-  rawBaseUrl = "/api/v1";
-}
 
 /** Base URL of the backend, without a trailing slash. */
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");

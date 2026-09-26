@@ -33,6 +33,10 @@ export const apiClient: AxiosInstance = axios.create({
 /* ------------------------------ request layer ------------------------------ */
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
+
   const mode: AuthMode = config.authMode ?? "bearer";
 
   if (mode === "bearer") {
@@ -111,6 +115,7 @@ apiClient.interceptors.response.use(
       url.includes("/auth/forget-password") ||
       url.includes("/auth/verify-reset-otp") ||
       url.includes("/auth/reset-password") ||
+      url.includes("/auth/oauth-login") ||
       url.includes("/auth/resend-otp") ||
       url.includes("/auth/refresh");
 

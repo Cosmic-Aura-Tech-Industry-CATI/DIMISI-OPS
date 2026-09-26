@@ -21,18 +21,35 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { tasks, admins } from "@/lib/mock-data";
+import { useTaskQuery, useStartTask, type Task } from "@/features/tasks";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/employee/tasks/$id/")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
   component: EmployeeTaskDetail,
 });
 
-const taskId = (id: string) => `TSK-${id.replace(/\D/g, "").padStart(4, "0")}`;
+const taskId = (id: string) => id;
 
 function EmployeeTaskDetail() {
   const { id } = useParams({ from: "/employee/tasks/$id/" });
-  const task = tasks.find((t) => t.id === id);
+  const { data: task, isLoading } = useTaskQuery(id);
+  const startTask = useStartTask({
+    onSuccess: () => {
+      toast.success("Task started", { description: "Task is now in progress." });
+    },
+    onError: (err) => {
+      toast.error("Failed to start task", { description: err.message || "An error occurred." });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="glass flex flex-col items-center justify-center rounded-2xl py-20 text-muted-foreground">
+        <p className="text-sm">Loading task details...</p>
+      </div>
+    );
+  }
 
   if (!task) {
     return (
@@ -45,37 +62,55 @@ function EmployeeTaskDetail() {
     );
   }
 
-  const days = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
+  const days = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
   const remaining =
     days < 0 ? { label: `${-days}d overdue`, tone: "text-destructive" }
-    : days === 0 ? { label: "Due today", tone: "text-warning" }
-    : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
-    : { label: `${days}d left`, tone: "text-muted-foreground" };
+      : days === 0 ? { label: "Due today", tone: "text-warning" }
+        : days <= 3 ? { label: `${days}d left`, tone: "text-warning" }
+          : { label: `${days}d left`, tone: "text-muted-foreground" };
 
   const progress =
     task.status === "completed" ? 100
-    : task.status === "in_progress" ? 60
-    : task.status === "overdue" ? 45
-    : 15;
+      : task.status === "in_progress" ? 60
+        : task.status === "overdue" ? 45
+          : 15;
 
-  const creator = task.createdBy ?? admins[+task.id.replace(/\D/g, "") % admins.length]?.name ?? "Elena Voss";
+  const creator = task.createdBy || "Admin";
 
   const submissionState =
     task.reviewState === "approved" ? { label: "Approved", tone: "text-success", bg: "bg-success/15", ring: "ring-success/30" }
-    : task.reviewState === "rejected" ? { label: "Rejected", tone: "text-destructive", bg: "bg-destructive/15", ring: "ring-destructive/30" }
-    : task.reviewState === "in_review" ? { label: "In review", tone: "text-primary", bg: "bg-primary/15", ring: "ring-primary/30" }
-    : { label: "Not submitted", tone: "text-muted-foreground", bg: "bg-muted", ring: "ring-border" };
+      : task.reviewState === "rejected" ? { label: "Rejected", tone: "text-destructive", bg: "bg-destructive/15", ring: "ring-destructive/30" }
+        : task.reviewState === "in_review" ? { label: "In review", tone: "text-primary", bg: "bg-primary/15", ring: "ring-primary/30" }
+          : { label: "Not submitted", tone: "text-muted-foreground", bg: "bg-muted", ring: "ring-border" };
 
   const timeline = buildTimeline(task, creator);
 
-  const primaryAction =
-    task.reviewState === "in_review"
-      ? { icon: Eye, label: "View submission", variant: "outline" as const }
-      : task.reviewState === "rejected"
-      ? { icon: RotateCcw, label: "Resubmit task", variant: "default" as const }
-      : task.status === "completed"
-      ? { icon: CheckCircle2, label: "View details", variant: "outline" as const }
-      : { icon: Send, label: "Submit for review", variant: "default" as const };
+  const normalizedStatus = (task.status || "").toLowerCase().trim();
+  const rawStatus = (task.rawStatus || "").toLowerCase().trim();
+
+  const isAssigned =
+    (normalizedStatus === "assigned" || rawStatus === "assigned" || normalizedStatus === "open") &&
+    task.reviewState !== "in_review" &&
+    task.reviewState !== "approved" &&
+    normalizedStatus !== "completed";
+
+  const isInProgress =
+    (normalizedStatus === "in_progress" || rawStatus === "in progress" || rawStatus === "in_progress") &&
+    task.reviewState !== "in_review" &&
+    task.reviewState !== "approved" &&
+    normalizedStatus !== "completed";
+
+  const isInReview =
+    task.reviewState === "in_review" ||
+    rawStatus === "in review" ||
+    rawStatus === "in_review";
+
+  const isCompleted =
+    normalizedStatus === "completed" ||
+    rawStatus === "completed" ||
+    task.reviewState === "approved";
+
+  const targetTaskId = task.id || task._id || id;
 
   return (
     <>
@@ -87,17 +122,38 @@ function EmployeeTaskDetail() {
 
       <PageHeader
         title={task.title}
-        subtitle={`${task.category} · ${taskId(task.id)}`}
+        subtitle={`${task.category} · ${taskId(task.id || task._id || id)}`}
         actions={
-          primaryAction.variant === "default" ? (
-            <Button asChild className="rounded-md shadow-glow">
-              <Link to="/employee/tasks/$id/submit" params={{ id: task.id }}>
-                <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}
+          isAssigned ? (
+            <Button
+              className="rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={startTask.isPending}
+              onClick={() => startTask.mutate(targetTaskId)}
+            >
+              <PlayCircle className="mr-1.5 h-4 w-4" />
+              {startTask.isPending ? "Starting…" : "Start Task"}
+            </Button>
+          ) : isInProgress ? (
+            <Button asChild className="rounded-md shadow-glow bg-indigo-600 text-white hover:bg-indigo-700">
+              <Link to="/employee/tasks/$id/submit" params={{ id: targetTaskId }}>
+                <Send className="mr-1.5 h-4 w-4" /> Submit for Review
               </Link>
             </Button>
+          ) : isInReview ? (
+            <Button asChild variant="outline" className="rounded-md border-primary/40 text-primary">
+              <Link to="/employee/pending-review">
+                <Eye className="mr-1.5 h-4 w-4" /> Waiting for Review
+              </Link>
+            </Button>
+          ) : isCompleted ? (
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
+              <CheckCircle2 className="h-4 w-4" /> Completed & Points Awarded
+            </div>
           ) : (
-            <Button variant="outline" className="rounded-md">
-              <primaryAction.icon className="mr-1.5 h-4 w-4" /> {primaryAction.label}
+            <Button asChild className="rounded-md shadow-glow">
+              <Link to="/employee/tasks/$id/submit" params={{ id: targetTaskId }}>
+                <Send className="mr-1.5 h-4 w-4" /> Submit for Review
+              </Link>
             </Button>
           )
         }
@@ -263,7 +319,7 @@ type TimelineItem = {
   dotIcon: string;
 };
 
-function buildTimeline(task: (typeof tasks)[number], creator: string): TimelineItem[] {
+function buildTimeline(task: Task, creator: string): TimelineItem[] {
   const fmt = (d: string | Date) =>
     new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 

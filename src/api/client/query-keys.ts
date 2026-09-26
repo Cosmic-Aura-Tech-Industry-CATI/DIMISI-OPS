@@ -1,4 +1,19 @@
-/** Centralised query keys — keeps invalidation predictable. */
+/**
+ * Centralised query keys — keeps invalidation predictable.
+ */
+
+export const taskKeys = {
+  all: ["tasks"] as const,
+  lists: () => ["tasks", "list"] as const,
+  list: (filters?: Record<string, unknown>) => ["tasks", "list", filters] as const,
+  assigned: ["tasks", "assigned"] as const,
+  pending: ["tasks", "pending"] as const,
+  completed: ["tasks", "completed"] as const,
+  reviewCenter: ["tasks", "review-center"] as const,
+  details: () => ["tasks", "detail"] as const,
+  detail: (id: string) => ["tasks", "detail", id] as const,
+};
+
 export const queryKeys = {
   health: ["health"] as const,
   auth: {
@@ -23,12 +38,13 @@ export const queryKeys = {
     detail: (id: string) => ["projects", "detail", id] as const,
   },
   tasks: {
-    all: ["tasks"] as const,
-    list: (filters?: Record<string, unknown>) => ["tasks", "list", filters] as const,
-    detail: (id: string) => ["tasks", "detail", id] as const,
-    available: (filters?: Record<string, unknown>) => ["tasks", "available", filters] as const,
-    employee: (employeeId?: string) => ["tasks", "employee", employeeId] as const,
-    reviews: () => ["tasks", "reviews"] as const,
+    all: taskKeys.all,
+    list: (filters?: Record<string, unknown>) => taskKeys.list(filters),
+    detail: (id: string) => taskKeys.detail(id),
+    assigned: () => taskKeys.assigned,
+    pending: () => taskKeys.pending,
+    completed: () => taskKeys.completed,
+    reviewCenter: () => taskKeys.reviewCenter,
   },
   admins: {
     all: ["admins"] as const,
@@ -45,12 +61,48 @@ export const queryKeys = {
     all: ["leaderboard"] as const,
     get: (limit?: number) => ["leaderboard", limit] as const,
   },
+  accounts: {
+    all: ["accounts"] as const,
+    list: (filters?: Record<string, unknown>) => ["accounts", "list", filters] as const,
+    stats: () => ["accounts", "stats"] as const,
+    detail: (id: string) => ["accounts", "detail", id] as const,
+  },
   notices: {
     all: ["notices"] as const,
     list: (filters?: Record<string, unknown>) => ["notices", "list", filters] as const,
     detail: (id: string) => ["notices", "detail", id] as const,
   },
+  dashboard: {
+    all: ["dashboard"] as const,
+    overview: () => ["dashboard", "overview"] as const,
+  },
+  reports: {
+    all: ["reports"] as const,
+    overview: (timeframe?: string) => ["reports", "overview", timeframe] as const,
+    employees: () => ["reports", "employees"] as const,
+    tasks: (timeframe?: string) => ["reports", "tasks", timeframe] as const,
+    projects: (timeframe?: string) => ["reports", "projects", timeframe] as const,
+    departments: () => ["reports", "departments"] as const,
+  },
+  settings: {
+    all: ["settings"] as const,
+    preferences: () => ["settings", "preferences"] as const,
+    workspace: () => ["settings", "workspace"] as const,
+    sessions: () => ["settings", "sessions"] as const,
+  },
+  activity: {
+    all: ["activity"] as const,
+    personal: (filters?: Record<string, unknown>) => ["activity", "personal", filters] as const,
+    admin: (filters?: Record<string, unknown>) => ["activity", "admin", filters] as const,
+    org: (filters?: Record<string, unknown>) => ["activity", "org", filters] as const,
+  },
+  employeeDashboard: {
+    all: ["employee-dashboard"] as const,
+    tasksDeadlines: () => ["employee-dashboard", "tasks-deadlines"] as const,
+    analytics: () => ["employee-dashboard", "analytics"] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: () => ["notifications", "list"] as const,
+  },
 } as const;
-
-
-

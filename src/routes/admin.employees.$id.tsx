@@ -94,7 +94,7 @@ function EmployeeProfilePage() {
       ? (user.designation as { name?: string }).name || "Employee"
       : (user.designation as string) || "Employee";
 
-  const empCode = user.empId || "—";
+  const empCode = user.empId || user.code || user._id || user.id || "—";
   const userTasks = allTasks.filter((t) => t.assigneeId === userId);
 
   const completed = userTasks.filter((t) => (t.status || "").toLowerCase() === "completed");

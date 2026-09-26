@@ -102,7 +102,7 @@ function NewAdminPage() {
       toast.success("Admin account created successfully");
       setCreated({
         name: user?.name || form.name,
-        code: user?.empId || "ADM",
+        code: user?.empId || user?.code || user?._id || user?.id || "",
         email: user?.email || form.email,
       });
     } catch (err: any) {

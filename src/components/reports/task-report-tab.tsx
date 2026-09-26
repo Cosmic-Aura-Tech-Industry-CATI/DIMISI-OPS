@@ -8,20 +8,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { tasks } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { TablePanel } from "./report-panels";
 import type { TaskBucket } from "./use-report-data";
 
 const PRIORITY_BADGE = "border-primary/30 bg-primary/10 text-primary";
 
+export interface TaskReportRowItem {
+  id: string;
+  title: string;
+  assignee: string;
+  category: string;
+  priority: string;
+  status: string;
+  points: number;
+  dueDate: string;
+}
+
 export function TaskReportTab({
-  buckets,
+  buckets = [],
+  tasks = [],
   onDownload,
 }: {
-  buckets: TaskBucket[];
+  buckets?: TaskBucket[];
+  tasks?: TaskReportRowItem[];
   onDownload: () => void;
 }) {
+  const totalTasks = tasks.length || buckets.reduce((acc, b) => acc + b.value, 0) || 1;
+
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-4">
@@ -32,7 +46,7 @@ export function TaskReportTab({
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                style={{ width: `${Math.min(100, (t.value / tasks.length) * 100)}%` }}
+                style={{ width: `${Math.min(100, (t.value / totalTasks) * 100)}%` }}
               />
             </div>
           </div>
@@ -57,28 +71,38 @@ export function TaskReportTab({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tasks.map((t) => (
-              <TableRow key={t.id} className="border-border/40">
-                <TableCell className="font-medium">{t.title}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{t.assignee}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={cn("capitalize border", PRIORITY_BADGE)}>
-                    {t.priority}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={t.status} />
-                </TableCell>
-                <TableCell className="text-right font-medium">+{t.points}</TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">
-                  {new Date(t.dueDate).toLocaleDateString(undefined, {
-                    day: "numeric",
-                    month: "short",
-                  })}
+            {tasks.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                  No tasks recorded for this timeframe
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              tasks.map((t) => (
+                <TableRow key={t.id} className="border-border/40">
+                  <TableCell className="font-medium">{t.title}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{t.assignee}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("capitalize border", PRIORITY_BADGE)}>
+                      {t.priority}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={t.status as any} />
+                  </TableCell>
+                  <TableCell className="text-right font-medium">+{t.points}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {t.dueDate
+                      ? new Date(t.dueDate).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                        })
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TablePanel>

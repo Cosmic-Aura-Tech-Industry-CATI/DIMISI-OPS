@@ -101,7 +101,7 @@ function AdminsPage() {
 
       return {
         id: a._id || a.id || "",
-        code: a.empId || "—",
+        code: a.empId || a.code || a._id || a.id || "—",
         name: a.name || "Administrator",
         email: a.email || "",
         jobTitle: titleName,

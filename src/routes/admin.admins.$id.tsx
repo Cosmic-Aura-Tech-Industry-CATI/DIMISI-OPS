@@ -98,7 +98,7 @@ function AdminDetailPage() {
       ? (user.designation as { name?: string }).name || "Admin"
       : (user.designation as string) || "Admin";
 
-  const empCode = user.empId || "—";
+  const empCode = user.empId || user.code || user._id || user.id || "—";
   const isDirector = String(user.role || "").toLowerCase() === "director";
 
   const handleRevoke = () => {

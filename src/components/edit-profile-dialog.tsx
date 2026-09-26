@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Camera, Trash2, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -10,12 +10,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AvatarUpload } from "@/components/avatar-upload";
 import { useEditableProfile, updateProfile } from "@/lib/profile-store";
-import { cn } from "@/lib/utils";
-
-const MAX_BIO = 280;
+import { useAuth } from "@/lib/auth";
+import { useUpdateProfileMutation } from "@/features/settings";
 
 type Props = {
   open: boolean;
@@ -24,40 +24,54 @@ type Props = {
   initials: string;
   /** Read-only fields shown for context. */
   readOnly: { label: string; value: string }[];
+  currentPhone?: string;
 };
 
-export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Props) {
+export function EditProfileDialog({ open, onOpenChange, initials, readOnly, currentPhone }: Props) {
+  const { user, setUser } = useAuth();
+  const updateProfileMutation = useUpdateProfileMutation();
   const profile = useEditableProfile();
-  const [bio, setBio] = useState(profile.bio);
-  const [photo, setPhoto] = useState<string | null>(profile.photo);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [phone, setPhone] = useState(profile.phone ?? currentPhone ?? user?.phone ?? "");
+  const [photo, setPhoto] = useState<string | null>(profile.photo ?? user?.avatar ?? null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (open) {
-      setBio(profile.bio);
-      setPhoto(profile.photo);
+      setPhone(profile.phone ?? currentPhone ?? user?.phone ?? "");
+      setPhoto(profile.photo ?? user?.avatar ?? null);
+      setSelectedFile(null);
     }
-  }, [open, profile.bio, profile.photo]);
+  }, [open, profile.phone, profile.photo, currentPhone, user]);
 
-  const onPick = (file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be smaller than 2 MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(String(reader.result));
-    reader.readAsDataURL(file);
-  };
+  const save = async () => {
+    try {
+      let payload: any;
+      if (selectedFile) {
+        payload = new FormData();
+        payload.append("avatar", selectedFile);
+        if (phone.trim()) payload.append("phone", phone.trim());
+      } else {
+        payload = { phone: phone.trim(), avatar: photo || "" };
+      }
 
-  const save = () => {
-    updateProfile({ bio: bio.slice(0, MAX_BIO), photo });
-    toast.success("Profile updated");
-    onOpenChange(false);
+      const res = await updateProfileMutation.mutateAsync(payload);
+      const updatedUser = res?.user || res?.data?.user || res;
+      const newAvatar = updatedUser?.avatar || photo || user?.avatar || "";
+      const newPhone = updatedUser?.phone ?? phone.trim();
+
+      if (user) {
+        setUser({
+          ...user,
+          phone: newPhone,
+          avatar: newAvatar,
+        });
+      }
+      updateProfile({ phone: newPhone, photo: newAvatar });
+      toast.success("Profile updated");
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update profile");
+    }
   };
 
   return (
@@ -66,55 +80,31 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Pr
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
-            Only your profile picture and bio can be changed. Contact an admin for other details.
+            Only your profile picture and phone number can be changed. Contact an admin for other details.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Photo */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-muted text-xl font-display font-semibold">
-                {photo ? (
-                  <img src={photo} alt="Profile preview" className="h-full w-full object-cover" />
-                ) : (
-                  initials
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(ev) => onPick(ev.target.files?.[0])}
-              />
-              <Button type="button" variant="outline" className="rounded-md" onClick={() => fileRef.current?.click()}>
-                <Camera className="mr-2 h-4 w-4" /> Upload photo
-              </Button>
-              {photo && (
-                <Button type="button" variant="ghost" className="rounded-md" onClick={() => setPhoto(null)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Remove
-                </Button>
-              )}
-            </div>
-          </div>
+          <AvatarUpload
+            value={photo}
+            name={user?.name || "User"}
+            onChange={(photoUrl, file) => {
+              setPhoto(photoUrl);
+              setSelectedFile(file ?? null);
+            }}
+          />
 
-          {/* Bio */}
+          {/* Phone Number */}
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              value={bio}
-              maxLength={MAX_BIO}
-              rows={4}
-              onChange={(ev) => setBio(ev.target.value)}
-              placeholder="Tell your team a little about yourself…"
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(ev) => setPhone(ev.target.value)}
+              placeholder="e.g. +1 (415) 555-0142"
             />
-            <div className={cn("text-right text-xs", bio.length >= MAX_BIO ? "text-destructive" : "text-muted-foreground")}>
-              {bio.length}/{MAX_BIO}
-            </div>
           </div>
 
           {/* Locked fields */}
@@ -137,8 +127,8 @@ export function EditProfileDialog({ open, onOpenChange, initials, readOnly }: Pr
           <Button variant="outline" className="rounded-md" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button className="rounded-md shadow-glow" onClick={save}>
-            Save changes
+          <Button className="rounded-md shadow-glow" onClick={save} disabled={updateProfileMutation.isPending}>
+            {updateProfileMutation.isPending ? "Saving…" : "Save changes"}
           </Button>
         </DialogFooter>
       </DialogContent>

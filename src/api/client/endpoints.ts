@@ -14,6 +14,8 @@ export const API_ENDPOINTS = {
     forgetPassword: "/auth/forget-password",
     verifyResetOtp: "/auth/verify-reset-otp",
     resetPassword: "/auth/reset-password",
+    oauthLogin: "/auth/oauth-login",
+    microsoftLogin: "/auth/microsoft-login",
   },
   departments: {
     list: "/departments",
@@ -48,6 +50,19 @@ export const API_ENDPOINTS = {
     start: (id: string) => `/tasks/${id}/start`,
     submit: (id: string) => `/tasks/${id}/submit`,
     review: (id: string) => `/tasks/${id}/review`,
+    assigned: "/tasks/assigned",
+    pending: "/tasks/pending",
+    completed: "/tasks/completed",
+    reviewCenter: "/tasks/review-center",
+  },
+  accounts: {
+    list: "/accounts",
+    stats: "/accounts/stats",
+    detail: (id: string) => `/accounts/${id}`,
+    create: "/accounts",
+    update: (id: string) => `/accounts/${id}`,
+    delete: (id: string) => `/accounts/${id}`,
+    upload: "/accounts/upload",
   },
   leaderboard: {
     get: "/leaderboard",
@@ -72,5 +87,40 @@ export const API_ENDPOINTS = {
     update: (id: string) => `/employees/${id}`,
     revoke: (id: string) => `/employees/${id}/revoke`,
   },
+  dashboard: {
+    overview: "/dashboard/overview",
+  },
+  reports: {
+    overview: "/reports/overview",
+    employees: "/reports/employees",
+    tasks: "/reports/tasks",
+    projects: "/reports/projects",
+    departments: "/reports/departments",
+  },
+  settings: {
+    preferences: "/settings/general/preferences",
+    workspace: "/settings/general/workspace",
+    setup2Fa: "/settings/general/2fa/authenticator/setup",
+    verify2Fa: "/settings/general/2fa/authenticator/verify",
+    checkPassword: "/settings/passwords/check",
+    updatePassword: "/settings/passwords/update",
+    profile: "/settings/profile",
+    sessions: "/settings/sessions",
+    revokeOtherSessions: "/settings/sessions/others",
+    revokeSession: (id: string) => `/settings/sessions/${id}`,
+  },
+  activity: {
+    personal: "/activity/personal",
+    admin: "/activity/admin",
+    org: "/activity/org",
+  },
+  employeeDashboard: {
+    tasksDeadlines: "/employee-dashboard/tasks-deadlines",
+    analytics: "/employee-dashboard/analytics",
+  },
+  notifications: {
+    list: "/notifications",
+    readAll: "/notifications/read-all",
+    markRead: (id: string) => `/notifications/${id}/read`,
+  },
 } as const;
-

@@ -1,20 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Palette, Key } from "lucide-react";
+import { AlertCircle, Bell, Key, Monitor, Palette, RotateCcw, Trash2, UserCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { SettingCard, ToggleRow, ThemeSection } from "./admin.settings";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  NotificationsSection,
+  ProfileSection,
+  SettingCard,
+  ThemeSection,
+  ToggleRow,
+} from "./admin.settings";
 import { ChangePasswordCard } from "@/components/change-password-card";
-
+import {
+  useRevokeOtherSessionsMutation,
+  useRevokeSessionMutation,
+  useSessionsQuery,
+  useUpdatePreferencesMutation,
+  useUserPreferencesQuery,
+} from "@/features/settings";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/employee/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Poll" },
-      { name: "description", content: "Manage your profile, preferences, theme, password, and notifications." },
-      { property: "og:title", content: "Settings — Poll" },
-      { property: "og:description", content: "Manage your profile, preferences, theme, password, and notifications." },
+      { title: "Settings — Dimisi Operations" },
+      {
+        name: "description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
+      { property: "og:title", content: "Settings — Dimisi Operations" },
+      {
+        property: "og:description",
+        content: "Manage your profile, preferences, theme, password, and notifications.",
+      },
     ],
   }),
   component: EmployeeSettingsPage,
@@ -23,24 +43,91 @@ export const Route = createFileRoute("/employee/settings")({
 function EmployeeSettingsPage() {
   return (
     <>
-      <PageHeader title="Settings" subtitle="Theme and account security controls." />
+      <PageHeader title="Settings" subtitle="Profile, theme, and account security controls." />
 
-      <Tabs defaultValue="theme" className="space-y-6">
+      <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="theme"><Palette className="mr-1.5 h-3.5 w-3.5" />Theme</TabsTrigger>
-          <TabsTrigger value="password"><Key className="mr-1.5 h-3.5 w-3.5" />Password</TabsTrigger>
+          <TabsTrigger value="profile">
+            <UserCircle className="mr-1.5 h-3.5 w-3.5" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="password">
+            <Key className="mr-1.5 h-3.5 w-3.5" />
+            Password
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-1.5 h-3.5 w-3.5" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="theme">
+            <Palette className="mr-1.5 h-3.5 w-3.5" />
+            Theme
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="theme"><ThemeSection /></TabsContent>
-        <TabsContent value="password"><PasswordSection /></TabsContent>
+        <TabsContent value="profile">
+          <ProfileSection role="employee" />
+        </TabsContent>
+        <TabsContent value="password">
+          <PasswordSection />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="theme">
+          <ThemeSection />
+        </TabsContent>
       </Tabs>
     </>
   );
 }
 
-
-
 function PasswordSection() {
+  const {
+    data: preferences,
+    isLoading: isLoadingPrefs,
+    isError: isErrorPrefs,
+    refetch: refetchPrefs,
+  } = useUserPreferencesQuery();
+  const updatePreferences = useUpdatePreferencesMutation();
+
+  const {
+    data: sessionsData,
+    isLoading: isLoadingSessions,
+    isError: isErrorSessions,
+    refetch: refetchSessions,
+  } = useSessionsQuery();
+  const revokeSession = useRevokeSessionMutation();
+  const revokeOtherSessions = useRevokeOtherSessionsMutation();
+
+  const handleRevokeSession = async (sessionId: string) => {
+    try {
+      await revokeSession.mutateAsync(sessionId);
+      toast.success("Session revoked successfully.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to revoke session.");
+    }
+  };
+
+  const handleRevokeAllOtherSessions = async () => {
+    try {
+      await revokeOtherSessions.mutateAsync();
+      toast.success("All other sessions revoked successfully.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to revoke sessions.");
+    }
+  };
+
+  const allSessions = [
+    ...(sessionsData?.currentSession ? [{ ...sessionsData.currentSession, current: true }] : []),
+    ...(sessionsData?.otherSessions || []).map((s) => ({ ...s, current: false })),
+  ];
+
+  const isEmailVerificationEnabled =
+    preferences?.security?.twoFactor?.emailVerification ??
+    preferences?.security?.emailOtpEnabled ??
+    true;
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <ChangePasswordCard
@@ -51,19 +138,131 @@ function PasswordSection() {
         )}
       />
 
-
       <SettingCard title="Sign-in security" description="Extra protection on your account.">
-        <div className="space-y-3">
-          <ToggleRow title="Two-factor authentication" description="Require a one-time code when signing in." defaultChecked />
-          <ToggleRow title="Sign-in alerts" description="Email me when a new device signs in." defaultChecked />
-          <ToggleRow title="Trusted devices" description="Skip 2FA on devices I mark as trusted." />
-        </div>
-        <Separator className="my-5" />
-        <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-          <div className="text-sm font-medium">Backup codes</div>
-          <p className="mt-1 text-xs text-muted-foreground">Generate one-time codes to sign in when you can't access your authenticator.</p>
-          <Button variant="outline" size="sm" className="mt-3 rounded-md">Generate codes</Button>
-        </div>
+        {isLoadingPrefs ? (
+          <Skeleton className="h-16 w-full rounded-xl" />
+        ) : isErrorPrefs ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Failed to load security settings.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => refetchPrefs()}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ToggleRow
+              title="Email verification on sign-in"
+              description="Send an email OTP code to verify new sign-ins."
+              checked={isEmailVerificationEnabled}
+              onChange={(checked) => {
+                updatePreferences.mutate(
+                  { security: { twoFactor: { emailVerification: checked } } },
+                  {
+                    onSuccess: () => toast.success("Sign-in security preference updated."),
+                    onError: (err: any) =>
+                      toast.error(err?.message || "Failed to update preference."),
+                  },
+                );
+              }}
+            />
+          </div>
+        )}
+      </SettingCard>
+
+      <SettingCard
+        title="Sessions"
+        description="Devices currently signed in to your account."
+        actions={
+          allSessions.length > 1 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-md text-destructive hover:bg-destructive/10"
+              onClick={handleRevokeAllOtherSessions}
+              disabled={revokeOtherSessions.isPending}
+            >
+              Sign out all others
+            </Button>
+          ) : undefined
+        }
+      >
+        {isLoadingSessions ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+        ) : isErrorSessions ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Failed to load active sessions.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => refetchSessions()}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        ) : allSessions.length === 0 ? (
+          <div className="py-6 text-center text-xs text-muted-foreground">
+            No active session records found
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {allSessions.map((s) => (
+              <li key={s.id || s._id} className="flex items-center justify-between gap-3 py-3">
+                <div className="flex items-center gap-3">
+                  <Monitor className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      {s.device || s.browser || "Active Device"}
+                      {s.os && <span className="text-xs text-muted-foreground">({s.os})</span>}
+                      {s.current && (
+                        <Badge
+                          variant="outline"
+                          className="border-primary/30 bg-primary/10 text-primary"
+                        >
+                          Current
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {s.location || s.ipAddress || "Active"} ·{" "}
+                      {s.lastActive
+                        ? new Date(s.lastActive).toLocaleString(undefined, {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })
+                        : "Active now"}
+                    </p>
+                  </div>
+                </div>
+                {!s.current && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-destructive hover:bg-destructive/10"
+                    onClick={() => handleRevokeSession(s.id || s._id || "")}
+                    disabled={revokeSession.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" /> Revoke
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </SettingCard>
     </div>
   );
