@@ -7,10 +7,18 @@ export const notificationsService = {
   getNotifications: async (): Promise<NotificationItem[]> => {
     let items: any[] = [];
     try {
-      const res = await http.get<NotificationItem[] | { data: NotificationItem[] }>(
+      const res = await http.get<any>(
         API_ENDPOINTS.notifications.list,
       );
-      items = Array.isArray(res) ? res : (res as any)?.data || [];
+      if (Array.isArray(res)) {
+        items = res;
+      } else if (res?.notifications && Array.isArray(res.notifications)) {
+        items = res.notifications;
+      } else if (res?.data?.notifications && Array.isArray(res.data.notifications)) {
+        items = res.data.notifications;
+      } else if (res?.data && Array.isArray(res.data)) {
+        items = res.data;
+      }
     } catch (err) {
       console.warn("[notificationsService] API call failed, using fallback:", err);
     }

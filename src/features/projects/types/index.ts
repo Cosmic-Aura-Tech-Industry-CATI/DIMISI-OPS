@@ -6,7 +6,7 @@
 // 1. Backend Contract Types
 // ==========================================
 
-export type BackendProjectStatus = "Active" | "Inactive" | "Completed" | "Archived";
+export type BackendProjectStatus = "active" | "inactive" | "completed" | "archived" | string;
 
 export interface ProjectAnalytics {
   totalTasks: number;
@@ -172,25 +172,46 @@ export const projectStatusStyles: Record<string, string> = {
 // 4. Adapter Functions
 // ==========================================
 
-/** Normalizes any status representation to backend enum: 'Active' | 'Inactive' | 'Archived' | 'Completed' */
+/** Normalizes any status representation to backend enum: 'active' | 'inactive' | 'archived' | 'completed' */
 export function normalizeStatusToBackend(status?: string): BackendProjectStatus {
-  if (!status) return "Active";
+  if (!status) return "active";
   const s = status.toLowerCase();
-  if (s === "active") return "Active";
-  if (s === "inactive") return "Inactive";
-  if (s === "archived") return "Archived";
-  if (s === "completed") return "Completed";
-  return "Active";
+  if (s === "inactive") return "inactive";
+  if (s === "archived") return "archived";
+  if (s === "completed") return "completed";
+  return "active";
 }
 
 /** Maps raw backend project object to frontend Project entity */
-export function mapProjectResponse(raw: BackendProject): Project {
+export function mapProjectResponse(raw: BackendProject | any): Project {
+  if (!raw || typeof raw !== "object") {
+    return {
+      _id: "",
+      id: "",
+      code: "",
+      name: "",
+      description: "",
+      status: "active",
+      color: projectColors[0],
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      createdBy: "Dimisi Directors",
+      templates: [],
+      analytics: {
+        totalTasks: 0,
+        completedTasks: 0,
+        progressPercentage: 0,
+      },
+    };
+  }
+
+  const rawId = raw._id || raw.id || "";
   const resolvedManager =
     typeof raw.managerId === "object" && raw.managerId !== null
       ? raw.managerId.name
       : typeof raw.managerId === "string"
         ? raw.managerId
-        : undefined;
+        : raw.manager || undefined;
 
   const resolvedCreator =
     typeof raw.createdBy === "object" && raw.createdBy !== null
@@ -200,13 +221,13 @@ export function mapProjectResponse(raw: BackendProject): Project {
         : "Dimisi Directors";
 
   const rawStatus = raw.status || (raw.isActive === false ? "Archived" : "Active");
-  const normalizedStatus = (rawStatus.toLowerCase() as FrontendProjectStatus);
+  const normalizedStatus = (String(rawStatus).toLowerCase() as FrontendProjectStatus);
 
   return {
-    _id: raw._id,
-    id: raw._id,
-    code: raw.code || raw._id.slice(-6).toUpperCase(),
-    name: raw.name,
+    _id: rawId,
+    id: rawId,
+    code: raw.code || (rawId ? rawId.slice(-6).toUpperCase() : "PRJ"),
+    name: raw.name || "Untitled Project",
     description: raw.description || "",
     manager: resolvedManager,
     managerId: raw.managerId,
@@ -216,7 +237,7 @@ export function mapProjectResponse(raw: BackendProject): Project {
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt: raw.updatedAt,
     createdBy: resolvedCreator,
-    templates: [],
+    templates: Array.isArray(raw.templates) ? raw.templates : [],
     analytics: raw.analytics || {
       totalTasks: 0,
       completedTasks: 0,

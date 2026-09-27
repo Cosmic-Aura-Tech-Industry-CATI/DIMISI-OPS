@@ -22,34 +22,36 @@ const { projects: projectEndpoints } = API_ENDPOINTS;
 
 /** GET /api/v1/projects — retrieves all projects with real-time task analytics. */
 export async function getProjects(filters?: ProjectFilters): Promise<Project[]> {
-  const res = await http.get<ProjectListResponse | BackendProject[]>(
+  const res = await http.get<any>(
     projectEndpoints.list,
     { params: filters },
   );
 
-  const rawList = Array.isArray(res) ? res : res?.projects ?? [];
-  return rawList.map(mapProjectResponse);
+  const rawList = Array.isArray(res)
+    ? res
+    : res?.projects || res?.data?.projects || (res?.data && Array.isArray(res.data) ? res.data : []);
+  return (Array.isArray(rawList) ? rawList : []).map(mapProjectResponse);
 }
 
 /** GET /api/v1/projects/:id — retrieves a single project by ID. */
 export async function getProjectById(id: string): Promise<Project> {
-  const res = await http.get<ProjectSingleResponse | BackendProject>(
+  const res = await http.get<any>(
     projectEndpoints.detail(id),
   );
 
-  const raw = "project" in res ? res.project : (res as BackendProject);
+  const raw = res?.project || res?.data?.project || res?.data || res;
   return mapProjectResponse(raw);
 }
 
 /** POST /api/v1/projects — creates a new project. */
 export async function createProject(payload: CreateProjectPayload): Promise<Project> {
   const body = mapCreateProjectPayload(payload);
-  const res = await http.post<ProjectSingleResponse | BackendProject>(
+  const res = await http.post<any>(
     projectEndpoints.create,
     body,
   );
 
-  const raw = "project" in res ? res.project : (res as BackendProject);
+  const raw = res?.project || res?.data?.project || res?.data || res;
   return mapProjectResponse(raw);
 }
 
@@ -59,12 +61,12 @@ export async function updateProject(
   payload: UpdateProjectPayload,
 ): Promise<Project> {
   const body = mapUpdateProjectPayload(payload);
-  const res = await http.patch<ProjectSingleResponse | BackendProject>(
+  const res = await http.patch<any>(
     projectEndpoints.update(id),
     body,
   );
 
-  const raw = "project" in res ? res.project : (res as BackendProject);
+  const raw = res?.project || res?.data?.project || res?.data || res;
   return mapProjectResponse(raw);
 }
 
