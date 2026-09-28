@@ -240,178 +240,178 @@ function TasksPage() {
             <span>{filtered.length} results</span>
             <span>Page {current} of {pages}</span>
           </div>
-        {/* Mobile: cards instead of horizontal scrolling */}
-        <div className="space-y-3 p-3 lg:hidden">
-          {slice.length === 0 && (
-            <EmptyState icon={ListTodo} title="No tasks match" description="Try clearing filters or creating a new task." />
-          )}
-          {slice.map((t, i) => (
-            <RecordCard
-              key={t.id}
-              index={i}
-              avatar={
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-primary/60 text-[11px] font-semibold text-primary-foreground">
-                  {(t.assignee || "—").split(" ").map((n) => n[0]).join("")}
-                </div>
-              }
-              title={
-                <Link to="/admin/tasks/$id" params={{ id: t.id }} className="hover:text-primary">{t.title}</Link>
-              }
-              subtitle={`${t.category} · ${taskId(t.id)}`}
-              badges={<><TaskTypeBadge type={t.taskType} /><StatusBadge status={t.status} /><PriorityBadge priority={t.priority} /></>}
-              fields={[
-                {
-                  label: "Employee",
-                  value: t.assignee
-                    ? `${t.assignee}${t.assigneeCode ? ` · ${t.assigneeCode}` : ""}`
-                    : t.taskType === "project" ? `Open · ${projectName(t.projectId)}` : "Unassigned",
-                },
-                ...(t.assignedAt
-                  ? [{ label: "Assigned", value: new Date(t.assignedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }]
-                  : []),
-                { label: "Points", value: <span className="inline-flex items-center gap-1"><Trophy className="h-3 w-3 text-warning" /> {t.points}</span> },
-                { label: "Deadline", value: new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) },
-                { label: "Created by", value: createdByFor(t) },
-              ]}
-              actions={
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
-                      <Eye className="mr-2 h-4 w-4" /> View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
-                      <Pencil className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPendingDelete(t)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              }
-            />
-          ))}
-        </div>
+          {/* Mobile: cards instead of horizontal scrolling */}
+          <div className="space-y-3 p-3 lg:hidden">
+            {slice.length === 0 && (
+              <EmptyState icon={ListTodo} title="No tasks match" description="Try clearing filters or creating a new task." />
+            )}
+            {slice.map((t, i) => (
+              <RecordCard
+                key={t.id}
+                index={i}
+                avatar={
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-primary/60 text-[11px] font-semibold text-primary-foreground">
+                    {(t.assignee || "—").split(" ").map((n) => n[0]).join("")}
+                  </div>
+                }
+                title={
+                  <Link to="/admin/tasks/$id" params={{ id: t.id }} className="hover:text-primary">{t.title}</Link>
+                }
+                subtitle={`${t.category} · ${taskId(t.id)}`}
+                badges={<><TaskTypeBadge type={t.taskType} /><StatusBadge status={t.status} /><PriorityBadge priority={t.priority} /></>}
+                fields={[
+                  {
+                    label: "Employee",
+                    value: t.assignee
+                      ? `${t.assignee}${t.assigneeCode ? ` · ${t.assigneeCode}` : ""}`
+                      : t.taskType === "project" ? `Open · ${projectName(t.projectId)}` : "Unassigned",
+                  },
+                  ...(t.assignedAt
+                    ? [{ label: "Assigned", value: new Date(t.assignedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }]
+                    : []),
+                  { label: "Points", value: <span className="inline-flex items-center gap-1"><Trophy className="h-3 w-3 text-warning" /> {t.points}</span> },
+                  { label: "Deadline", value: new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) },
+                  { label: "Created by", value: createdByFor(t) },
+                ]}
+                actions={
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
+                        <Eye className="mr-2 h-4 w-4" /> View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
+                        <Pencil className="mr-2 h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPendingDelete(t)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                }
+              />
+            ))}
+          </div>
 
-        <div className="hidden overflow-x-auto lg:block">
-          <table className="w-full min-w-[760px] whitespace-nowrap text-sm xl:min-w-[900px]">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-medium"><SortBtn label="Title" active={sortKey === "title"} dir={sortDir} onClick={() => toggleSort("title")} /></th>
-                <th className="px-5 py-3 font-medium">Type</th>
-                <th className="px-5 py-3 font-medium">Employee</th>
-                <th className="px-5 py-3 font-medium"><SortBtn label="Priority" active={sortKey === "priority"} dir={sortDir} onClick={() => toggleSort("priority")} /></th>
-                <th className="px-5 py-3 font-medium"><SortBtn label="Points" active={sortKey === "points"} dir={sortDir} onClick={() => toggleSort("points")} /></th>
-                <th className="px-5 py-3 font-medium"><SortBtn label="Deadline" active={sortKey === "dueDate"} dir={sortDir} onClick={() => toggleSort("dueDate")} /></th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="hidden px-5 py-3 font-medium xl:table-cell">Created by</th>
-                <th className="px-5 py-3 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slice.length === 0 && (
-                <tr><td colSpan={9} className="p-0">
-                  <EmptyState icon={ListTodo} title="No tasks match" description="Try clearing filters or creating a new task." />
-                </td></tr>
-              )}
-              {slice.map((t, i) => (
-                <tr
-                  key={t.id}
-                  className="border-t border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
-                  style={{ animationDelay: `${i * 20}ms` }}
-                >
-                  <td className="px-5 py-3.5">
-                    <Link to="/admin/tasks/$id" params={{ id: t.id }} className="block font-medium hover:text-primary">{t.title}</Link>
-                    <div className="text-xs text-muted-foreground">{t.category} · {taskId(t.id)}</div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <TaskTypeBadge type={t.taskType} />
-                    {t.taskType === "project" && (
-                      <div className="mt-1 text-xs text-muted-foreground">{projectName(t.projectId)}</div>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {t.assignee ? (
-                      <div className="flex items-center gap-2">
-                        <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-primary/60 text-[11px] font-semibold text-primary-foreground">
-                          {(t.assignee || "—").split(" ").map((n) => n[0]).join("")}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate">{t.assignee}</div>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            {t.assigneeCode && <IdBadge id={t.assigneeCode} />}
-                            {t.assignedAt && (
-                              <span>
-                                {new Date(t.assignedAt).toLocaleString(undefined, {
-                                  month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-                                })}
-                              </span>
-                            )}
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full min-w-[760px] whitespace-nowrap text-sm xl:min-w-[900px]">
+              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3 font-medium"><SortBtn label="Title" active={sortKey === "title"} dir={sortDir} onClick={() => toggleSort("title")} /></th>
+                  <th className="px-5 py-3 font-medium">Type</th>
+                  <th className="px-5 py-3 font-medium">Employee</th>
+                  <th className="px-5 py-3 font-medium"><SortBtn label="Priority" active={sortKey === "priority"} dir={sortDir} onClick={() => toggleSort("priority")} /></th>
+                  <th className="px-5 py-3 font-medium"><SortBtn label="Points" active={sortKey === "points"} dir={sortDir} onClick={() => toggleSort("points")} /></th>
+                  <th className="px-5 py-3 font-medium"><SortBtn label="Deadline" active={sortKey === "dueDate"} dir={sortDir} onClick={() => toggleSort("dueDate")} /></th>
+                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="hidden px-5 py-3 font-medium xl:table-cell">Created by</th>
+                  <th className="px-5 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slice.length === 0 && (
+                  <tr><td colSpan={9} className="p-0">
+                    <EmptyState icon={ListTodo} title="No tasks match" description="Try clearing filters or creating a new task." />
+                  </td></tr>
+                )}
+                {slice.map((t, i) => (
+                  <tr
+                    key={t.id}
+                    className="border-t border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
+                    style={{ animationDelay: `${i * 20}ms` }}
+                  >
+                    <td className="px-5 py-3.5">
+                      <Link to="/admin/tasks/$id" params={{ id: t.id }} className="block font-medium hover:text-primary">{t.title}</Link>
+                      <div className="text-xs text-muted-foreground">{t.category} · {taskId(t.id)}</div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <TaskTypeBadge type={t.taskType} />
+                      {t.taskType === "project" && (
+                        <div className="mt-1 text-xs text-muted-foreground">{projectName(t.projectId)}</div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {t.assignee ? (
+                        <div className="flex items-center gap-2">
+                          <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-primary/60 text-[11px] font-semibold text-primary-foreground">
+                            {(t.assignee || "—").split(" ").map((n) => n[0]).join("")}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate">{t.assignee}</div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              {t.assigneeCode && <IdBadge id={t.assigneeCode} />}
+                              {t.assignedAt && (
+                                <span>
+                                  {new Date(t.assignedAt).toLocaleString(undefined, {
+                                    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                                  })}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
+                      ) : (
+                        <span className="text-muted-foreground">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5"><PriorityBadge priority={t.priority} /></td>
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        <Trophy className="h-3.5 w-3.5 text-warning" /> {t.points}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5"><PriorityBadge priority={t.priority} /></td>
-                  <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1 font-medium">
-                      <Trophy className="h-3.5 w-3.5 text-warning" /> {t.points}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="inline-flex items-center gap-1.5 text-muted-foreground">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      {new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5"><StatusBadge status={t.status} /></td>
-                  <td className="hidden px-5 py-3.5 text-muted-foreground xl:table-cell">{createdByFor(t)}</td>
-                  <td className="px-5 py-3.5 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
-                          <Eye className="mr-2 h-4 w-4" /> View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPendingDelete(t)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td className="px-5 py-3.5"><StatusBadge status={t.status} /></td>
+                    <td className="hidden px-5 py-3.5 text-muted-foreground xl:table-cell">{createdByFor(t)}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
+                            <Eye className="mr-2 h-4 w-4" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
+                            <Pencil className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPendingDelete(t)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
-          <span className="text-xs text-muted-foreground">
-            Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–{(current - 1) * PAGE_SIZE + slice.length} of {filtered.length}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
-            {Array.from({ length: pages }).slice(0, 5).map((_, i) => {
-              const n = i + 1;
-              return (
-                <Button key={n} variant={n === current ? "default" : "outline"} size="sm" className="h-8 w-8 rounded-md p-0" onClick={() => setPage(n)}>{n}</Button>
-              );
-            })}
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
+            <span className="text-xs text-muted-foreground">
+              Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–{(current - 1) * PAGE_SIZE + slice.length} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
+              {Array.from({ length: pages }).slice(0, 5).map((_, i) => {
+                const n = i + 1;
+                return (
+                  <Button key={n} variant={n === current ? "default" : "outline"} size="sm" className="h-8 w-8 rounded-md p-0" onClick={() => setPage(n)}>{n}</Button>
+                );
+              })}
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>

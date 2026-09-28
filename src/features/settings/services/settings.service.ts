@@ -163,23 +163,27 @@ export const settingsService = {
   },
 
   updatePassword: async (payload: UpdatePasswordPayload): Promise<{ message: string }> => {
+    const body = {
+      otp: payload.otp,
+      newPassword: payload.newPassword,
+      password: payload.newPassword,
+      currentPassword: payload.currentPassword,
+      refreshToken: payload.refreshToken,
+    };
     try {
-      const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, {
-        otp: payload.otp,
-        newPassword: payload.newPassword,
-        refreshToken: payload.refreshToken,
-      });
+      const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, body);
       return res;
     } catch (err: any) {
       try {
-        const fallbackRes = await http.post<{ message: string }>("/settings/password/update", {
-          otp: payload.otp,
-          newPassword: payload.newPassword,
-          refreshToken: payload.refreshToken,
-        });
-        return fallbackRes;
+        const fallbackPatch = await http.patch<{ message: string }>(API_ENDPOINTS.settings.updatePassword, body);
+        return fallbackPatch;
       } catch {
-        throw err;
+        try {
+          const fallbackRes = await http.post<{ message: string }>("/settings/password/update", body);
+          return fallbackRes;
+        } catch {
+          throw err;
+        }
       }
     }
   },
@@ -187,13 +191,17 @@ export const settingsService = {
   updateProfile: async (payload: UpdateProfilePayload | FormData): Promise<any> => {
     if (payload instanceof FormData) {
       const res = await http.patch<any>(API_ENDPOINTS.settings.profile, payload);
-      return res;
+      return res?.user || res?.data?.user || res?.data || res;
     }
-    const res = await http.patch<any>(API_ENDPOINTS.settings.profile, {
-      phone: payload.phone,
-      avatar: payload.avatar || payload.avtar,
-    });
-    return res;
+    const avatarValue = payload.avatar || payload.avtar;
+    const body: Record<string, any> = {};
+    if (payload.phone !== undefined) body.phone = payload.phone;
+    if (avatarValue !== undefined) {
+      body.avatar = avatarValue;
+      body.avtar = avatarValue;
+    }
+    const res = await http.patch<any>(API_ENDPOINTS.settings.profile, body);
+    return res?.user || res?.data?.user || res?.data || res;
   },
 
   getSessions: async (): Promise<SessionsData> => {
