@@ -921,19 +921,12 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
 
   const handleSaveProfile = async () => {
     try {
-      let payload: any;
-      if (selectedFile) {
-        payload = new FormData();
-        payload.append("avatar", selectedFile);
-        if (phone) payload.append("phone", phone);
-      } else {
-        payload = { phone, avatar: photo };
-      }
+      const payload: Record<string, any> = { phone, avatar: photo };
 
       const res = await updateProfile.mutateAsync(payload);
-      const updatedUser = res?.user || res?.data?.user || res;
+      const updatedUser = res?.user || res?.data?.user || res?.data || res;
 
-      const newAvatar = updatedUser?.avatar || photo;
+      const newAvatar = updatedUser?.avatar || updatedUser?.avtar || photo;
       const newPhone = updatedUser?.phone ?? phone;
 
       if (user) {
@@ -988,17 +981,10 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
             setPhoto(nextPhoto);
             setSelectedFile(file ?? null);
             try {
-              let payload: any;
-              if (file) {
-                payload = new FormData();
-                payload.append("avatar", file);
-                if (phone) payload.append("phone", phone);
-              } else {
-                payload = { phone, avatar: nextPhoto };
-              }
+              const payload = { phone, avatar: nextPhoto };
               const res = await updateProfile.mutateAsync(payload);
-              const updatedUser = res?.user || res?.data?.user || res;
-              const newAvatar = updatedUser?.avatar || nextPhoto;
+              const updatedUser = res?.user || res?.data?.user || res?.data || res;
+              const newAvatar = updatedUser?.avatar || updatedUser?.avtar || nextPhoto;
               if (user) {
                 setUser({
                   ...user,

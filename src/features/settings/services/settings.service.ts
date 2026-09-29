@@ -143,63 +143,36 @@ export const settingsService = {
   checkPassword: async (
     payload: CheckPasswordPayload,
   ): Promise<{ message: string; email?: string }> => {
-    try {
-      const res = await http.post<{ message: string; email?: string }>(
-        API_ENDPOINTS.settings.checkPassword,
-        { currentPassword: payload.currentPassword || payload.password },
-      );
-      return res;
-    } catch (err: any) {
-      try {
-        const fallbackRes = await http.post<{ message: string; email?: string }>(
-          "/settings/password/check",
-          { currentPassword: payload.currentPassword || payload.password },
-        );
-        return fallbackRes;
-      } catch {
-        throw err;
-      }
-    }
+    const res = await http.post<{ message: string; email?: string }>(
+      API_ENDPOINTS.settings.checkPassword,
+      { currentPassword: payload.currentPassword || payload.password },
+    );
+    return res;
   },
 
   updatePassword: async (payload: UpdatePasswordPayload): Promise<{ message: string }> => {
     const body = {
-      otp: payload.otp,
+      otp: String(payload.otp || "").trim(),
       newPassword: payload.newPassword,
-      password: payload.newPassword,
       currentPassword: payload.currentPassword,
       refreshToken: payload.refreshToken,
     };
-    try {
-      const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, body);
-      return res;
-    } catch (err: any) {
-      try {
-        const fallbackPatch = await http.patch<{ message: string }>(API_ENDPOINTS.settings.updatePassword, body);
-        return fallbackPatch;
-      } catch {
-        try {
-          const fallbackRes = await http.post<{ message: string }>("/settings/password/update", body);
-          return fallbackRes;
-        } catch {
-          throw err;
-        }
-      }
-    }
+    const res = await http.post<{ message: string }>(API_ENDPOINTS.settings.updatePassword, body);
+    return res;
   },
 
-  updateProfile: async (payload: UpdateProfilePayload | FormData): Promise<any> => {
-    if (payload instanceof FormData) {
-      const res = await http.patch<any>(API_ENDPOINTS.settings.profile, payload);
-      return res?.user || res?.data?.user || res?.data || res;
-    }
-    const avatarValue = payload.avatar || payload.avtar;
+  updateProfile: async (payload: UpdateProfilePayload | Record<string, any>): Promise<any> => {
+    const avatarValue = payload.avatar || payload.avtar || payload.photo || payload.profileImage;
     const body: Record<string, any> = {};
-    if (payload.phone !== undefined) body.phone = payload.phone;
+
+    if (payload.phone !== undefined) {
+      body.phone = payload.phone;
+    }
     if (avatarValue !== undefined) {
       body.avatar = avatarValue;
       body.avtar = avatarValue;
     }
+
     const res = await http.patch<any>(API_ENDPOINTS.settings.profile, body);
     return res?.user || res?.data?.user || res?.data || res;
   },

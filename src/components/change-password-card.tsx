@@ -194,7 +194,7 @@ export function ChangePasswordCard({
     setError("");
     if (!isStrongPassword(next))
       return setError("New password does not meet all the requirements below.");
-    if (next === currentPasswordFor(email))
+    if (next === current)
       return setError("Your new password must be different from your current password.");
     if (next !== confirm) return setError("New password and confirmation do not match.");
 
@@ -205,8 +205,12 @@ export function ChangePasswordCard({
         newPassword: next,
         otp: code,
       });
-      updatePassword(email, next);
-      await sendPasswordChangedEmail(email);
+      try {
+        updatePassword(email, next);
+      } catch {}
+      try {
+        await sendPasswordChangedEmail(email);
+      } catch {}
       audit(
         "Password Changed",
         portal,

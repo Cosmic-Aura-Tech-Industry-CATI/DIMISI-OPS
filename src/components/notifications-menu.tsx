@@ -11,6 +11,7 @@ import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
   useNotificationsQuery,
+  IncomingCallDialog,
 } from "@/features/notifications";
 
 type ToneType = "info" | "success" | "warning";
@@ -40,9 +41,10 @@ export function NotificationsMenu() {
 
   const notifications = rawNotifications.map((n) => {
     let tone: ToneType = "info";
-    if (n.type.includes("approved") || n.type.includes("points")) {
+    const typeStr = String(n.type || "");
+    if (typeStr.includes("approved") || typeStr.includes("points")) {
       tone = "success";
-    } else if (n.type.includes("rejected") || n.type.includes("deadline")) {
+    } else if (typeStr.includes("rejected") || typeStr.includes("deadline")) {
       tone = "warning";
     }
 
@@ -75,7 +77,8 @@ export function NotificationsMenu() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -166,5 +169,7 @@ export function NotificationsMenu() {
         </div>
       </PopoverContent>
     </Popover>
+    <IncomingCallDialog />
+    </>
   );
 }

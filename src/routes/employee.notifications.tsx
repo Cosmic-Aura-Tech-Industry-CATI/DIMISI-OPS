@@ -40,15 +40,15 @@ export const Route = createFileRoute("/employee/notifications")({
 type State = "all" | "unread" | "read";
 
 const meta: Record<string, { label: string; Icon: typeof Bell; tone: string; ring: string }> = {
-  task_assignment:   { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  new_task:          { label: "New Task",           Icon: ClipboardList, tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  deadline_reminder: { label: "Deadline Reminder",  Icon: AlarmClock,    tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  deadline:          { label: "Deadline Reminder",  Icon: AlarmClock,    tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  task_approval:     { label: "Task Approved",      Icon: CheckCircle2,  tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  approved:          { label: "Task Approved",      Icon: CheckCircle2,  tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  rejected:          { label: "Task Rejected",      Icon: XCircle,       tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
-  points_earned:     { label: "Points Earned",      Icon: Sparkles,      tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
-  points:            { label: "Points Earned",      Icon: Sparkles,      tone: "bg-primary/15 text-primary",         ring: "ring-primary/30" },
+  task_assignment: { label: "New Task", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  new_task: { label: "New Task", Icon: ClipboardList, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  deadline_reminder: { label: "Deadline Reminder", Icon: AlarmClock, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  deadline: { label: "Deadline Reminder", Icon: AlarmClock, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  task_approval: { label: "Task Approved", Icon: CheckCircle2, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  approved: { label: "Task Approved", Icon: CheckCircle2, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  rejected: { label: "Task Rejected", Icon: XCircle, tone: "bg-destructive/15 text-destructive", ring: "ring-destructive/30" },
+  points_earned: { label: "Points Earned", Icon: Sparkles, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
+  points: { label: "Points Earned", Icon: Sparkles, tone: "bg-primary/15 text-primary", ring: "ring-primary/30" },
 };
 
 const defaultMeta = {
@@ -198,8 +198,8 @@ function NotificationsPage() {
             tab === "unread"
               ? "No unread notifications"
               : tab === "read"
-              ? "No read notifications"
-              : "No matching notifications"
+                ? "No read notifications"
+                : "No matching notifications"
           }
           description="No notifications match your current filter selection."
         />
