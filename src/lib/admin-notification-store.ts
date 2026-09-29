@@ -44,7 +44,7 @@ function setState(next: AdminNotification[]) {
   g.__dimisiAdminNotifs = state;
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {}
+  } catch { }
   listeners.forEach((l) => l());
 }
 

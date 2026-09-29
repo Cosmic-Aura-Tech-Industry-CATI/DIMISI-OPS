@@ -1,88 +1,50 @@
-/** API services for the notifications module. */
+/** API services for the notifications module (Real database integration, zero demo data). */
 import { http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import type { NotificationItem } from "../types";
 
 export const notificationsService = {
+  /**
+   * Fetches real in-app notifications from the backend database for the authenticated user.
+   */
   getNotifications: async (): Promise<NotificationItem[]> => {
-    let items: any[] = [];
     try {
-      const res = await http.get<any>(
-        API_ENDPOINTS.notifications.list,
-      );
+      const res = await http.get<any>(API_ENDPOINTS.notifications.list);
+      let items: any[] = [];
+
       if (Array.isArray(res)) {
         items = res;
+      } else if (res?.data && Array.isArray(res.data)) {
+        items = res.data;
       } else if (res?.notifications && Array.isArray(res.notifications)) {
         items = res.notifications;
       } else if (res?.data?.notifications && Array.isArray(res.data.notifications)) {
         items = res.data.notifications;
-      } else if (res?.data && Array.isArray(res.data)) {
-        items = res.data;
       }
+
+      return items.map((item: any) => ({
+        _id: String(item._id || item.id || ""),
+        id: String(item.id || item._id || ""),
+        recipientId: String(item.recipientId || ""),
+        recipientType: item.recipientType || "User",
+        title: item.title || "Notification",
+        message: item.message || "",
+        type: item.type || "task_assignment",
+        isRead: Boolean(item.isRead),
+        createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: item.updatedAt ? new Date(item.updatedAt).toISOString() : undefined,
+        taskId: item.taskId || item.metadata?.taskId || item.dynamicData?.taskId || undefined,
+        metadata: item.metadata || item.dynamicData || {},
+      }));
     } catch (err) {
-      console.warn("[notificationsService] API call failed, using fallback:", err);
+      console.error("[notificationsService] Failed to fetch real database notifications:", err);
+      return [];
     }
-
-    if (!items || items.length === 0) {
-      const now = Date.now();
-      const hoursAgo = (h: number) => new Date(now - h * 3600_000).toISOString();
-      items = [
-        {
-          _id: "notif-seed-1",
-          id: "notif-seed-1",
-          title: "New Task Assigned",
-          message: "You have been assigned to 'Enterprise SSO Rollout'. Please review details.",
-          type: "task_assignment",
-          isRead: false,
-          createdAt: hoursAgo(1),
-          taskId: "t1",
-        },
-        {
-          _id: "notif-seed-2",
-          id: "notif-seed-2",
-          title: "Submission Approved",
-          message: "Your submission for 'Database Optimization' was approved! +120 points awarded.",
-          type: "task_approval",
-          isRead: false,
-          createdAt: hoursAgo(5),
-          taskId: "t2",
-        },
-        {
-          _id: "notif-seed-3",
-          id: "notif-seed-3",
-          title: "Deadline Approaching",
-          message: "Task 'Fix Mobile Crash' is due in 24 hours.",
-          type: "deadline_reminder",
-          isRead: true,
-          createdAt: hoursAgo(18),
-          taskId: "t3",
-        },
-        {
-          _id: "notif-seed-4",
-          id: "notif-seed-4",
-          title: "Points Credited",
-          message: "You earned 150 points for top weekly performance.",
-          type: "points_earned",
-          isRead: true,
-          createdAt: hoursAgo(30),
-        },
-      ];
-    }
-
-    return items.map((item: any) => ({
-      _id: item._id || item.id || "",
-      id: item.id || item._id || "",
-      recipientId: item.recipientId || "",
-      title: item.title || "Notification",
-      message: item.message || "",
-      type: item.type || "notification",
-      isRead: Boolean(item.isRead),
-      createdAt: item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt,
-      taskId: item.taskId || item.metadata?.taskId || item.dynamicData?.taskId || undefined,
-    }));
   },
 
+  /**
+   * Marks a single notification as read in the database.
+   */
   markAsRead: async (notificationId: string): Promise<{ message: string }> => {
     const res = await http.patch<{ message: string }>(
       API_ENDPOINTS.notifications.markRead(notificationId),
@@ -90,6 +52,9 @@ export const notificationsService = {
     return res;
   },
 
+  /**
+   * Marks all user notifications as read in the database.
+   */
   markAllAsRead: async (): Promise<{ message: string }> => {
     const res = await http.patch<{ message: string }>(
       API_ENDPOINTS.notifications.readAll,

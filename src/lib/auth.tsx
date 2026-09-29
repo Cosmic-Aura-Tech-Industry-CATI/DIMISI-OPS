@@ -31,21 +31,31 @@ function getInitials(name?: string): string {
 }
 
 export function normalizeUser(raw: any): AuthUser {
+  const avatarValue = raw?.avatar || raw?.avtar || raw?.photo || raw?.profileImage || "";
+  const isImg =
+    typeof avatarValue === "string" &&
+    avatarValue.trim() !== "" &&
+    (avatarValue.startsWith("data:") ||
+      avatarValue.startsWith("http:") ||
+      avatarValue.startsWith("https:") ||
+      avatarValue.startsWith("/") ||
+      avatarValue.includes("/"));
+
   return {
-    id: raw._id || raw.id || "",
-    _id: raw._id || raw.id || "",
-    code: raw.empId || raw.code || raw._id || raw.id || "",
-    empId: raw.empId || raw.code || raw._id || raw.id || "",
-    name: raw.name || "User",
-    email: raw.email || "",
-    role: raw.role || "employee",
-    department: raw.department,
-    designation: raw.designation,
-    isActive: raw.isActive ?? true,
-    avatar: raw.avatar || getInitials(raw.name),
-    points: raw.points,
-    phone: raw.phone,
-    joinDate: raw.joinDate,
+    id: String(raw?._id || raw?.id || ""),
+    _id: String(raw?._id || raw?.id || ""),
+    code: String(raw?.empId || raw?.code || raw?._id || raw?.id || ""),
+    empId: String(raw?.empId || raw?.code || raw?._id || raw?.id || ""),
+    name: raw?.name || "User",
+    email: raw?.email || "",
+    role: raw?.role || "employee",
+    department: raw?.department,
+    designation: raw?.designation,
+    isActive: raw?.isActive ?? true,
+    avatar: isImg ? avatarValue : (avatarValue && avatarValue.length <= 4 ? avatarValue : getInitials(raw?.name)),
+    points: raw?.points ?? raw?.rewardPoints,
+    phone: raw?.phone || "",
+    joinDate: raw?.joinDate,
   };
 }
 
