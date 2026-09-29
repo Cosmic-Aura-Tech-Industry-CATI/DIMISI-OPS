@@ -3,7 +3,7 @@ import { loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const rawBackendUrl = env.VITE_DEV_BACKEND_URL || "http://127.0.0.1:5000";
+  const rawBackendUrl = env.VITE_DEV_BACKEND_URL || "https://api.dimisi.tech";
   const NGROK_HOST = env.VITE_NGROK_HOST;
   const VITE_ENV = env.VITE_ENV;
   const isProd = VITE_ENV === 'production';

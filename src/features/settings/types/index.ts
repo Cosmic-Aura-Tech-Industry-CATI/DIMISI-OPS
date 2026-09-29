@@ -138,4 +138,6 @@ export interface UpdateProfilePayload {
   phone?: string;
   avatar?: string;
   avtar?: string;
+  photo?: string;
+  profileImage?: string;
 }
