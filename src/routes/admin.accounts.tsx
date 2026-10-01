@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileSpreadsheet,
   FileText,
   FileUp,
@@ -20,6 +21,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,6 +176,47 @@ function AccountsPage() {
     setPage(1);
   };
 
+  const handleExport = () => {
+    if (sortedEntries.length === 0) {
+      toast.error("No account entries to export");
+      return;
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const COLUMNS = [
+      "Date",
+      "Name / Party",
+      "Credit (₹)",
+      "Debit (₹)",
+      "Balance (₹)",
+      "Reason / Purpose",
+      "Source",
+    ];
+
+    const rows = sortedEntries.map((e) => [
+      e.date,
+      e.name,
+      e.credit,
+      e.debit,
+      e.balance,
+      e.reason,
+      e.isUploaded ? "Uploaded PDF" : "Manual",
+    ]);
+
+    const csvContent = [COLUMNS, ...rows]
+      .map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `accounts-ledger-${stamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${sortedEntries.length} account entries to CSV`);
+  };
+
   return (
     <>
       <PageHeader
@@ -190,6 +233,16 @@ function AccountsPage() {
               title="Refresh ledger"
             >
               <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-md gap-1.5"
+              onClick={handleExport}
+              disabled={isLoading || sortedEntries.length === 0}
+              title="Export ledger entries to CSV"
+            >
+              <Download className="h-4 w-4 text-primary" />
+              Export
             </Button>
             <Button
               variant="outline"
