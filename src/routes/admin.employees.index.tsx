@@ -49,7 +49,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useEmployeesQuery, useRevokeEmployeeAccess } from "@/features/employees";
+import type { AuthUser } from "@/auth/types/auth";
+import { useEmployeesQuery, useRevokeEmployeeAccess, EditEmployeeDialog } from "@/features/employees";
 
 export const Route = createFileRoute("/admin/employees/")({
   head: () => ({
@@ -130,6 +131,7 @@ function EmployeesPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<AuthUser | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -385,10 +387,11 @@ function EmployeesPage() {
                           <Eye className="mr-2 h-4 w-4" /> View details
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/employees/$id/edit" params={{ id: e.id }} className="flex items-center">
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
-                        </Link>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onSelect={() => setEditingEmployee(e.raw)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -487,10 +490,11 @@ function EmployeesPage() {
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to="/admin/employees/$id/edit" params={{ id: e.id }} className="flex items-center">
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
-                            </Link>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onSelect={() => setEditingEmployee(e.raw)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -553,6 +557,14 @@ function EmployeesPage() {
           </div>
         </div>
       )}
+
+      <EditEmployeeDialog
+        employee={editingEmployee}
+        open={!!editingEmployee}
+        onOpenChange={(open) => {
+          if (!open) setEditingEmployee(null);
+        }}
+      />
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>

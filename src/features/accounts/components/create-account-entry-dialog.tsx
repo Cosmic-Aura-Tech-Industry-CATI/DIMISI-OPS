@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, PlusCircle, Sparkles } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,6 @@ export function CreateAccountEntryDialog({
   const [name, setName] = useState<string>("");
   const [credit, setCredit] = useState<string>("");
   const [debit, setDebit] = useState<string>("");
-  const [balance, setBalance] = useState<string>("");
   const [reason, setReason] = useState<string>("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -43,9 +42,28 @@ export function CreateAccountEntryDialog({
     setName("");
     setCredit("");
     setDebit("");
-    setBalance("");
     setReason("");
     setErrors({});
+  };
+
+  const handleCreditChange = (val: string) => {
+    setCredit(val);
+    if (val && parseFloat(val) > 0) {
+      setDebit("");
+    }
+    if (errors.credit || errors.debit) {
+      setErrors((prev) => ({ ...prev, credit: "", debit: "" }));
+    }
+  };
+
+  const handleDebitChange = (val: string) => {
+    setDebit(val);
+    if (val && parseFloat(val) > 0) {
+      setCredit("");
+    }
+    if (errors.credit || errors.debit) {
+      setErrors((prev) => ({ ...prev, credit: "", debit: "" }));
+    }
   };
 
   const validate = () => {
@@ -59,7 +77,11 @@ export function CreateAccountEntryDialog({
 
     if (isNaN(cr) || cr < 0) errs.credit = "Credit must be a valid positive number";
     if (isNaN(db) || db < 0) errs.debit = "Debit must be a valid positive number";
-    if (!credit && !debit) {
+
+    if (cr > 0 && db > 0) {
+      errs.credit = "An entry must have either Credit OR Debit, not both";
+      errs.debit = "An entry must have either Credit OR Debit, not both";
+    } else if (cr <= 0 && db <= 0) {
       errs.credit = "Specify either Credit or Debit amount";
     }
 
@@ -77,7 +99,6 @@ export function CreateAccountEntryDialog({
         name: name.trim(),
         credit: parseFloat(credit) || 0,
         debit: parseFloat(debit) || 0,
-        balance: parseFloat(balance) || 0,
         reason: reason.trim(),
         isUploaded: false,
       });
@@ -140,8 +161,8 @@ export function CreateAccountEntryDialog({
             </div>
           </div>
 
-          {/* Credit, Debit, Balance */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Credit & Debit (Either / Or) */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="create-credit" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Credit (+)
@@ -157,10 +178,7 @@ export function CreateAccountEntryDialog({
                   min="0"
                   placeholder="0.00"
                   value={credit}
-                  onChange={(e) => {
-                    setCredit(e.target.value);
-                    if (errors.credit) setErrors((prev) => ({ ...prev, credit: "" }));
-                  }}
+                  onChange={(e) => handleCreditChange(e.target.value)}
                   className={`pl-7 font-mono ${errors.credit ? "border-destructive" : ""}`}
                 />
               </div>
@@ -182,34 +200,11 @@ export function CreateAccountEntryDialog({
                   min="0"
                   placeholder="0.00"
                   value={debit}
-                  onChange={(e) => {
-                    setDebit(e.target.value);
-                    if (errors.credit) setErrors((prev) => ({ ...prev, credit: "" }));
-                  }}
+                  onChange={(e) => handleDebitChange(e.target.value)}
                   className={`pl-7 font-mono ${errors.debit ? "border-destructive" : ""}`}
                 />
               </div>
               {errors.debit && <p className="text-xs text-destructive">{errors.debit}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="create-balance" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Balance
-              </Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground">
-                  ₹
-                </span>
-                <Input
-                  id="create-balance"
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={balance}
-                  onChange={(e) => setBalance(e.target.value)}
-                  className="pl-7 font-mono font-semibold"
-                />
-              </div>
             </div>
           </div>
 
