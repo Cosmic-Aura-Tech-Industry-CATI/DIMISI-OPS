@@ -48,7 +48,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAdminsQuery, useAdminStatsQuery, useRevokeAdminAccess } from "@/features/admins";
+import type { AuthUser } from "@/auth/types/auth";
+import { useAdminsQuery, useAdminStatsQuery, useRevokeAdminAccess, EditAdminDialog } from "@/features/admins";
 
 export const Route = createFileRoute("/admin/admins/")({
   head: () => ({
@@ -128,6 +129,7 @@ function AdminsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AuthUser | null>(null);
 
   const requestDelete = (a: { id: string; name: string; permanent?: boolean; code?: string }) => {
     if (a.permanent) {
@@ -381,10 +383,11 @@ function AdminsPage() {
                           <Eye className="mr-2 h-4 w-4" /> View details
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/admins/$id/edit" params={{ id: a.id }} className="flex items-center">
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
-                        </Link>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onSelect={() => setEditingAdmin(a.raw)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
                       {!a.permanent && <DropdownMenuSeparator />}
                       {!a.permanent && (
@@ -481,10 +484,11 @@ function AdminsPage() {
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to="/admin/admins/$id/edit" params={{ id: a.id }} className="flex items-center">
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
-                            </Link>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onSelect={() => setEditingAdmin(a.raw)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           {!a.permanent && <DropdownMenuSeparator />}
                           {!a.permanent && (
@@ -549,6 +553,14 @@ function AdminsPage() {
           </div>
         </div>
       )}
+
+      <EditAdminDialog
+        admin={editingAdmin}
+        open={!!editingAdmin}
+        onOpenChange={(open) => {
+          if (!open) setEditingAdmin(null);
+        }}
+      />
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>

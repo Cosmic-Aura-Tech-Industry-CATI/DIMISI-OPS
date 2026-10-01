@@ -16,7 +16,7 @@ export interface CreateAccountEntryPayload {
   name: string;
   credit: number;
   debit: number;
-  balance: number;
+  balance?: number;
   reason: string;
   isUploaded?: boolean;
 }

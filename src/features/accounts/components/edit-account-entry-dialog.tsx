@@ -34,9 +34,8 @@ export function EditAccountEntryDialog({
 
   const [date, setDate] = useState<string>("");
   const [name, setName] = useState<string>("");
-  const [credit, setCredit] = useState<string>("0");
-  const [debit, setDebit] = useState<string>("0");
-  const [balance, setBalance] = useState<string>("0");
+  const [credit, setCredit] = useState<string>("");
+  const [debit, setDebit] = useState<string>("");
   const [reason, setReason] = useState<string>("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,13 +46,34 @@ export function EditAccountEntryDialog({
     if (open && entry) {
       setDate(entry.date || "");
       setName(entry.name || "");
-      setCredit(String(entry.credit ?? 0));
-      setDebit(String(entry.debit ?? 0));
-      setBalance(String(entry.balance ?? 0));
+      setCredit(entry.credit ? String(entry.credit) : "");
+      setDebit(entry.debit ? String(entry.debit) : "");
       setReason(entry.reason || "");
       setErrors({});
     }
   }, [open, entry]);
+
+  const handleCreditChange = (val: string) => {
+    if (isUploaded) return;
+    setCredit(val);
+    if (val && parseFloat(val) > 0) {
+      setDebit("");
+    }
+    if (errors.credit || errors.debit) {
+      setErrors((prev) => ({ ...prev, credit: "", debit: "" }));
+    }
+  };
+
+  const handleDebitChange = (val: string) => {
+    if (isUploaded) return;
+    setDebit(val);
+    if (val && parseFloat(val) > 0) {
+      setCredit("");
+    }
+    if (errors.credit || errors.debit) {
+      setErrors((prev) => ({ ...prev, credit: "", debit: "" }));
+    }
+  };
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -62,11 +82,17 @@ export function EditAccountEntryDialog({
 
     if (!isUploaded) {
       if (!date) errs.date = "Date is required";
-      const cr = parseFloat(credit);
-      const db = parseFloat(debit);
+      const cr = credit ? parseFloat(credit) : 0;
+      const db = debit ? parseFloat(debit) : 0;
       if (isNaN(cr) || cr < 0) errs.credit = "Credit must be a valid non-negative number";
       if (isNaN(db) || db < 0) errs.debit = "Debit must be a valid non-negative number";
-      if (isNaN(parseFloat(balance))) errs.balance = "Balance must be a valid number";
+
+      if (cr > 0 && db > 0) {
+        errs.credit = "An entry must have either Credit OR Debit, not both";
+        errs.debit = "An entry must have either Credit OR Debit, not both";
+      } else if (cr <= 0 && db <= 0) {
+        errs.credit = "Specify either Credit or Debit amount";
+      }
     }
 
     setErrors(errs);
@@ -90,7 +116,6 @@ export function EditAccountEntryDialog({
             date,
             credit: parseFloat(credit) || 0,
             debit: parseFloat(debit) || 0,
-            balance: parseFloat(balance) || 0,
           };
 
       const updated = await updateMutation.mutateAsync({
@@ -135,7 +160,7 @@ export function EditAccountEntryDialog({
           <DialogDescription>
             {isUploaded
               ? "This transaction was imported from a PDF statement. Financial amounts and date are locked to protect ledger integrity."
-              : "Update the transaction information or adjust ledger amounts."}
+              : "Update the transaction information, date, or credit/debit amounts."}
           </DialogDescription>
         </DialogHeader>
 
@@ -145,8 +170,8 @@ export function EditAccountEntryDialog({
             <div>
               <p className="font-medium text-foreground">Financial fields are read-only</p>
               <p className="mt-0.5">
-                Date, Credit, Debit, and Balance originate from an uploaded statement and cannot be
-                altered. You can edit the <strong>Name</strong> and <strong>Reason</strong>.
+                Date, Credit, and Debit originate from an uploaded statement and cannot be altered.
+                You can edit the <strong>Name</strong> and <strong>Reason</strong>.
               </p>
             </div>
           </div>
@@ -213,8 +238,8 @@ export function EditAccountEntryDialog({
             </div>
           </div>
 
-          {/* Credit, Debit, Balance */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Credit & Debit */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label
@@ -239,9 +264,7 @@ export function EditAccountEntryDialog({
                   disabled={isUploaded}
                   readOnly={isUploaded}
                   tabIndex={isUploaded ? -1 : undefined}
-                  onChange={(e) => {
-                    if (!isUploaded) setCredit(e.target.value);
-                  }}
+                  onChange={(e) => handleCreditChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (isUploaded) e.preventDefault();
                   }}
@@ -281,9 +304,7 @@ export function EditAccountEntryDialog({
                   disabled={isUploaded}
                   readOnly={isUploaded}
                   tabIndex={isUploaded ? -1 : undefined}
-                  onChange={(e) => {
-                    if (!isUploaded) setDebit(e.target.value);
-                  }}
+                  onChange={(e) => handleDebitChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (isUploaded) e.preventDefault();
                   }}
@@ -297,48 +318,6 @@ export function EditAccountEntryDialog({
                 />
               </div>
               {errors.debit && <p className="text-xs text-destructive">{errors.debit}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="edit-balance"
-                  className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-                >
-                  Balance
-                </Label>
-                {isUploaded && <Lock className="h-2.5 w-2.5 text-muted-foreground" />}
-              </div>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground">
-                  ₹
-                </span>
-                <Input
-                  id="edit-balance"
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={balance}
-                  disabled={isUploaded}
-                  readOnly={isUploaded}
-                  tabIndex={isUploaded ? -1 : undefined}
-                  onChange={(e) => {
-                    if (!isUploaded) setBalance(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (isUploaded) e.preventDefault();
-                  }}
-                  className={`pl-7 font-mono font-semibold ${
-                    isUploaded
-                      ? "cursor-not-allowed bg-muted/40 opacity-80 select-none"
-                      : errors.balance
-                        ? "border-destructive"
-                        : ""
-                  }`}
-                  required={!isUploaded}
-                />
-              </div>
-              {errors.balance && <p className="text-xs text-destructive">{errors.balance}</p>}
             </div>
           </div>
 

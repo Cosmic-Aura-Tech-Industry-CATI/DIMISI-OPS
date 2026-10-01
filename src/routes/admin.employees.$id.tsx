@@ -83,7 +83,7 @@ function EmployeeProfilePage() {
     );
   }
 
-  const userId = user._id || "";
+  const userId = user._id || user.id || id;
   const deptName =
     typeof user.department === "object" && user.department
       ? (user.department as { name?: string }).name || "General"
@@ -91,7 +91,9 @@ function EmployeeProfilePage() {
 
   const titleName =
     typeof user.designation === "object" && user.designation
-      ? (user.designation as { name?: string }).name || "Employee"
+      ? (user.designation as { title?: string; name?: string }).title ||
+        (user.designation as { name?: string }).name ||
+        "Employee"
       : (user.designation as string) || "Employee";
 
   const empCode = user.empId || user.code || user._id || user.id || "—";
