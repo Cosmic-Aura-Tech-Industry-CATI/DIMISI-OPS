@@ -24,6 +24,7 @@ import {
   XCircle,
   Megaphone,
   ScrollText,
+  Download,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth, type Role } from "@/lib/auth";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { cn } from "@/lib/utils";
 
 const adminNav = {
@@ -90,13 +92,15 @@ export function AppSidebar({ role }: { role: Role }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, logout } = useAuth();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { canPromptNative, promptInstall } = usePwaInstall();
 
   // On mobile the sidebar is a drawer: close it as soon as a nav item is picked.
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false);
   };
 
-  const isActive = (url: string) => (url === `/${role}` ? pathname === url : pathname.startsWith(url));
+  const isActive = (url: string) =>
+    url === `/${role}` ? pathname === url : pathname.startsWith(url);
 
   const groups =
     role === "admin"
@@ -111,7 +115,6 @@ export function AppSidebar({ role }: { role: Role }) {
           { label: "Account", items: employeeNav.account },
         ];
 
-
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/60">
       <SidebarHeader className="border-b border-sidebar-border/60">
@@ -125,8 +128,12 @@ export function AppSidebar({ role }: { role: Role }) {
             <img src={BRAND_MARK_SRC} alt="Dimisi" className="h-6 w-6 object-contain" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-display text-lg font-bold leading-none tracking-tight">Dimisi</span>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{role}</span>
+            <span className="font-display text-lg font-bold leading-none tracking-tight">
+              Dimisi
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              {role}
+            </span>
           </div>
         </Link>
       </SidebarHeader>
@@ -165,7 +172,9 @@ export function AppSidebar({ role }: { role: Role }) {
                           <item.icon
                             className={cn(
                               "h-4 w-4 transition-colors",
-                              active ? "text-primary-foreground" : "text-muted-foreground group-hover/nav:text-foreground",
+                              active
+                                ? "text-primary-foreground"
+                                : "text-muted-foreground group-hover/nav:text-foreground",
                             )}
                           />
 
@@ -181,8 +190,19 @@ export function AppSidebar({ role }: { role: Role }) {
         ))}
       </SidebarContent>
 
-
       <SidebarFooter className="border-t border-sidebar-border/60">
+        {canPromptNative && (
+          <div className="px-1 pt-1 pb-1 group-data-[collapsible=icon]:hidden">
+            <button
+              type="button"
+              onClick={promptInstall}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary/20 hover:border-primary/50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Install App</span>
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2 px-1 py-1">
           <div className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/40 to-accent text-xs font-semibold">
             {user?.avatar &&
@@ -190,14 +210,20 @@ export function AppSidebar({ role }: { role: Role }) {
               user.avatar.startsWith("http") ||
               user.avatar.startsWith("/") ||
               user.avatar.includes("/")) ? (
-              <img src={user.avatar} alt={user.name || "User"} className="h-full w-full object-cover" />
+              <img
+                src={user.avatar}
+                alt={user.name || "User"}
+                className="h-full w-full object-cover"
+              />
             ) : (
               user?.avatar || (user?.name ? user.name.slice(0, 2).toUpperCase() : "U")
             )}
           </div>
           <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <div className="truncate text-xs font-medium">{user?.name}</div>
-            <div className="truncate font-mono text-[10px] tracking-wider text-muted-foreground">{user?.code}</div>
+            <div className="truncate font-mono text-[10px] tracking-wider text-muted-foreground">
+              {user?.code}
+            </div>
           </div>
           <button
             onClick={() => {
