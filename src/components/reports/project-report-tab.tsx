@@ -29,9 +29,11 @@ import type { ProjectReportRow } from "./use-report-data";
 export function ProjectReportTab({
   rows,
   onDownload,
+  downloadDisabled,
 }: {
   rows: ProjectReportRow[];
   onDownload: () => void;
+  downloadDisabled?: boolean;
 }) {
   return (
     <>
@@ -88,6 +90,7 @@ export function ProjectReportTab({
         title="Project performance"
         subtitle="Every project with live task counters"
         onDownload={onDownload}
+        downloadDisabled={downloadDisabled}
       >
         <Table>
           <TableHeader>
@@ -116,7 +119,10 @@ export function ProjectReportTab({
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.manager ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={cn("capitalize", projectStatusStyles[p.status])}>
+                  <Badge
+                    variant="outline"
+                    className={cn("capitalize", projectStatusStyles[p.status])}
+                  >
                     {projectStatusLabel[p.status]}
                   </Badge>
                 </TableCell>

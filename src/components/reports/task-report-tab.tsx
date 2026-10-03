@@ -29,10 +29,12 @@ export function TaskReportTab({
   buckets = [],
   tasks = [],
   onDownload,
+  downloadDisabled,
 }: {
   buckets?: TaskBucket[];
   tasks?: TaskReportRowItem[];
   onDownload: () => void;
+  downloadDisabled?: boolean;
 }) {
   const totalTasks = tasks.length || buckets.reduce((acc, b) => acc + b.value, 0) || 1;
 
@@ -57,6 +59,7 @@ export function TaskReportTab({
         title="All tasks"
         subtitle="Status, priority, and reward across the workspace"
         onDownload={onDownload}
+        downloadDisabled={downloadDisabled}
       >
         <Table>
           <TableHeader>

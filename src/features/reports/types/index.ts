@@ -84,3 +84,107 @@ export interface DepartmentReportItem {
   totalAssigned: number;
   totalCompleted: number;
 }
+
+export interface ReportEstimateData {
+  type: string;
+  format: string;
+  timeframe?: string;
+  rows?: number;
+  threshold?: number;
+  recommended: "sync" | "async";
+  estimatedSeconds?: number;
+}
+
+export interface DownloadJobCreationResult {
+  status?: string;
+  jobId: string;
+  statusUrl?: string;
+}
+
+export interface DownloadJobStatusResult {
+  jobId: string;
+  status: "queued" | "processing" | "completed" | "failed" | "expired";
+  progress?: number;
+  downloadUrl?: string;
+  fileSize?: number;
+  error?: string;
+  expiresAt?: string;
+}
+
+export type EstimateReportType = "tasks" | "projects" | "employees" | "departments";
+export type AsyncJobReportType =
+  "report:task" | "report:project" | "report:employee" | "report:department";
+
+export type ReportCategoryType =
+  | "overview"
+  | "employees"
+  | "tasks"
+  | "projects"
+  | "departments"
+  | "employee"
+  | "task"
+  | "project"
+  | "department";
+
+export const estimateTypeMap: Record<string, EstimateReportType> = {
+  task: "tasks",
+  tasks: "tasks",
+  project: "projects",
+  projects: "projects",
+  employee: "employees",
+  employees: "employees",
+  department: "departments",
+  departments: "departments",
+  overview: "tasks",
+};
+
+export const reportTypeMap = estimateTypeMap;
+
+/**
+ * Centralized mapping function for Report Estimate API.
+ * Converts UI report keys into the valid types accepted by the backend:
+ * 'tasks', 'projects', 'employees', 'departments'.
+ */
+export function mapToEstimateType(type: string): EstimateReportType {
+  const normalized = (type || "").toLowerCase().trim();
+  return estimateTypeMap[normalized] || "tasks";
+}
+
+/**
+ * Centralized mapping function for Asynchronous Download Job API.
+ * Formats report types into the namespaced job format ('report:employee', 'report:task', 'report:project', 'report:department').
+ */
+export function mapToAsyncJobType(type: string): AsyncJobReportType | string {
+  const normalized = (type || "").toLowerCase().trim();
+  switch (normalized) {
+    case "employees":
+    case "employee":
+      return "report:employee";
+    case "projects":
+    case "project":
+      return "report:project";
+    case "departments":
+    case "department":
+      return "report:department";
+    case "account":
+    case "accounts":
+    case "account:data":
+      return "account:data";
+    case "tasks":
+    case "task":
+    case "overview":
+    default:
+      return "report:task";
+  }
+}
+
+/**
+ * Normalizes user-selected file format string to the backend supported formats ('csv', 'excel', 'pdf', 'json').
+ */
+export function normalizeDownloadFormat(format: string): "csv" | "excel" | "pdf" | "json" {
+  const f = (format || "").toLowerCase().trim();
+  if (f === "xlsx" || f === "xls" || f === "excel") return "excel";
+  if (f === "pdf") return "pdf";
+  if (f === "json") return "json";
+  return "csv";
+}

@@ -10,12 +10,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useDeleteAccountEntry } from "../hooks/use-accounts";
-import type { AccountEntry } from "../types";
+import { useDeleteTransactionMutation } from "../hooks/accounts.hooks";
+import { formatCurrency, formatDate } from "../utils/accounts.utils";
+import type { AccountTransaction } from "../types/accounts.types";
 
 interface DeleteAccountEntryDialogProps {
   open: boolean;
-  entry: AccountEntry | null;
+  entry: AccountTransaction | null;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
@@ -26,18 +27,28 @@ export function DeleteAccountEntryDialog({
   onOpenChange,
   onSuccess,
 }: DeleteAccountEntryDialogProps) {
-  const deleteMutation = useDeleteAccountEntry();
+  const deleteMutation = useDeleteTransactionMutation();
 
   if (!entry) return null;
 
+  const id = entry._id || entry.id;
+  const amount = entry.creditAmount > 0 ? entry.creditAmount : entry.debitAmount;
+  const amountType = entry.creditAmount > 0 ? "Credit" : "Debit";
+
   const handleDelete = async () => {
+    if (!id) {
+      toast.error("Transaction identifier missing");
+      return;
+    }
+
     try {
-      await deleteMutation.mutateAsync(entry.id);
-      toast.success("Account entry deleted successfully");
+      await deleteMutation.mutateAsync(id);
+      toast.success("Transaction voucher deleted successfully");
       onOpenChange(false);
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to delete account entry");
+      const msg = err?.message || err?.error || "Failed to delete transaction";
+      toast.error(msg);
     }
   };
 
@@ -45,11 +56,17 @@ export function DeleteAccountEntryDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Account Entry?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete the entry for <strong>{entry.name}</strong> (₹
-            {Number(entry.credit || entry.debit).toLocaleString("en-IN")})?{" "}
-            <span className="font-semibold text-foreground">This action can't be undone.</span>
+          <AlertDialogTitle>Delete Transaction Voucher?</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <span>
+              Are you sure you want to delete the voucher for{" "}
+              <strong className="text-foreground">{entry.partyName || "Unnamed Party"}</strong>{" "}
+              dated <strong className="text-foreground">{formatDate(entry.transactionDate)}</strong>{" "}
+              ({amountType}: <strong className="text-foreground">{formatCurrency(amount)}</strong>)?
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              This will update the ledger running balance and soft-delete the record from active view.
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -77,3 +94,5 @@ export function DeleteAccountEntryDialog({
     </AlertDialog>
   );
 }
+
+export { DeleteAccountEntryDialog as DeleteEntryDialog };

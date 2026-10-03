@@ -55,11 +55,13 @@ export function TablePanel({
   title,
   subtitle,
   onDownload,
+  downloadDisabled,
   children,
 }: {
   title: string;
   subtitle: string;
   onDownload: () => void;
+  downloadDisabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -69,7 +71,13 @@ export function TablePanel({
           <h3 className="font-display text-base font-semibold">{title}</h3>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-md" onClick={onDownload}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-md"
+          onClick={onDownload}
+          disabled={downloadDisabled}
+        >
           <Download className="mr-1.5 h-3.5 w-3.5" /> Download
         </Button>
       </div>
