@@ -7,7 +7,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
-  Download,
+  FileDown,
   FileSpreadsheet,
   FileText,
   FileUp,
@@ -19,9 +19,9 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  User,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,42 +37,24 @@ import {
 } from "@/components/ui/select";
 import {
   useAccountsQuery,
-  useAccountStatsQuery,
   CreateAccountEntryDialog,
   EditAccountEntryDialog,
   UploadEntriesDialog,
   DeleteAccountEntryDialog,
-  type AccountEntry,
+  ExportAccountDialog,
+  formatCurrency,
+  formatDate,
+  getCreatorDisplay,
+  type AccountTransaction,
 } from "@/features/accounts";
 
 export const Route = createFileRoute("/admin/accounts")({
-  head: () => ({ meta: [{ title: "Accounts & Ledger — Dimisi" }] }),
+  head: () => ({ meta: [{ title: "Accounts & Financial Ledger — Dimisi" }] }),
   component: AccountsPage,
 });
 
 type SortKey = "date" | "name" | "credit" | "debit" | "balance";
 type SortDir = "asc" | "desc";
-
-const PAGE_SIZE = 8;
-
-function formatCurrency(val: number): string {
-  if (val === 0) return "₹0.00";
-  return `₹${val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-IN", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-}
 
 function SortHeaderButton({
   label,
@@ -100,56 +82,127 @@ function SortHeaderButton({
 }
 
 function AccountsPage() {
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "credit" | "debit" | "uploaded" | "manual">(
-    "all",
-  );
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [typeFilter, setTypeFilter] = useState<"all" | "credit" | "debit">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "uploaded" | "manual">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(1);
 
-  // Dialog state
+  // Dialog states
   const [createOpen, setCreateOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<AccountEntry | null>(null);
-  const [deletingEntry, setDeletingEntry] = useState<AccountEntry | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<AccountTransaction | null>(null);
+  const [deletingEntry, setDeletingEntry] = useState<AccountTransaction | null>(null);
+
+  // Backend Query
+  const isUploadedParam =
+    sourceFilter === "uploaded" ? true : sourceFilter === "manual" ? false : undefined;
 
   const {
-    data: entries = [],
+    data,
     isLoading,
     isError,
     error,
     refetch,
     isRefetching,
   } = useAccountsQuery({
-    query: query || undefined,
+    page,
+    limit,
     type: typeFilter,
+    isUploaded: isUploadedParam,
   });
 
-  const { data: stats } = useAccountStatsQuery();
+  const transactions = data?.transactions || [];
+  const rawPagination = data?.pagination;
+  const totalCount =
+    typeof rawPagination?.total === "number"
+      ? rawPagination.total
+      : typeof rawPagination?.totalRecords === "number"
+        ? rawPagination.totalRecords
+        : transactions.length || 0;
 
-  // Sorting
-  const sortedEntries = useMemo(() => {
-    return [...entries].sort((a, b) => {
+  const totalPages =
+    typeof rawPagination?.totalPages === "number" && rawPagination.totalPages > 0
+      ? rawPagination.totalPages
+      : 1;
+
+  const currentPage =
+    typeof rawPagination?.page === "number" && rawPagination.page > 0
+      ? rawPagination.page
+      : page;
+
+  const hasNext =
+    typeof rawPagination?.hasNext === "boolean"
+      ? rawPagination.hasNext
+      : currentPage < totalPages;
+
+  const hasPrev =
+    typeof rawPagination?.hasPrev === "boolean"
+      ? rawPagination.hasPrev
+      : currentPage > 1;
+
+  const pagination = {
+    page: currentPage,
+    limit: rawPagination?.limit || limit || 10,
+    totalPages,
+    total: totalCount,
+    totalRecords: totalCount,
+    hasNext,
+    hasPrev,
+  };
+
+  // Client-side search filtering if active
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const q = searchQuery.toLowerCase().trim();
+    return transactions.filter((t) => {
+      const party = (t.partyName || "").toLowerCase();
+      const purpose = (t.purpose || "").toLowerCase();
+      const credit = String(t.creditAmount || "");
+      const debit = String(t.debitAmount || "");
+      const balance = String(t.runningBalance || "");
+      const creator = getCreatorDisplay(t.createdBy).toLowerCase();
+      const formattedD = formatDate(t.transactionDate).toLowerCase();
+      return (
+        party.includes(q) ||
+        purpose.includes(q) ||
+        credit.includes(q) ||
+        debit.includes(q) ||
+        balance.includes(q) ||
+        creator.includes(q) ||
+        formattedD.includes(q)
+      );
+    });
+  }, [transactions, searchQuery]);
+
+  // Client-side sorting for current page
+  const sortedTransactions = useMemo(() => {
+    return [...filteredTransactions].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
       if (sortKey === "date") {
-        return (new Date(a.date).getTime() - new Date(b.date).getTime()) * dir;
+        return (
+          (new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()) * dir
+        );
       }
       if (sortKey === "name") {
-        return a.name.localeCompare(b.name) * dir;
+        return (a.partyName || "").localeCompare(b.partyName || "") * dir;
       }
       if (sortKey === "credit") {
-        return (a.credit - b.credit) * dir;
+        return ((a.creditAmount || 0) - (b.creditAmount || 0)) * dir;
       }
       if (sortKey === "debit") {
-        return (a.debit - b.debit) * dir;
+        return ((a.debitAmount || 0) - (b.debitAmount || 0)) * dir;
       }
       if (sortKey === "balance") {
-        return (a.balance - b.balance) * dir;
+        return ((a.runningBalance || 0) - (b.runningBalance || 0)) * dir;
       }
       return 0;
     });
-  }, [entries, sortKey, sortDir]);
+  }, [filteredTransactions, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -158,70 +211,44 @@ function AccountsPage() {
       setSortKey(key);
       setSortDir("desc");
     }
-    setPage(1);
   };
 
-  // Pagination
-  const totalResults = sortedEntries.length;
-  const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedEntries = sortedEntries.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  // Calculate live KPI statistics from the latest fetched data
+  const stats = useMemo(() => {
+    const totalCredit = transactions.reduce(
+      (sum, t) => sum + (Number(t.creditAmount) || 0),
+      0,
+    );
+    const totalDebit = transactions.reduce(
+      (sum, t) => sum + (Number(t.debitAmount) || 0),
+      0,
+    );
+    const latestBalance = transactions.length > 0 ? transactions[0].runningBalance : 0;
+    const uploadedCount = transactions.filter((t) => t.isUploaded).length;
+    const manualCount = transactions.length - uploadedCount;
+
+    return {
+      currentBalance: latestBalance,
+      totalCredit,
+      totalDebit,
+      uploadedCount,
+      manualCount,
+      totalRecords: totalCount,
+    };
+  }, [transactions, totalCount]);
 
   const clearFilters = () => {
-    setQuery("");
+    setSearchQuery("");
     setTypeFilter("all");
+    setSourceFilter("all");
     setPage(1);
-  };
-
-  const handleExport = () => {
-    if (sortedEntries.length === 0) {
-      toast.error("No account entries to export");
-      return;
-    }
-
-    const stamp = new Date().toISOString().slice(0, 10);
-    const COLUMNS = [
-      "Date",
-      "Name / Party",
-      "Credit (₹)",
-      "Debit (₹)",
-      "Balance (₹)",
-      "Reason / Purpose",
-      "Source",
-    ];
-
-    const rows = sortedEntries.map((e) => [
-      e.date,
-      e.name,
-      e.credit,
-      e.debit,
-      e.balance,
-      e.reason,
-      e.isUploaded ? "Uploaded PDF" : "Manual",
-    ]);
-
-    const csvContent = [COLUMNS, ...rows]
-      .map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `accounts-ledger-${stamp}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${sortedEntries.length} account entries to CSV`);
   };
 
   return (
     <>
       <PageHeader
-        title="Accounts & Ledger"
-        subtitle="Manage financial vouchers, credit/debit transactions, and imported statements."
+        title="Accounts & Financial Ledger"
+        subtitle="Manage financial vouchers, credit/debit transactions, and reconciled bank statements."
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -237,12 +264,12 @@ function AccountsPage() {
             <Button
               variant="outline"
               className="rounded-md gap-1.5"
-              onClick={handleExport}
-              disabled={isLoading || sortedEntries.length === 0}
-              title="Export ledger entries to CSV"
+              onClick={() => setExportOpen(true)}
+              disabled={isLoading || pagination.totalRecords === 0}
+              title="Export ledger entries to PDF"
             >
-              <Download className="h-4 w-4 text-primary" />
-              Export
+              <FileDown className="h-4 w-4 text-primary" />
+              Export PDF
             </Button>
             <Button
               variant="outline"
@@ -250,7 +277,7 @@ function AccountsPage() {
               onClick={() => setUploadOpen(true)}
             >
               <FileUp className="h-4 w-4 text-primary" />
-              Upload Entries
+              Upload Statement
             </Button>
             <Button
               className="rounded-md shadow-glow gap-1.5"
@@ -269,13 +296,13 @@ function AccountsPage() {
         <div className="glass flex items-center justify-between rounded-2xl p-5">
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Current Balance
+              Current Ledger Balance
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-foreground">
-              {formatCurrency(stats?.totalBalance ?? 0)}
+              {formatCurrency(stats.currentBalance)}
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              Net running ledger balance
+              Real-time running balance
             </p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -283,17 +310,17 @@ function AccountsPage() {
           </div>
         </div>
 
-        {/* Total Credit */}
+        {/* Total Inflow */}
         <div className="glass flex items-center justify-between rounded-2xl p-5">
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wider text-emerald-500">
               Total Inflow (Credit)
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-emerald-500">
-              {formatCurrency(stats?.totalCredit ?? 0)}
+              {formatCurrency(stats.totalCredit)}
             </h3>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <TrendingUp className="h-3 w-3 text-emerald-500" /> Revenue & Receivables
+              <TrendingUp className="h-3 w-3 text-emerald-500" /> Page revenue & receivables
             </div>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-500/10 text-emerald-500">
@@ -301,17 +328,17 @@ function AccountsPage() {
           </div>
         </div>
 
-        {/* Total Debit */}
+        {/* Total Outflow */}
         <div className="glass flex items-center justify-between rounded-2xl p-5">
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wider text-rose-500">
               Total Outflow (Debit)
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-rose-500">
-              {formatCurrency(stats?.totalDebit ?? 0)}
+              {formatCurrency(stats.totalDebit)}
             </h3>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <TrendingDown className="h-3 w-3 text-rose-500" /> Expenses & Disbursements
+              <TrendingDown className="h-3 w-3 text-rose-500" /> Page expenses & disbursements
             </div>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-rose-500/10 text-rose-500">
@@ -319,18 +346,18 @@ function AccountsPage() {
           </div>
         </div>
 
-        {/* Ledger Entries Breakdown */}
+        {/* Total Ledger Records */}
         <div className="glass flex items-center justify-between rounded-2xl p-5">
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Total Records
+              Total Transactions
             </p>
             <h3 className="font-display text-2xl font-bold tracking-tight text-foreground">
-              {stats?.entryCount ?? 0}
+              {stats.totalRecords.toLocaleString()}
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              <span className="text-primary font-medium">{stats?.uploadedCount ?? 0} PDF</span> ·{" "}
-              {stats?.manualCount ?? 0} manual
+              <span className="text-primary font-medium">{stats.uploadedCount} PDF</span> ·{" "}
+              {stats.manualCount} manual (page)
             </p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -341,43 +368,76 @@ function AccountsPage() {
 
       {/* Filters Bar */}
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center">
+        {/* Search */}
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by party name, purpose, amount, or date..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by party, purpose, amount, or creator..."
             className="h-10 rounded-full border-border/60 bg-background/50 pl-10 text-sm"
           />
         </div>
 
+        {/* Type Filter */}
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={typeFilter}
-            onValueChange={(val: any) => {
+            onValueChange={(val: "all" | "credit" | "debit") => {
               setTypeFilter(val);
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-10 w-[170px] rounded-full border-border/60">
-              <SelectValue placeholder="All entries" />
+            <SelectTrigger className="h-10 w-[150px] rounded-full border-border/60">
+              <SelectValue placeholder="All types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All transactions</SelectItem>
+              <SelectItem value="all">All types</SelectItem>
               <SelectItem value="credit">Credit (+) only</SelectItem>
               <SelectItem value="debit">Debit (-) only</SelectItem>
-              <SelectItem value="uploaded">Uploaded PDF only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Source Filter */}
+          <Select
+            value={sourceFilter}
+            onValueChange={(val: "all" | "uploaded" | "manual") => {
+              setSourceFilter(val);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 w-[160px] rounded-full border-border/60">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="uploaded">Uploaded PDF</SelectItem>
               <SelectItem value="manual">Manual vouchers</SelectItem>
             </SelectContent>
           </Select>
 
-          {(query || typeFilter !== "all") && (
+          {/* Page Size */}
+          <Select
+            value={String(limit)}
+            onValueChange={(val) => {
+              setLimit(Number(val));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 w-[110px] rounded-full border-border/60">
+              <SelectValue placeholder="10 / page" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="20">20 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(searchQuery || typeFilter !== "all" || sourceFilter !== "all") && (
             <Button
               variant="outline"
-              className="h-10 rounded-md text-xs"
+              className="h-10 rounded-full text-xs"
               onClick={clearFilters}
             >
               Clear filters
@@ -386,7 +446,7 @@ function AccountsPage() {
         </div>
       </div>
 
-      {/* Content Area */}
+      {/* Main Content Area */}
       {isLoading ? (
         <div className="glass space-y-3 rounded-2xl p-5">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -404,14 +464,18 @@ function AccountsPage() {
             Retry
           </Button>
         </div>
-      ) : totalResults === 0 ? (
+      ) : sortedTransactions.length === 0 ? (
         <EmptyState
           icon={FileSpreadsheet}
-          title={query || typeFilter !== "all" ? "No matching entries" : "No ledger entries yet"}
+          title={
+            searchQuery || typeFilter !== "all" || sourceFilter !== "all"
+              ? "No matching ledger vouchers"
+              : "No ledger entries recorded yet"
+          }
           description={
-            query || typeFilter !== "all"
-              ? "Try adjusting your search criteria or type filter."
-              : "Click 'Create Entry' or 'Upload Entries' above to add your first financial transaction."
+            searchQuery || typeFilter !== "all" || sourceFilter !== "all"
+              ? "Try adjusting your search criteria or type filters."
+              : "Create your first financial voucher or upload a bank PDF statement to begin reconciliation."
           }
           action={
             <div className="flex gap-2">
@@ -429,10 +493,10 @@ function AccountsPage() {
         <div className="glass overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
             <span>
-              Showing {paginatedEntries.length} of {totalResults} entries
+              Showing {sortedTransactions.length} of {pagination.totalRecords} total records
             </span>
             <span>
-              Page {currentPage} of {totalPages}
+              Page {pagination.page} of {pagination.totalPages}
             </span>
           </div>
 
@@ -442,7 +506,7 @@ function AccountsPage() {
                 <tr>
                   <th className="px-5 py-3 font-medium">
                     <SortHeaderButton
-                      label="Date"
+                      label="Transaction Date"
                       active={sortKey === "date"}
                       dir={sortDir}
                       onClick={() => toggleSort("date")}
@@ -450,12 +514,13 @@ function AccountsPage() {
                   </th>
                   <th className="px-5 py-3 font-medium">
                     <SortHeaderButton
-                      label="Name / Party"
+                      label="Party Name"
                       active={sortKey === "name"}
                       dir={sortDir}
                       onClick={() => toggleSort("name")}
                     />
                   </th>
+                  <th className="px-5 py-3 font-medium">Purpose</th>
                   <th className="px-5 py-3 font-medium text-right">
                     <SortHeaderButton
                       label="Credit (+)"
@@ -474,110 +539,134 @@ function AccountsPage() {
                   </th>
                   <th className="px-5 py-3 font-medium text-right">
                     <SortHeaderButton
-                      label="Balance"
+                      label="Running Balance"
                       active={sortKey === "balance"}
                       dir={sortDir}
                       onClick={() => toggleSort("balance")}
                     />
                   </th>
-                  <th className="px-5 py-3 font-medium">Reason / Purpose</th>
+                  <th className="px-5 py-3 font-medium">Source</th>
+                  <th className="px-5 py-3 font-medium">Created By</th>
                   <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {paginatedEntries.map((entry) => (
-                  <tr
-                    key={entry.id}
-                    className="transition-colors hover:bg-muted/40"
-                  >
-                    {/* Date */}
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground font-sans">
-                      {formatDate(entry.date)}
-                    </td>
+                {sortedTransactions.map((tx) => {
+                  const id = tx._id || tx.id || "";
+                  return (
+                    <tr
+                      key={id}
+                      className="transition-colors hover:bg-muted/40"
+                    >
+                      {/* 1. Transaction Date */}
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground font-sans">
+                        {formatDate(tx.transactionDate)}
+                      </td>
 
-                    {/* Name / Party */}
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{entry.name}</span>
-                        {entry.isUploaded && (
+                      {/* 2. Party Name */}
+                      <td className="px-5 py-3.5">
+                        <span className="font-medium text-foreground">
+                          {tx.partyName || "—"}
+                        </span>
+                      </td>
+
+                      {/* 3. Purpose */}
+                      <td
+                        className="px-5 py-3.5 max-w-[240px] truncate text-muted-foreground text-xs"
+                        title={tx.purpose}
+                      >
+                        {tx.purpose || "—"}
+                      </td>
+
+                      {/* 4. Credit (+) */}
+                      <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
+                        {tx.creditAmount > 0 ? (
+                          <span className="text-emerald-500 font-semibold">
+                            +{formatCurrency(tx.creditAmount)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+
+                      {/* 5. Debit (-) */}
+                      <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
+                        {tx.debitAmount > 0 ? (
+                          <span className="text-rose-500 font-semibold">
+                            -{formatCurrency(tx.debitAmount)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+
+                      {/* 6. Running Balance */}
+                      <td className="px-5 py-3.5 text-right font-mono font-bold text-xs text-foreground">
+                        {formatCurrency(tx.runningBalance)}
+                      </td>
+
+                      {/* 7. Uploaded Status */}
+                      <td className="px-5 py-3.5">
+                        {tx.isUploaded ? (
                           <Badge
                             variant="outline"
                             className="h-5 px-1.5 border-primary/30 bg-primary/10 text-[10px] text-primary"
                             title="Imported from PDF statement"
                           >
-                            <FileText className="mr-0.5 h-2.5 w-2.5" /> PDF
+                            <FileText className="mr-0.5 h-2.5 w-2.5" /> PDF Statement
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="h-5 px-1.5 border-border/60 text-[10px] text-muted-foreground"
+                          >
+                            Manual Voucher
                           </Badge>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Credit (+) */}
-                    <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
-                      {entry.credit > 0 ? (
-                        <span className="text-emerald-500 font-semibold">
-                          +{formatCurrency(entry.credit)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/40">—</span>
-                      )}
-                    </td>
+                      {/* 8. Created By */}
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3 w-3 text-muted-foreground/60" />
+                          <span>{getCreatorDisplay(tx.createdBy)}</span>
+                        </div>
+                      </td>
 
-                    {/* Debit (-) */}
-                    <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
-                      {entry.debit > 0 ? (
-                        <span className="text-rose-500 font-semibold">
-                          -{formatCurrency(entry.debit)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/40">—</span>
-                      )}
-                    </td>
-
-                    {/* Balance */}
-                    <td className="px-5 py-3.5 text-right font-mono font-bold text-xs text-foreground">
-                      {formatCurrency(entry.balance)}
-                    </td>
-
-                    {/* Reason */}
-                    <td
-                      className="px-5 py-3.5 max-w-[260px] truncate text-muted-foreground text-xs"
-                      title={entry.reason}
-                    >
-                      {entry.reason}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                          onClick={() => setEditingEntry(entry)}
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeletingEntry(entry)}
-                        >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* 9. Actions */}
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                            onClick={() => setEditingEntry(tx)}
+                          >
+                            <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeletingEntry(tx)}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          {totalPages > 1 && (
+          {/* Backend Pagination Footer */}
+          {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-border/60 px-5 py-3 text-xs text-muted-foreground">
               <span>
-                Page {currentPage} of {totalPages} ({totalResults} total entries)
+                Page {pagination.page} of {pagination.totalPages} ({pagination.totalRecords} total
+                records)
               </span>
               <div className="flex items-center gap-1.5">
                 <Button
@@ -585,7 +674,7 @@ function AccountsPage() {
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
+                  disabled={!pagination.hasPrev || page <= 1}
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" /> Previous
                 </Button>
@@ -593,8 +682,8 @@ function AccountsPage() {
                   variant="outline"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={!pagination.hasNext || page >= pagination.totalPages}
                 >
                   Next <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
@@ -605,7 +694,10 @@ function AccountsPage() {
       )}
 
       {/* Dialogs */}
-      <CreateAccountEntryDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateAccountEntryDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+      />
 
       <EditAccountEntryDialog
         open={Boolean(editingEntry)}
@@ -615,14 +707,22 @@ function AccountsPage() {
         }}
       />
 
-      <UploadEntriesDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <UploadEntriesDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+      />
 
       <DeleteAccountEntryDialog
         open={Boolean(deletingEntry)}
-        entry={editingEntry ? null : deletingEntry}
+        entry={deletingEntry}
         onOpenChange={(open) => {
           if (!open) setDeletingEntry(null);
         }}
+      />
+
+      <ExportAccountDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
       />
     </>
   );
