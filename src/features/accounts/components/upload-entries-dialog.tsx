@@ -2,16 +2,18 @@ import { useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Clock,
+  Copy,
+  FileCheck,
   FileText,
   FileUp,
   Loader2,
-  Plus,
-  Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -20,59 +22,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useUploadAccountEntries } from "../hooks/use-accounts";
-import type { CreateAccountEntryPayload } from "../types";
+import { useUploadPdfMutation } from "../hooks/accounts.hooks";
+import type { UploadPdfResponse } from "../types/accounts.types";
 
 interface UploadEntriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (response: UploadPdfResponse) => void;
 }
 
-interface ParsedPdfItem {
-  id: string;
-  date: string;
-  name: string;
-  credit: number;
-  debit: number;
-  balance: number;
-  reason: string;
-}
-
-const SAMPLE_EXTRACTED_DATA: Omit<ParsedPdfItem, "id">[] = [
-  {
-    date: "2026-09-24",
-    name: "Enterprise Wire Payout (Stripe Inc)",
-    credit: 215000,
-    debit: 0,
-    balance: 757000,
-    reason: "Monthly subscription auto-settlement payout batch #9842",
-  },
-  {
-    date: "2026-09-23",
-    name: "Cloudflare Enterprise Security",
-    credit: 0,
-    debit: 14500,
-    balance: 542000,
-    reason: "DDoS mitigation & CDN edge network traffic allowance",
-  },
-  {
-    date: "2026-09-21",
-    name: "Anthropic Claude API Services",
-    credit: 0,
-    debit: 9800,
-    balance: 556500,
-    reason: "Claude 3.5 Sonnet processing batch operations",
-  },
-  {
-    date: "2026-09-19",
-    name: "Vanguard Tech Ventures Retainer",
-    credit: 180000,
-    debit: 0,
-    balance: 566300,
-    reason: "Q3 architectural audit milestone delivery invoice #VTV-401",
-  },
-];
+const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export function UploadEntriesDialog({
   open,
@@ -80,80 +40,80 @@ export function UploadEntriesDialog({
   onSuccess,
 }: UploadEntriesDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadMutation = useUploadAccountEntries();
+  const uploadMutation = useUploadPdfMutation();
 
   const [file, setFile] = useState<File | null>(null);
-  const [isParsing, setIsParsing] = useState(false);
-  const [parsedItems, setParsedItems] = useState<ParsedPdfItem[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadResult, setUploadResult] = useState<UploadPdfResponse | null>(null);
 
-  const handleFileSelect = (selectedFile: File) => {
-    if (!selectedFile.name.toLowerCase().endsWith(".pdf")) {
+  const resetDialog = () => {
+    setFile(null);
+    setDragOver(false);
+    setUploadProgress(0);
+    setUploadResult(null);
+  };
+
+  const validateAndSetFile = (selectedFile: File) => {
+    if (
+      !selectedFile.name.toLowerCase().endsWith(".pdf") &&
+      selectedFile.type !== "application/pdf"
+    ) {
       toast.error("Invalid file format", {
-        description: "Please upload a valid PDF bank or ledger statement.",
+        description: "Only PDF bank/ledger statements are supported.",
+      });
+      return;
+    }
+
+    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      toast.error("File exceeds size limit", {
+        description: `Max allowed file size is ${MAX_FILE_SIZE_MB}MB.`,
       });
       return;
     }
 
     setFile(selectedFile);
-    setIsParsing(true);
-
-    // Simulate smart PDF optical/text parsing
-    setTimeout(() => {
-      const generated = SAMPLE_EXTRACTED_DATA.map((item, idx) => ({
-        ...item,
-        id: `extracted-${Date.now()}-${idx}`,
-      }));
-      setParsedItems(generated);
-      setIsParsing(false);
-      toast.success(`Extracted ${generated.length} transactions from PDF`);
-    }, 900);
+    setUploadResult(null);
+    setUploadProgress(0);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+      validateAndSetFile(e.dataTransfer.files[0]);
     }
   };
 
-  const handleDeleteItem = (id: string) => {
-    setParsedItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const resetDialog = () => {
-    setFile(null);
-    setParsedItems([]);
-    setIsParsing(false);
-    setDragOver(false);
-  };
-
-  const handleConfirmImport = async () => {
-    if (parsedItems.length === 0) {
-      toast.error("No entries to import");
+  const handleUpload = async () => {
+    if (!file) {
+      toast.error("Please select a PDF file first");
       return;
     }
 
     try {
-      const payload: CreateAccountEntryPayload[] = parsedItems.map((item) => ({
-        date: item.date,
-        name: item.name,
-        credit: item.credit,
-        debit: item.debit,
-        balance: item.balance,
-        reason: item.reason,
-        isUploaded: true,
-      }));
+      setUploadProgress(10);
+      const res = await uploadMutation.mutateAsync({
+        file,
+        onProgress: (percent) => {
+          setUploadProgress(percent);
+        },
+      });
 
-      await uploadMutation.mutateAsync(payload);
-      toast.success(`Successfully imported ${parsedItems.length} transactions`);
-      resetDialog();
-      onOpenChange(false);
-      onSuccess?.();
+      setUploadProgress(100);
+      setUploadResult(res);
+      toast.success("PDF uploaded successfully and added to processing queue");
+      onSuccess?.(res);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to import entries from PDF");
+      const msg = err?.message || err?.error || "Failed to upload statement PDF";
+      toast.error(msg);
+      setUploadProgress(0);
     }
+  };
+
+  const handleCopyJobId = (jobId: string) => {
+    navigator.clipboard.writeText(jobId);
+    toast.success("Job ID copied to clipboard");
   };
 
   return (
@@ -164,7 +124,7 @@ export function UploadEntriesDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -173,153 +133,178 @@ export function UploadEntriesDialog({
             <DialogTitle className="font-display text-xl">Upload PDF Statement</DialogTitle>
           </div>
           <DialogDescription>
-            Import and reconcile financial vouchers directly from your bank or ERP statements.
+            Upload bank statements or accounting ledgers in PDF format for automated transaction extraction.
           </DialogDescription>
         </DialogHeader>
 
-        {!file ? (
-          /* Dropzone */
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all ${
-              dragOver
-                ? "border-primary bg-primary/10"
-                : "border-border/70 hover:border-primary/60 hover:bg-secondary/20"
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileSelect(e.target.files[0]);
-                }
-              }}
-            />
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-primary">
-              <Upload className="h-6 w-6" />
-            </div>
-            <h4 className="mt-3 text-sm font-semibold text-foreground">
-              Click to select PDF or drag and drop
-            </h4>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Bank statements, e-passbooks, or credit/debit transaction logs (PDF)
-            </p>
-          </div>
-        ) : isParsing ? (
-          /* Parsing Loader */
-          <div className="glass flex flex-col items-center justify-center rounded-xl py-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="mt-3 text-sm font-medium text-foreground">Parsing statement...</p>
-            <p className="text-xs text-muted-foreground">
-              Extracting transaction rows, dates, and amounts
-            </p>
-          </div>
-        ) : (
-          /* Extraction Preview */
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 px-3.5 py-2.5 text-xs">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="font-medium text-foreground">{file.name}</span>
-                <Badge variant="outline" className="border-border/60 text-[10px]">
-                  {(file.size / 1024).toFixed(1)} KB
-                </Badge>
+        {uploadResult ? (
+          /* Success State (202 Accepted) */
+          <div className="space-y-4 py-2">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/20 text-emerald-500">
+                <CheckCircle2 className="h-6 w-6" />
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                onClick={resetDialog}
-              >
-                Change file
-              </Button>
+              <h4 className="mt-3 text-base font-semibold text-foreground">
+                PDF Uploaded Successfully
+              </h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                PDF uploaded successfully and added to processing queue
+              </p>
             </div>
 
-            <div className="max-h-[280px] overflow-y-auto rounded-xl border border-border/60">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-secondary text-muted-foreground font-medium uppercase tracking-wider">
-                  <tr>
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Party / Name</th>
-                    <th className="px-3 py-2">Credit</th>
-                    <th className="px-3 py-2">Debit</th>
-                    <th className="px-3 py-2">Balance</th>
-                    <th className="px-3 py-2 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40 font-mono">
-                  {parsedItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-2 font-sans">{item.date}</td>
-                      <td className="px-3 py-2 font-sans font-medium text-foreground max-w-[160px] truncate">
-                        {item.name}
-                      </td>
-                      <td className="px-3 py-2 text-emerald-500 font-semibold">
-                        {item.credit > 0 ? `₹${item.credit.toLocaleString("en-IN")}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-rose-500 font-semibold">
-                        {item.debit > 0 ? `₹${item.debit.toLocaleString("en-IN")}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-foreground font-bold">
-                        ₹{item.balance.toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-3 py-2 text-right font-sans">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-muted-foreground hover:text-destructive p-1 rounded"
-                          title="Remove item"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Job Metadata Card */}
+            <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Status</span>
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-primary/40 bg-primary/10 text-primary uppercase text-[10px]"
+                >
+                  <Clock className="h-3 w-3 animate-pulse" /> {uploadResult.status || "queued"}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Job Identifier</span>
+                <div className="flex items-center gap-1.5 font-mono text-[11px] text-foreground">
+                  <span>{uploadResult.jobId}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyJobId(uploadResult.jobId)}
+                    className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+                    title="Copy Job ID"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              {uploadResult.message && (
+                <div className="pt-1 text-[11px] text-muted-foreground border-t border-border/40">
+                  {uploadResult.message}
+                </div>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              These transactions will be added as locked records (isUploaded: true).
-            </p>
+          </div>
+        ) : (
+          /* File Selection / Dropzone */
+          <div className="space-y-4 py-1">
+            {!file ? (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+                  dragOver
+                    ? "border-primary bg-primary/10"
+                    : "border-border/70 hover:border-primary/60 hover:bg-secondary/20"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      validateAndSetFile(e.target.files[0]);
+                    }
+                  }}
+                />
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-primary">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <h4 className="mt-3 text-sm font-semibold text-foreground">
+                  Click to select PDF or drag and drop
+                </h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  PDF format only (up to {MAX_FILE_SIZE_MB}MB)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/30 p-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium text-foreground truncate max-w-[240px]">
+                        {file.name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={resetDialog}
+                    disabled={uploadMutation.isPending}
+                  >
+                    Change
+                  </Button>
+                </div>
+
+                {uploadMutation.isPending && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Uploading to queue...</span>
+                      <span className="font-mono font-medium">{uploadProgress}%</span>
+                    </div>
+                    <Progress value={uploadProgress} className="h-2" />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         <DialogFooter className="pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={uploadMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={parsedItems.length === 0 || uploadMutation.isPending}
-            onClick={handleConfirmImport}
-            className="shadow-glow"
-          >
-            {uploadMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Import {parsedItems.length} Entries
-              </>
-            )}
-          </Button>
+          {uploadResult ? (
+            <Button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="shadow-glow w-full sm:w-auto"
+            >
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={uploadMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!file || uploadMutation.isPending}
+                onClick={handleUpload}
+                className="shadow-glow"
+              >
+                {uploadMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading ({uploadProgress}%)...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-1.5 h-4 w-4" /> Upload Statement
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+export { UploadEntriesDialog as UploadAccountPdfDialog };

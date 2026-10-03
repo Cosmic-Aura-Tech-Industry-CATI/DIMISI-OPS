@@ -19,10 +19,12 @@ export function ReportsToolbar({
   range,
   onRangeChange,
   onDownload,
+  disabled,
 }: {
   range: string;
   onRangeChange: (value: string) => void;
   onDownload: (label: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <>
@@ -40,7 +42,7 @@ export function ReportsToolbar({
       </Select>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="rounded-md shadow-glow">
+          <Button className="rounded-md shadow-glow" disabled={disabled}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
         </DropdownMenuTrigger>
@@ -53,6 +55,9 @@ export function ReportsToolbar({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onDownload("PDF")}>
             <FileText className="mr-2 h-4 w-4" /> Download PDF
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onDownload("JSON")}>
+            <FileText className="mr-2 h-4 w-4" /> Download JSON
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

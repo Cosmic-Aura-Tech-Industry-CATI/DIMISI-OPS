@@ -33,10 +33,12 @@ export function DepartmentReportTab({
   rows = [],
   radar = [],
   onDownload,
+  downloadDisabled,
 }: {
   rows?: DepartmentReportRow[];
   radar?: { department: string; Score: number }[];
   onDownload: () => void;
+  downloadDisabled?: boolean;
 }) {
   const headcountData = rows.map((r) => ({
     name: r.department,
@@ -76,8 +78,17 @@ export function DepartmentReportTab({
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={radar}>
               <PolarGrid stroke={GRID_STROKE} />
-              <PolarAngleAxis dataKey="department" tick={{ fill: "oklch(0.75 0 0)", fontSize: 11 }} />
-              <Radar name="Score" dataKey="Score" stroke={ACCENT} fill={ACCENT} fillOpacity={0.35} />
+              <PolarAngleAxis
+                dataKey="department"
+                tick={{ fill: "oklch(0.75 0 0)", fontSize: 11 }}
+              />
+              <Radar
+                name="Score"
+                dataKey="Score"
+                stroke={ACCENT}
+                fill={ACCENT}
+                fillOpacity={0.35}
+              />
               <Tooltip contentStyle={tooltipStyle} />
             </RadarChart>
           </ResponsiveContainer>
@@ -88,6 +99,7 @@ export function DepartmentReportTab({
         title="Department performance"
         subtitle="Aggregated across all employees per department"
         onDownload={onDownload}
+        downloadDisabled={downloadDisabled}
       >
         <Table>
           <TableHeader>
@@ -130,7 +142,11 @@ export function DepartmentReportTab({
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline" className={cn("gap-1", TREND_BADGE)}>
-                        {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {up ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
                         {up ? "+" : "-"}
                         {4 + i}%
                       </Badge>

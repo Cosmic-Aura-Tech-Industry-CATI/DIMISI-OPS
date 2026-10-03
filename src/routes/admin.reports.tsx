@@ -18,7 +18,14 @@ import { TaskReportTab } from "@/components/reports/task-report-tab";
 import { ProjectReportTab } from "@/components/reports/project-report-tab";
 import { DepartmentReportTab } from "@/components/reports/department-report-tab";
 import { useProjectReport, useReportData } from "@/components/reports/use-report-data";
-import { useExportReportMutation, type TimeframeFilter } from "@/features/reports";
+import {
+  useExportReportMutation,
+  reportsService,
+  triggerBlobDownload,
+  triggerUrlDownload,
+  type ReportEstimateData,
+  type TimeframeFilter,
+} from "@/features/reports";
 import { logAudit } from "@/lib/audit-log";
 
 export const Route = createFileRoute("/admin/reports")({
@@ -42,6 +49,7 @@ export const Route = createFileRoute("/admin/reports")({
 function ReportsPage() {
   const [range, setRange] = useState("month");
   const [activeTab, setActiveTab] = useState("employee");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const timeframeMap: Record<string, TimeframeFilter> = {
     week: "weekly",
@@ -66,17 +74,103 @@ function ReportsPage() {
 
   const exportMutation = useExportReportMutation();
 
+  const executeSyncDownload = async (
+    type: "overview" | "employees" | "tasks" | "projects" | "departments",
+    fmt: "csv" | "xlsx" | "pdf" | "json",
+    timeframe: TimeframeFilter,
+    formatName: string,
+    estimate?: ReportEstimateData,
+  ) => {
+    const estTimeText = estimate?.estimatedSeconds ? ` (~${estimate.estimatedSeconds}s)` : "";
+    toast.loading(`Generating ${type} report (${fmt.toUpperCase()}${estTimeText})...`, {
+      id: "report-export",
+    });
+
+    const blob = await exportMutation.mutateAsync({
+      type,
+      format: fmt,
+      timeframe,
+    });
+
+    const fileName = `${type}_report_${timeframe}.${fmt === "xlsx" ? "xlsx" : fmt}`;
+    triggerBlobDownload(blob, fileName);
+
+    logAudit({
+      category: "reports",
+      action: "Exported Report",
+      target: `${type} (${formatName})`,
+      details: `${type} report exported synchronously as ${formatName}.`,
+    });
+
+    toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} report downloaded`, {
+      id: "report-export",
+    });
+  };
+
+  const executeAsyncDownload = async (
+    type: "overview" | "employees" | "tasks" | "projects" | "departments",
+    fmt: "csv" | "xlsx" | "pdf" | "json",
+    timeframe: TimeframeFilter,
+    formatName: string,
+  ) => {
+    toast.loading(`Queueing ${type} report export job (${fmt.toUpperCase()})...`, {
+      id: "report-export",
+    });
+
+    const job = await reportsService.createDownloadJob(type, fmt, timeframe);
+    const jobId = job.jobId || (job as unknown as { data?: { jobId?: string } })?.data?.jobId;
+
+    if (!jobId) {
+      throw new Error("Unable to initialize async report download job.");
+    }
+
+    toast.loading(`Generating ${type} report in background...`, {
+      id: "report-export",
+    });
+
+    const result = await reportsService.pollDownloadJob(jobId, (status) => {
+      if (status.progress && status.progress > 0) {
+        toast.loading(`Generating ${type} report (${status.progress}%)...`, {
+          id: "report-export",
+        });
+      }
+    });
+
+    if (result.downloadUrl) {
+      const fileName = `${type}_report_${timeframe}.${fmt === "xlsx" ? "xlsx" : fmt}`;
+      triggerUrlDownload(result.downloadUrl, fileName);
+
+      logAudit({
+        category: "reports",
+        action: "Exported Report",
+        target: `${type} (${formatName})`,
+        details: `${type} report exported asynchronously via queue as ${formatName}.`,
+      });
+
+      toast.success(
+        `${type.charAt(0).toUpperCase() + type.slice(1)} report generated and downloading`,
+        {
+          id: "report-export",
+        },
+      );
+    }
+  };
+
   const handleDownload = async (
     formatName: string,
     specificType?: "overview" | "employees" | "tasks" | "projects" | "departments",
   ) => {
-    const fmt = formatName.toLowerCase().includes("csv")
-      ? "csv"
-      : formatName.toLowerCase().includes("excel") || formatName.toLowerCase().includes("xlsx")
-        ? "xlsx"
-        : formatName.toLowerCase().includes("pdf")
-          ? "pdf"
-          : "json";
+    if (isDownloading) return;
+
+    const fmt = (
+      formatName.toLowerCase().includes("csv")
+        ? "csv"
+        : formatName.toLowerCase().includes("excel") || formatName.toLowerCase().includes("xlsx")
+          ? "xlsx"
+          : formatName.toLowerCase().includes("pdf")
+            ? "pdf"
+            : "json"
+    ) as "csv" | "xlsx" | "pdf" | "json";
 
     const type =
       specificType ||
@@ -90,41 +184,39 @@ function ReportsPage() {
               ? "departments"
               : "overview");
 
+    setIsDownloading(true);
+
     try {
-      toast.loading(`Generating ${type} report (${fmt.toUpperCase()})...`, {
-        id: "report-export",
-      });
+      let recommendation: "sync" | "async" = "async";
+      let estimateData: ReportEstimateData | undefined;
 
-      const blob = await exportMutation.mutateAsync({
-        type,
-        format: fmt as any,
-        timeframe: selectedTimeframe,
-      });
+      try {
+        const estimate = await reportsService.getEstimate(type, fmt, selectedTimeframe);
+        estimateData = estimate;
+        const rec =
+          (estimate as unknown as { data?: { recommended?: "sync" | "async" } })?.data
+            ?.recommended || estimate?.recommended;
+        if (rec === "sync" || rec === "async") {
+          recommendation = rec;
+        }
+      } catch {
+        recommendation = "async";
+      }
 
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${type}_report_${selectedTimeframe}.${fmt === "xlsx" ? "xlsx" : fmt}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      logAudit({
-        category: "reports",
-        action: "Exported Report",
-        target: `${type} (${formatName})`,
-        details: `${type} report exported as ${formatName}.`,
-      });
-
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} report downloaded`, {
-        id: "report-export",
-      });
-    } catch (err: any) {
+      if (recommendation === "sync") {
+        await executeSyncDownload(type, fmt, selectedTimeframe, formatName, estimateData);
+      } else {
+        await executeAsyncDownload(type, fmt, selectedTimeframe, formatName);
+      }
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { message?: string })?.message || "Export service encountered an issue";
       toast.error("Failed to export report", {
         id: "report-export",
-        description: err?.message || "Export service encountered an issue",
+        description: errorMsg,
       });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -138,6 +230,7 @@ function ReportsPage() {
             range={range}
             onRangeChange={setRange}
             onDownload={(fmt) => handleDownload(fmt)}
+            disabled={isDownloading}
           />
         }
       />
@@ -200,6 +293,7 @@ function ReportsPage() {
           <EmployeeReportTab
             rows={employeeReport}
             onDownload={() => handleDownload("CSV", "employees")}
+            downloadDisabled={isDownloading}
           />
         </TabsContent>
 
@@ -208,6 +302,7 @@ function ReportsPage() {
             buckets={taskReport}
             tasks={tasksForTab}
             onDownload={() => handleDownload("CSV", "tasks")}
+            downloadDisabled={isDownloading}
           />
         </TabsContent>
 
@@ -215,6 +310,7 @@ function ReportsPage() {
           <ProjectReportTab
             rows={projectReport}
             onDownload={() => handleDownload("CSV", "projects")}
+            downloadDisabled={isDownloading}
           />
         </TabsContent>
 
@@ -223,6 +319,7 @@ function ReportsPage() {
             rows={departmentReport}
             radar={departmentRadar}
             onDownload={() => handleDownload("CSV", "departments")}
+            downloadDisabled={isDownloading}
           />
         </TabsContent>
       </Tabs>

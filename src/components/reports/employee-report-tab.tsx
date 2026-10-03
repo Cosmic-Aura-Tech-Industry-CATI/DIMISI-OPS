@@ -13,15 +13,18 @@ import type { EmployeeReportRow } from "./use-report-data";
 export function EmployeeReportTab({
   rows,
   onDownload,
+  downloadDisabled,
 }: {
   rows: EmployeeReportRow[];
   onDownload: () => void;
+  downloadDisabled?: boolean;
 }) {
   return (
     <TablePanel
       title="Employee performance"
       subtitle="Ranked by points earned"
       onDownload={onDownload}
+      downloadDisabled={downloadDisabled}
     >
       <Table>
         <TableHeader>
