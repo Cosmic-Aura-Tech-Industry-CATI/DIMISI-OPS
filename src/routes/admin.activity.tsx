@@ -15,12 +15,17 @@ import {
   Search,
   Filter,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -52,6 +57,8 @@ export const Route = createFileRoute("/admin/activity")({
   }),
   component: ActivityPage,
 });
+
+const PAGE_SIZE = 10;
 
 type EventType =
   | "task_assigned"
@@ -284,13 +291,22 @@ function ActivityPage() {
   const { user } = useAuth();
   const isDirector = String(user?.role || "").toLowerCase() === "director";
 
+  const [page, setPage] = useState<number>(1);
   const [range, setRange] = useState<RangeKey>("all");
   const [employee, setEmployee] = useState<string>("all");
   const [type, setType] = useState<string>("all");
   const [search, setSearch] = useState("");
 
-  const adminQuery = useAdminActivityQuery({ limit: 100 });
-  const orgQuery = useOrgActivityQuery({ limit: 100 });
+  const adminQuery = useAdminActivityQuery({
+    page,
+    limit: PAGE_SIZE,
+    entityType: type !== "all" ? type : undefined,
+  });
+  const orgQuery = useOrgActivityQuery({
+    page,
+    limit: PAGE_SIZE,
+    entityType: type !== "all" ? type : undefined,
+  });
   const employeesQuery = useEmployeesQuery();
 
   const activeQuery = isDirector ? orgQuery : adminQuery;
@@ -365,6 +381,7 @@ function ActivityPage() {
     }));
   }, [rawLogs, auditLogs]);
 
+  // Client-side filtering across active events
   const filtered = useMemo(() => {
     return events
       .filter((e) => withinRange(e.timestamp, range))
@@ -382,24 +399,71 @@ function ActivityPage() {
       .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
   }, [events, range, employee, type, search]);
 
+  // Determine pagination bounds (respecting API pagination or fallback client slice)
+  const isApiPaginated = Boolean(
+    activeQuery.data &&
+    !Array.isArray(activeQuery.data) &&
+    typeof activeQuery.data === "object" &&
+    (activeQuery.data.totalPages || activeQuery.data.total)
+  );
+
+  const totalRecords = isApiPaginated
+    ? activeQuery.data?.total ?? filtered.length
+    : filtered.length;
+
+  const totalPages = isApiPaginated
+    ? Math.max(1, activeQuery.data?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE))
+    : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  const currentPage = Math.min(page, totalPages);
+
+  // If server-side paginated, records in `filtered` are already 10 records for current page;
+  // otherwise, slice locally to guarantee exactly 10 records per page.
+  const displaySlice = useMemo(() => {
+    if (isApiPaginated && rawLogs.length > 0) {
+      return filtered;
+    }
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [isApiPaginated, rawLogs.length, filtered, currentPage]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, ActivityEvent[]>();
-    for (const ev of filtered) {
+    for (const ev of displaySlice) {
       const k = dayLabel(ev.timestamp);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(ev);
     }
     return Array.from(map.entries());
-  }, [filtered]);
+  }, [displaySlice]);
 
   const totals = useMemo(() => {
     return {
-      total: filtered.length,
+      total: totalRecords,
       approvals: filtered.filter((e) => e.type.includes("approved")).length,
       assignments: filtered.filter((e) => e.type.includes("assigned")).length,
       logins: filtered.filter((e) => e.type.includes("login")).length,
     };
-  }, [filtered]);
+  }, [totalRecords, filtered]);
+
+  const handleRangeChange = (v: string) => {
+    setRange(v as RangeKey);
+    setPage(1);
+  };
+
+  const handleEmployeeChange = (v: string) => {
+    setEmployee(v);
+    setPage(1);
+  };
+
+  const handleTypeChange = (v: string) => {
+    setType(v);
+    setPage(1);
+  };
+
+  const handleSearchChange = (v: string) => {
+    setSearch(v);
+    setPage(1);
+  };
 
   return (
     <>
@@ -439,7 +503,7 @@ function ActivityPage() {
 
       {/* Filters */}
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center lg:justify-between">
-        <Tabs value={range} onValueChange={(v) => setRange(v as RangeKey)}>
+        <Tabs value={range} onValueChange={handleRangeChange}>
           <TabsList>
             <TabsTrigger value="today">Today</TabsTrigger>
             <TabsTrigger value="week">Week</TabsTrigger>
@@ -452,12 +516,12 @@ function ActivityPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search activity"
               className="pl-9 sm:w-56"
             />
           </div>
-          <Select value={employee} onValueChange={setEmployee}>
+          <Select value={employee} onValueChange={handleEmployeeChange}>
             <SelectTrigger className="sm:w-48">
               <SelectValue placeholder="Employee" />
             </SelectTrigger>
@@ -470,7 +534,7 @@ function ActivityPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={type} onValueChange={setType}>
+          <Select value={type} onValueChange={handleTypeChange}>
             <SelectTrigger className="sm:w-44">
               <Filter className="mr-2 h-3.5 w-3.5" />
               <SelectValue placeholder="Event type" />
@@ -490,83 +554,155 @@ function ActivityPage() {
       {/* Timeline */}
       <div className="glass rounded-2xl p-6">
         {activeQuery.isLoading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">
-            Loading activity stream…
+          <div className="space-y-4 py-8">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex gap-4">
+                <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/3 rounded" />
+                  <Skeleton className="h-4 w-2/3 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : activeQuery.isError ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <h3 className="font-semibold text-destructive">Failed to load activity logs</h3>
+            <p className="text-sm text-muted-foreground">
+              {(activeQuery.error as any)?.message || "An unexpected error occurred while fetching activity."}
+            </p>
+            <Button variant="outline" onClick={() => void activeQuery.refetch()}>
+              Retry
+            </Button>
           </div>
         ) : grouped.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             No activity records found for the selected filters.
           </div>
         ) : (
-          grouped.map(([label, list]) => (
-            <div key={label} className="mb-8 last:mb-0">
-              <div className="mb-4 flex items-center gap-3">
-                <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {label}
-                </h3>
-                <Badge variant="outline" className="border-border/60">
-                  {list.length}
-                </Badge>
-                <div className="h-px flex-1 bg-border/60" />
-              </div>
+          <>
+            {grouped.map(([label, list]) => (
+              <div key={label} className="mb-8 last:mb-0">
+                <div className="mb-4 flex items-center gap-3">
+                  <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    {label}
+                  </h3>
+                  <Badge variant="outline" className="border-border/60">
+                    {list.length}
+                  </Badge>
+                  <div className="h-px flex-1 bg-border/60" />
+                </div>
 
-              <ol className="relative space-y-4">
-                <div className="absolute bottom-2 left-6.75 top-2 w-px bg-linear-to-b from-primary/40 via-border to-transparent" />
-                {list.map((ev, idx) => {
-                  const m = meta[ev.type] || defaultMeta;
-                  return (
-                    <li
-                      key={ev.id}
-                      className="relative flex gap-4 animate-in fade-in slide-in-from-bottom-1"
-                      style={{ animationDelay: `${idx * 40}ms` }}
-                    >
-                      <div
-                        className={cn(
-                          "relative z-10 grid h-14 w-14 shrink-0 place-items-center rounded-2xl ring-4 ring-background",
-                          m.tone,
-                        )}
+                <ol className="relative space-y-4">
+                  <div className="absolute bottom-2 left-6.75 top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
+                  {list.map((ev, idx) => {
+                    const m = meta[ev.type] || defaultMeta;
+                    return (
+                      <li
+                        key={ev.id}
+                        className="relative flex gap-4 animate-in fade-in slide-in-from-bottom-1"
+                        style={{ animationDelay: `${idx * 40}ms` }}
                       >
-                        <m.Icon className="h-5 w-5" />
-                      </div>
-                      <div
-                        className={cn(
-                          "min-w-0 flex-1 rounded-2xl border border-border/40 bg-card/60 p-4 transition-colors hover:border-primary/30",
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "border-border/40 text-[10px] uppercase tracking-widest",
-                              m.tone,
-                            )}
-                          >
-                            {m.label}
-                          </Badge>
-                          <span className="ml-auto text-xs text-muted-foreground">
-                            {formatWhen(ev.timestamp)}
-                          </span>
+                        <div
+                          className={cn(
+                            "relative z-10 grid h-14 w-14 shrink-0 place-items-center rounded-2xl ring-4 ring-background",
+                            m.tone,
+                          )}
+                        >
+                          <m.Icon className="h-5 w-5" />
                         </div>
-                        <div className="mt-2 flex items-center gap-2 text-sm">
-                          <div className="grid h-6 w-6 place-items-center rounded-full bg-linear-to-br from-primary/30 to-accent text-[10px] font-semibold">
-                            {ev.actorAvatar}
+                        <div
+                          className={cn(
+                            "min-w-0 flex-1 rounded-2xl border border-border/40 bg-card/60 p-4 transition-colors hover:border-primary/30",
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "border-border/40 text-[10px] uppercase tracking-widest",
+                                m.tone,
+                              )}
+                            >
+                              {m.label}
+                            </Badge>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {formatWhen(ev.timestamp)}
+                            </span>
                           </div>
-                          <span className="font-medium">{ev.actor}</span>
-                          <span className="text-muted-foreground">·</span>
-                          <span className="truncate font-medium text-foreground/90">
-                            {ev.target}
-                          </span>
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            <div className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[10px] font-semibold">
+                              {ev.actorAvatar}
+                            </div>
+                            <span className="font-medium">{ev.actor}</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="truncate font-medium text-foreground/90">
+                              {ev.target}
+                            </span>
+                          </div>
+                          {ev.detail && (
+                            <p className="mt-1.5 text-xs text-muted-foreground">{ev.detail}</p>
+                          )}
                         </div>
-                        {ev.detail && (
-                          <p className="mt-1.5 text-xs text-muted-foreground">{ev.detail}</p>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            ))}
+
+            {/* Pagination Controls (10 records per view) */}
+            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row">
+              <span className="text-xs text-muted-foreground">
+                Showing {displaySlice.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–
+                {Math.min((currentPage - 1) * PAGE_SIZE + displaySlice.length, totalRecords)} of {totalRecords} events
+                (Page {currentPage} of {totalPages})
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  disabled={currentPage <= 1 || activeQuery.isFetching}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-label="Previous Page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages })
+                  .slice(0, 5)
+                  .map((_, i) => {
+                    const n = i + 1;
+                    return (
+                      <Button
+                        key={n}
+                        variant={n === currentPage ? "default" : "outline"}
+                        size="sm"
+                        className="h-8 w-8 rounded-full p-0 text-xs"
+                        disabled={activeQuery.isFetching}
+                        onClick={() => setPage(n)}
+                      >
+                        {n}
+                      </Button>
+                    );
+                  })}
+                {totalPages > 5 && (
+                  <span className="px-1 text-xs text-muted-foreground">…</span>
+                )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  disabled={currentPage >= totalPages || activeQuery.isFetching}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label="Next Page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          ))
+          </>
         )}
       </div>
     </>

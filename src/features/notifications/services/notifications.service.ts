@@ -1,5 +1,4 @@
-/** API services for the notifications module (Real database integration, zero demo data). */
-import { http } from "@/api/client/client";
+import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import type { NotificationItem } from "../types";
 
@@ -9,17 +8,24 @@ export const notificationsService = {
    */
   getNotifications: async (): Promise<NotificationItem[]> => {
     try {
-      const res = await http.get<any>(API_ENDPOINTS.notifications.list);
+      const res = await apiClient.get<any>(API_ENDPOINTS.notifications.list);
+      const raw = res.data;
       let items: any[] = [];
 
-      if (Array.isArray(res)) {
-        items = res;
-      } else if (res?.data && Array.isArray(res.data)) {
-        items = res.data;
-      } else if (res?.notifications && Array.isArray(res.notifications)) {
-        items = res.notifications;
-      } else if (res?.data?.notifications && Array.isArray(res.data.notifications)) {
-        items = res.data.notifications;
+      if (Array.isArray(raw)) {
+        items = raw;
+      } else if (raw && typeof raw === "object") {
+        if (Array.isArray(raw.data)) {
+          items = raw.data;
+        } else if (Array.isArray(raw.notifications)) {
+          items = raw.notifications;
+        } else if (raw.data && typeof raw.data === "object") {
+          if (Array.isArray(raw.data.notifications)) {
+            items = raw.data.notifications;
+          } else if (Array.isArray(raw.data.data)) {
+            items = raw.data.data;
+          }
+        }
       }
 
       return items.map((item: any) => ({

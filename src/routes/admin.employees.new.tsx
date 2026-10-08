@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, Loader2, Save, UserPlus } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Loader2, RotateCcw, Save, UserPlus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { AccountCreatedDialog } from "@/components/account-created-dialog";
 import {
@@ -22,6 +23,7 @@ import {
 import { isStrongPassword } from "@/lib/password";
 import { useDepartmentsQuery, useDesignationsByDepartmentQuery } from "@/features/departments";
 import { authService } from "@/auth/services/auth.service";
+import { queryKeys } from "@/api/client/query-keys";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/employees/new")({
@@ -39,6 +41,7 @@ export const Route = createFileRoute("/admin/employees/new")({
   component: NewEmployeePage,
 });
 
+const DRAFT_KEY = "dimisi:create-employee:draft";
 const today = () => new Date().toISOString().slice(0, 10);
 
 const blank = {
@@ -55,17 +58,97 @@ const blank = {
 
 function NewEmployeePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: departments = [] } = useDepartmentsQuery();
 
   const [form, setForm] = useState(blank);
+  const [hasDraft, setHasDraft] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<{ name: string; code: string; email: string } | null>(null);
+  const isHydratedRef = useRef(false);
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          const safeDraft = {
+            name: typeof parsed.name === "string" ? parsed.name : "",
+            email: typeof parsed.email === "string" ? parsed.email : "",
+            password: "",
+            confirm: "",
+            departmentId: typeof parsed.departmentId === "string" ? parsed.departmentId : "",
+            designationId: typeof parsed.designationId === "string" ? parsed.designationId : "",
+            joinedAt: typeof parsed.joinedAt === "string" && parsed.joinedAt ? parsed.joinedAt : today(),
+            phone: typeof parsed.phone === "string" ? parsed.phone : "",
+            about: typeof parsed.about === "string" ? parsed.about : "",
+          };
+          const hasContent = Boolean(
+            safeDraft.name ||
+            safeDraft.email ||
+            safeDraft.departmentId ||
+            safeDraft.designationId ||
+            safeDraft.phone
+          );
+          if (hasContent) {
+            setForm(safeDraft);
+            setHasDraft(true);
+            toast.info("Draft restored", {
+              description: "Restored unsaved employee information.",
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignore corrupted draft
+    } finally {
+      isHydratedRef.current = true;
+    }
+  }, []);
+
+  // Debounced auto-save draft on changes (excluding passwords)
+  useEffect(() => {
+    if (!isHydratedRef.current || submitting) return;
+
+    const timer = setTimeout(() => {
+      const { name, email, departmentId, designationId, joinedAt, phone, about } = form;
+      const hasContent = Boolean(name || email || departmentId || designationId || phone || about);
+      if (hasContent) {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ name, email, departmentId, designationId, joinedAt, phone, about })
+        );
+        setHasDraft(true);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [form, submitting]);
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setForm({ ...blank, joinedAt: today() });
+    setHasDraft(false);
+    setErrors({});
+    toast.info("Draft discarded");
+  };
 
   const { data: designations = [] } = useDesignationsByDepartmentQuery(form.departmentId);
 
-  const set = <K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) =>
+  const set = <K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
+    setErrors((prev) => {
+      if (!prev[k] && !(k === "designationId" && prev.jobTitle) && !(k === "departmentId" && prev.department)) return prev;
+      const next = { ...prev };
+      delete next[k];
+      if (k === "designationId") delete next.jobTitle;
+      if (k === "departmentId") delete next.department;
+      return next;
+    });
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -89,7 +172,7 @@ function NewEmployeePage() {
     setSubmitting(true);
 
     try {
-      const res: any = await authService.createUser({
+      const res = await authService.createUser({
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
@@ -100,15 +183,26 @@ function NewEmployeePage() {
         joinDate: form.joinedAt,
       });
 
-      const user = res?.user || res;
+      const user = res.user;
+      // Invalidate queries so new employee appears in list immediately
+      await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admins.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+
+      // Clear draft upon successful creation
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
+
       toast.success("Employee account created successfully");
       setCreated({
-        name: user?.name || form.name,
-        code: user?.empId || user?.code || user?._id || user?.id || "",
-        email: user?.email || form.email,
+        name: user.name || form.name,
+        code: user.empId || user.code || user._id || user.id || "",
+        email: user.email || form.email,
       });
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to create employee account");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || "Failed to create employee account";
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -232,27 +326,43 @@ function NewEmployeePage() {
           <PasswordStrength value={form.password} />
         </section>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-4 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-md"
-            onClick={() => navigate({ to: "/admin/employees" })}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" className="rounded-md" disabled={submitting}>
-            {submitting ? (
-              <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Creating...
-              </>
-            ) : (
-              <>
-                <Save className="mr-1.5 h-4 w-4" /> Create employee
-              </>
+        <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-4 sm:flex-row sm:justify-between sm:items-center">
+          <div>
+            {hasDraft && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={discardDraft}
+                disabled={submitting}
+                className="text-xs text-muted-foreground hover:text-destructive"
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Discard draft
+              </Button>
             )}
-          </Button>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-md"
+              onClick={() => navigate({ to: "/admin/employees" })}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="rounded-md" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Creating...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-1.5 h-4 w-4" /> Create employee
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
 
@@ -270,6 +380,8 @@ function NewEmployeePage() {
           setCreated(null);
           setForm({ ...blank, joinedAt: today() });
           setErrors({});
+          localStorage.removeItem(DRAFT_KEY);
+          setHasDraft(false);
         }}
       />
     </>

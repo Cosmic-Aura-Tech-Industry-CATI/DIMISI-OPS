@@ -4,10 +4,22 @@ import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 import { cn } from "@/lib/utils";
 
+export interface AdminLeaderboardSearch {
+  period?: "weekly" | "monthly" | "yearly";
+}
+
 export const Route = createFileRoute("/admin/leaderboard")({
+  validateSearch: (search: Record<string, unknown>): AdminLeaderboardSearch => {
+    const p = search.period as string;
+    if (p === "weekly" || p === "yearly") {
+      return { period: p };
+    }
+    return { period: "monthly" };
+  },
   head: () => ({
     meta: [
       { title: "Leaderboard — Dimisi" },
@@ -18,6 +30,14 @@ export const Route = createFileRoute("/admin/leaderboard")({
   }),
   component: LeaderboardPage,
 });
+
+type Range = "weekly" | "monthly" | "yearly";
+
+const rangeMultiplier: Record<Range, number> = {
+  weekly: 0.18,
+  monthly: 0.6,
+  yearly: 1,
+};
 
 const podium = [Trophy, Medal, Award];
 const podiumColor = [
@@ -36,7 +56,20 @@ function initials(name: string) {
 }
 
 function LeaderboardPage() {
+  const navigate = Route.useNavigate();
+  const searchParams = Route.useSearch();
+  const range: Range = searchParams.period === "weekly" || searchParams.period === "yearly" ? searchParams.period : "monthly";
+
   const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
+
+  const handleRangeChange = (newRange: Range) => {
+    navigate({
+      search: (prev: Record<string, unknown>) => ({ ...prev, period: newRange }),
+      replace: true,
+    });
+  };
+
+  const mult = rangeMultiplier[range] || 1;
 
   const leaderboard = rawLeaderboard.map((item, index) => {
     const deptName =
@@ -45,6 +78,8 @@ function LeaderboardPage() {
         : (item.department as string) || "General";
 
     const codeStr = String(item.empId || item.code || "—");
+    const rawPoints = item.points ?? 0;
+    const scaledPoints = range === "yearly" ? rawPoints : Math.round(rawPoints * mult);
 
     return {
       id: String(item._id || index),
@@ -52,7 +87,7 @@ function LeaderboardPage() {
       code: codeStr,
       department: deptName,
       avatar: initials(item.name || "Employee"),
-      points: item.points ?? 0,
+      points: scaledPoints,
       tasksCompleted: (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0,
       rank: index + 1,
     };
@@ -63,7 +98,16 @@ function LeaderboardPage() {
 
   return (
     <>
-      <PageHeader title="Leaderboard" subtitle="The top performers, powered by points." />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader title="Leaderboard" subtitle="The top performers, powered by points." />
+        <Tabs value={range} onValueChange={(v) => handleRangeChange(v as Range)}>
+          <TabsList>
+            <TabsTrigger value="weekly">Weekly</TabsTrigger>
+            <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            <TabsTrigger value="yearly">Yearly</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
       {isLoading ? (
         <div className="space-y-6">
