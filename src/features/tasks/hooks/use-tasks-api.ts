@@ -144,6 +144,10 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
   void queryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
 }
 
 /**
@@ -206,13 +210,18 @@ export const useRequestTask = useRequestTaskMutation;
 /**
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
+type SubmitTaskVariables =
+  | { id: string; notes?: string }
+  | { id: string; payload?: SubmitTaskPayload }
+  | string;
+
 export function useSubmitTaskMutation(
-  options?: UseMutationOptions<Task, ApiError, { id: string; notes?: string } | { id: string; payload?: SubmitTaskPayload } | string>,
+  options?: UseMutationOptions<Task, ApiError, SubmitTaskVariables>,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation<Task, ApiError, any>({
-    mutationFn: (variables: { id: string; notes?: string } | { id: string; payload?: SubmitTaskPayload } | string) => {
+  return useMutation<Task, ApiError, SubmitTaskVariables>({
+    mutationFn: (variables: SubmitTaskVariables) => {
       const id = typeof variables === "string" ? variables : variables.id;
       const notes =
         typeof variables === "string"

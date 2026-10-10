@@ -98,6 +98,9 @@ export function useCreateUser(options?: MutationOpts<CreateUserResponse, CreateU
     mutationFn: (payload) => authService.createUser(payload),
     ...options,
     onSuccess: (...args) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admins.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       void queryClient.invalidateQueries({ queryKey: ["users"] });
       options?.onSuccess?.(...args);
     },

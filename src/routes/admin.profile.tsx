@@ -55,8 +55,19 @@ function AdminProfilePage() {
       avatar.startsWith("http") ||
       avatar.startsWith("/") ||
       avatar.includes("/");
-    const phone = user?.phone || "+1 (555) 214-8890";
-    const joinDate = user?.joinDate || "Jan 15, 2024";
+    const phone = user?.phone || "—";
+    const rawJoin = user?.joinDate || (user as any)?.createdAt;
+    let joinDate = "—";
+    if (rawJoin) {
+      try {
+        const d = new Date(rawJoin);
+        if (!isNaN(d.getTime())) {
+          joinDate = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+        }
+      } catch {
+        joinDate = "—";
+      }
+    }
 
     return {
       name,

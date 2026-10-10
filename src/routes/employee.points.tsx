@@ -35,22 +35,6 @@ function PointsPage() {
   const { data: tasks = [] } = useTasksQuery();
   const { data: analytics } = useEmployeeProgressAnalyticsQuery();
 
-  const userRankIndex = leaderboard.findIndex((l) => {
-    return (
-      (currentUserId && (l.id === currentUserId || (l as any)._id === currentUserId)) ||
-      (auth.user?.email && (l as any).email === auth.user.email) ||
-      (auth.user?.name && l.name === auth.user.name)
-    );
-  });
-  const rank = userRankIndex >= 0 ? `${userRankIndex + 1}` : "—";
-
-  const points = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? (analytics?.monthlyPerformance?.totalPoints || 0);
-  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
-
-  const nextTier = tiers.find((t) => t.min > points) ?? tiers[tiers.length - 1];
-  const currentTier = [...tiers].reverse().find((t) => points >= t.min) || tiers[0];
-  const progress = Math.min(100, Math.round(((points - currentTier.min) / Math.max(1, nextTier.min - currentTier.min)) * 100));
-
   const recent = useMemo(() => {
     return tasks.filter((t) => {
       const isMine =
@@ -60,6 +44,48 @@ function PointsPage() {
       return isMine && (t.status === "completed" || (t.status as string) === "Completed");
     });
   }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+
+  const completedTasksPoints = useMemo(() => {
+    return recent.reduce((sum, t) => {
+      const rec = t as unknown as Record<string, unknown>;
+      const pt = typeof t.points === "number" ? t.points : typeof rec.rewardPoints === "number" ? (rec.rewardPoints as number) : 0;
+      return sum + pt;
+    }, 0);
+  }, [recent]);
+
+  const userRankIndex = leaderboard.findIndex((item) => {
+    const l = item as Record<string, unknown>;
+    const lId = String(l.id || l._id || "");
+    const lCode = String(l.empId || l.code || "");
+    const lEmail = String(l.email || "").toLowerCase();
+    const lName = String(l.name || "").toLowerCase();
+    return (
+      (currentUserId && (lId === currentUserId || lCode === currentUserId)) ||
+      (auth.user?.email && lEmail === auth.user.email.toLowerCase()) ||
+      (auth.user?.name && lName === auth.user.name.toLowerCase())
+    );
+  });
+  const rank = userRankIndex >= 0 ? `${userRankIndex + 1}` : "—";
+  const leaderboardUser = userRankIndex >= 0 ? leaderboard[userRankIndex] : null;
+
+  const points = useMemo(() => {
+    const userRec = auth.user as unknown as Record<string, unknown> | null;
+    const fromAuth = typeof userRec?.points === "number" ? (userRec.points as number) : typeof userRec?.rewardPoints === "number" ? (userRec.rewardPoints as number) : undefined;
+    const fromLeaderboard = leaderboardUser?.points;
+    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints].filter(
+      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0
+    );
+    if (candidates.length > 0) {
+      return Math.max(...candidates);
+    }
+    return fromAuth ?? (analytics?.monthlyPerformance?.totalPoints || 0);
+  }, [auth.user, leaderboardUser, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints]);
+
+  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+
+  const nextTier = tiers.find((t) => t.min > points) ?? tiers[tiers.length - 1];
+  const currentTier = [...tiers].reverse().find((t) => points >= t.min) || tiers[0];
+  const progress = Math.min(100, Math.round(((points - currentTier.min) / Math.max(1, nextTier.min - currentTier.min)) * 100));
 
   return (
     <>
