@@ -9,11 +9,12 @@ import {
   CheckCircle2,
   Clock,
   TrendingUp,
-  MapPin,
   Phone,
   Briefcase,
   AlertCircle,
   Loader2,
+  Shield,
+  Layers,
 } from "lucide-react";
 import {
   AreaChart,
@@ -39,17 +40,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusBadge } from "@/components/status-badge";
-import {
-  currentEmployee,
-  tasks as mockTasks,
-  performanceTrend as mockPerformanceTrend,
-} from "@/lib/mock-data";
+import { TaskStatusBadge } from "@/components/task-status-badge";
 import { useAuth } from "@/lib/auth";
 import { useEditableProfile } from "@/lib/profile-store";
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { useDepartmentsQuery } from "@/features/departments";
 import { useTasksQuery } from "@/features/tasks";
+import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 import { cn } from "@/lib/utils";
 
 // ==========================================
@@ -84,13 +82,14 @@ export interface TaskEntity {
   _id?: string;
   title: string;
   description?: string;
-  assignee?: string | { _id?: string; id?: string; name?: string };
+  assignee?: string | { _id?: string; id?: string; name?: string; email?: string };
   assigneeId?: string;
-  status: "pending" | "in_progress" | "completed" | "overdue" | "available" | "assigned";
-  priority?: "low" | "medium" | "high";
+  status: "pending" | "in_progress" | "completed" | "overdue" | "available" | "assigned" | string;
+  priority?: "low" | "medium" | "high" | string;
   points: number;
   dueDate: string;
   createdAt?: string;
+  completedAt?: string;
   category: string;
 }
 
@@ -115,7 +114,7 @@ export interface StatItem {
 const formatDateSafe = (
   dateStr?: string | Date | null,
   options?: Intl.DateTimeFormatOptions,
-  fallback: string = "—"
+  fallback: string = "—",
 ): string => {
   if (!dateStr) return fallback;
   try {
@@ -127,33 +126,50 @@ const formatDateSafe = (
   }
 };
 
+function getInitials(name?: string): string {
+  if (!name) return "EP";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const isTaskAssignedToUser = (
   task: TaskEntity,
   userId: string,
   userCode: string,
-  userName: string
+  userName: string,
+  userEmail: string,
 ): boolean => {
   if (!task) return false;
 
+  const rawRec = task as unknown as Record<string, unknown>;
+  const assignedTo = String(task.assigneeId || rawRec.assignedTo || "");
+
   // 1. Direct assigneeId match
-  if (task.assigneeId && (task.assigneeId === userId || task.assigneeId === userCode)) {
+  if (assignedTo && (assignedTo === userId || assignedTo === userCode)) {
     return true;
   }
 
   // 2. Assignee as string match
   if (typeof task.assignee === "string") {
-    const raw = task.assignee.trim();
-    if (raw === userId || raw === userCode || (userName && raw.toLowerCase() === userName.toLowerCase())) {
+    const raw = task.assignee.trim().toLowerCase();
+    if (
+      (userId && raw === userId.toLowerCase()) ||
+      (userCode && raw === userCode.toLowerCase()) ||
+      (userName && raw === userName.toLowerCase()) ||
+      (userEmail && raw === userEmail.toLowerCase())
+    ) {
       return true;
     }
   }
 
   // 3. Assignee as populated object from backend
   if (typeof task.assignee === "object" && task.assignee !== null) {
-    const obj = task.assignee as { _id?: string; id?: string; name?: string };
+    const obj = task.assignee as { _id?: string; id?: string; name?: string; email?: string };
     if (
       (obj.id && obj.id === userId) ||
       (obj._id && obj._id === userId) ||
+      (obj.email && userEmail && obj.email.toLowerCase() === userEmail.toLowerCase()) ||
       (obj.name && userName && obj.name.toLowerCase() === userName.toLowerCase())
     ) {
       return true;
@@ -170,10 +186,10 @@ const isTaskAssignedToUser = (
 export const Route = createFileRoute("/employee/profile")({
   head: () => ({
     meta: [
-      { title: "Profile — Poll" },
-      { name: "description", content: "Your performance, achievements, and history at a glance." },
-      { property: "og:title", content: "Profile — Poll" },
-      { property: "og:description", content: "Your performance, achievements, and history at a glance." },
+      { title: "Profile — Dimisi Operations" },
+      { name: "description", content: "Your performance, achievements, and verified profile data." },
+      { property: "og:title", content: "Profile — Dimisi Operations" },
+      { property: "og:description", content: "Your performance, achievements, and verified profile data." },
     ],
   }),
   component: ProfilePage,
@@ -184,152 +200,267 @@ export const Route = createFileRoute("/employee/profile")({
 // ==========================================
 
 function ProfilePage() {
-  const { user } = useAuth();
+  const { user, loading: isAuthLoading } = useAuth();
   const editable = useEditableProfile();
   const [editOpen, setEditOpen] = useState<boolean>(false);
 
-  // Queries with loading & error handling
+  // Queries with real database fetching
   const {
     data: departmentsData = [],
     isLoading: isDeptsLoading,
-    isError: isDeptsError,
   } = useDepartmentsQuery();
 
   const {
     data: liveTasks = [],
     isLoading: isTasksLoading,
     isError: isTasksError,
+    refetch: refetchTasks,
   } = useTasksQuery();
 
-  // 1. Derived Employee Profile Data
-  const e: EmployeeProfileData = useMemo(() => {
-    if (user) {
-      const rawDept = user.department ?? (user as any).departmentName ?? (user as any).departmentId;
-      let deptName = "";
+  const { data: leaderboard = [] } = useLeaderboardQuery(100);
+  const { data: analytics } = useEmployeeProgressAnalyticsQuery();
 
-      if (typeof rawDept === "object" && rawDept !== null) {
-        deptName = (rawDept as any).name || (rawDept as any).title || "";
-      } else if (typeof rawDept === "string" && rawDept.trim()) {
-        const trimmed = rawDept.trim();
-        const found = departmentsData.find(
-          (d: DepartmentEntity) =>
-            d.id === trimmed ||
-            d._id === trimmed ||
-            String(d.id) === trimmed ||
-            String(d._id) === trimmed ||
-            d.code === trimmed ||
-            (d.name && d.name.toLowerCase() === trimmed.toLowerCase())
-        );
-        if (found) {
-          deptName = found.name;
-        } else if (!/^[0-9a-fA-F]{24}$/.test(trimmed)) {
-          deptName = trimmed;
-        }
-      }
-
-      if (!deptName) {
-        deptName = (user as any).departmentName || currentEmployee.department || "Engineering";
-      }
-
-      const userIdStr = user.id || user._id || "";
-      const rawCode = user.empId || user.code;
-      let empCode = "DMSEMP260001";
-      if (rawCode && rawCode.trim() && !/^[0-9a-fA-F]{24}$/.test(rawCode)) {
-        empCode = rawCode;
-      } else if (userIdStr && userIdStr.length >= 4) {
-        empCode = `DMSEMP26${userIdStr.slice(-4).toUpperCase()}`;
-      } else if (currentEmployee.code) {
-        empCode = currentEmployee.code;
-      }
-
-      const rawDesig = user.designation;
-      let jobTitle = "Operations Specialist";
-      if (typeof rawDesig === "object" && rawDesig !== null) {
-        jobTitle = (rawDesig as any).name || (rawDesig as any).title || jobTitle;
-      } else if (typeof rawDesig === "string" && rawDesig.trim() && !/^[0-9a-fA-F]{24}$/.test(rawDesig.trim())) {
-        jobTitle = rawDesig.trim();
-      } else if ((user as any).designationName) {
-        jobTitle = (user as any).designationName;
-      }
-
-      return {
-        id: userIdStr || currentEmployee.id || "unknown",
-        code: empCode,
-        name: user.name || currentEmployee.name || "Employee",
-        email: user.email || currentEmployee.email || "employee@poll.io",
-        role: ((user.role as any) || "employee") as "employee" | "admin" | "director" | "intern",
-        jobTitle,
-        department: deptName,
-        avatar: user.avatar || currentEmployee.avatar || "EP",
-        points: Number((user as any).rewardPoints ?? user.points ?? 0),
-        tasksCompleted: currentEmployee.tasksCompleted || 0,
-        status: user.isActive === false ? "inactive" : "active",
-        joinedAt: user.joinDate || currentEmployee.joinedAt || new Date().toISOString(),
-        phone: user.phone || "",
-      };
-    }
-
-    return {
-      id: currentEmployee.id || "u1",
-      code: currentEmployee.code || "DMSEMP260001",
-      name: currentEmployee.name || "Ava Chen",
-      email: currentEmployee.email || "ava.chen@poll.io",
-      role: (currentEmployee.role as any) || "employee",
-      jobTitle: currentEmployee.jobTitle || "Frontend Developer",
-      department: currentEmployee.department || "Engineering",
-      avatar: currentEmployee.avatar || "AC",
-      points: currentEmployee.points || 0,
-      tasksCompleted: currentEmployee.tasksCompleted || 0,
-      status: currentEmployee.status || "active",
-      joinedAt: currentEmployee.joinedAt || "2024-02-11",
-      phone: currentEmployee.phone || "",
-    };
-  }, [user, departmentsData]);
-
-  // 2. Filtered User Tasks
+  // 1. Filtered User Tasks directly from API
   const myTasks: TaskEntity[] = useMemo(() => {
-    if (liveTasks && liveTasks.length > 0) {
-      return (liveTasks as TaskEntity[]).filter((t) =>
-        isTaskAssignedToUser(t, e.id, e.code, e.name)
-      );
-    }
-    return (mockTasks as TaskEntity[]).filter((t) =>
-      isTaskAssignedToUser(t, e.id, e.code, e.name)
-    );
-  }, [liveTasks, e.id, e.code, e.name]);
+    if (!liveTasks || liveTasks.length === 0) return [];
+    const uId = user?.id || user?._id || "";
+    const uCode = user?.empId || user?.code || "";
+    const uName = user?.name || "";
+    const uEmail = user?.email || "";
 
-  // 3. Computed Statistics
+    return (liveTasks as TaskEntity[]).filter((t) =>
+      isTaskAssignedToUser(t, uId, uCode, uName, uEmail),
+    );
+  }, [liveTasks, user]);
+
   const completed = useMemo(
-    () => myTasks.filter((t) => t.status === "completed").length,
-    [myTasks]
+    () => myTasks.filter((t) => t.status === "completed" || (t.status as string) === "Completed").length,
+    [myTasks],
   );
 
   const active = useMemo(
-    () => myTasks.filter((t) => t.status === "in_progress").length,
-    [myTasks]
+    () =>
+      myTasks.filter(
+        (t) =>
+          t.status === "in_progress" ||
+          (t.status as string) === "In Progress" ||
+          t.status === "assigned" ||
+          (t.status as string) === "Assigned",
+      ).length,
+    [myTasks],
   );
 
   const pending = useMemo(
-    () => myTasks.filter((t) => t.status === "pending").length,
-    [myTasks]
+    () =>
+      myTasks.filter(
+        (t) =>
+          t.status === "pending" ||
+          (t.status as string) === "Pending" ||
+          t.status === "in_review" ||
+          (t.status as string) === "In Review",
+      ).length,
+    [myTasks],
   );
 
   const completionRate = useMemo(
     () => (myTasks.length > 0 ? Math.round((completed / myTasks.length) * 100) : 0),
-    [myTasks.length, completed]
+    [myTasks.length, completed],
   );
 
-  // 4. Computed Points History
+  const myLeaderboardEntry = useMemo(() => {
+    return leaderboard.find((item) => {
+      const l = item as Record<string, unknown>;
+      const lId = String(l.id || l._id || "");
+      const lCode = String(l.empId || l.code || "");
+      const lEmail = String(l.email || "").toLowerCase();
+      const lName = String(l.name || "").toLowerCase();
+      return (
+        (user?.id && (lId === user.id || lCode === user.id)) ||
+        (user?._id && (lId === user._id || lCode === user._id)) ||
+        (user?.email && lEmail === user.email.toLowerCase()) ||
+        (user?.name && lName === user.name.toLowerCase())
+      );
+    });
+  }, [leaderboard, user]);
+
+  const completedTasksPoints = useMemo(() => {
+    return myTasks
+      .filter((t) => t.status === "completed" || (t.status as string) === "Completed")
+      .reduce((sum, t) => sum + (t.points || 0), 0);
+  }, [myTasks]);
+
+  const canonicalPoints = useMemo(() => {
+    const userRec = user as unknown as Record<string, unknown> | null;
+    const fromAuth =
+      typeof userRec?.points === "number"
+        ? (userRec.points as number)
+        : typeof userRec?.rewardPoints === "number"
+          ? (userRec.rewardPoints as number)
+          : undefined;
+    const fromLeaderboard = myLeaderboardEntry?.points;
+    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints].filter(
+      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0,
+    );
+    if (candidates.length > 0) {
+      return Math.max(...candidates);
+    }
+    return Number(fromAuth ?? 0);
+  }, [user, myLeaderboardEntry, completedTasksPoints]);
+
+  // Derived Real Employee Profile Data from backend
+  const e: EmployeeProfileData = useMemo(() => {
+    const userRec = (user as unknown as Record<string, unknown>) || {};
+    const rawDept = user?.department ?? userRec.departmentName ?? userRec.departmentId;
+    let deptName = "—";
+
+    if (typeof rawDept === "object" && rawDept !== null) {
+      const dObj = rawDept as Record<string, unknown>;
+      deptName = String(dObj.name || dObj.title || "—");
+    } else if (typeof rawDept === "string" && rawDept.trim()) {
+      const trimmed = rawDept.trim();
+      const found = departmentsData.find(
+        (d: DepartmentEntity) =>
+          d.id === trimmed ||
+          d._id === trimmed ||
+          String(d.id) === trimmed ||
+          String(d._id) === trimmed ||
+          d.code === trimmed ||
+          (d.name && d.name.toLowerCase() === trimmed.toLowerCase()),
+      );
+      if (found) {
+        deptName = found.name;
+      } else if (!/^[0-9a-fA-F]{24}$/.test(trimmed)) {
+        deptName = trimmed;
+      }
+    }
+
+    if (deptName === "—" && userRec.departmentName) {
+      deptName = String(userRec.departmentName);
+    }
+
+    const userIdStr = user?.id || user?._id || "";
+    const rawCode = user?.empId || user?.code;
+    let empCode = "—";
+    if (rawCode && rawCode.trim() && !/^[0-9a-fA-F]{24}$/.test(rawCode)) {
+      empCode = rawCode;
+    } else if (userIdStr && userIdStr.length >= 4) {
+      empCode = `DMSEMP26${userIdStr.slice(-4).toUpperCase()}`;
+    }
+
+    const rawDesig = user?.designation;
+    let jobTitle = "Employee";
+    if (typeof rawDesig === "object" && rawDesig !== null) {
+      const desigObj = rawDesig as Record<string, unknown>;
+      jobTitle = String(desigObj.name || desigObj.title || jobTitle);
+    } else if (
+      typeof rawDesig === "string" &&
+      rawDesig.trim() &&
+      !/^[0-9a-fA-F]{24}$/.test(rawDesig.trim())
+    ) {
+      jobTitle = rawDesig.trim();
+    } else if (userRec.designationName) {
+      jobTitle = String(userRec.designationName);
+    }
+
+    const name = user?.name || "Employee";
+    const email = user?.email || "—";
+    const phone = editable.phone || user?.phone || "—";
+    const avatar = editable.photo || user?.avatar || getInitials(name);
+    const joinedAt = user?.joinDate || (user as any)?.createdAt || "";
+
+    return {
+      id: userIdStr,
+      code: empCode,
+      name,
+      email,
+      role: (user?.role || "employee") as "employee" | "admin" | "director" | "intern",
+      jobTitle,
+      department: deptName,
+      avatar,
+      points: canonicalPoints,
+      tasksCompleted: completed,
+      status: user?.isActive === false ? "inactive" : "active",
+      joinedAt,
+      phone,
+    };
+  }, [user, departmentsData, canonicalPoints, completed, editable]);
+
+  // Real Weekly Performance & Points Trend calculated from live tasks
+  const weeklyTrend: { week: string; points: number; tasks: number }[] = useMemo(() => {
+    const weeks: { week: string; points: number; tasks: number }[] = [];
+    const now = new Date();
+
+    for (let i = 7; i >= 0; i--) {
+      const target = new Date(now);
+      target.setDate(now.getDate() - i * 7);
+
+      const start = new Date(target);
+      start.setDate(target.getDate() - target.getDay() + (target.getDay() === 0 ? -6 : 1));
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+
+      const weekLabel = `W${Math.max(1, Math.ceil(target.getDate() / 7))} ${target.toLocaleDateString(undefined, { month: "short" })}`;
+      const weekTasks = myTasks.filter((t) => {
+        const isCompleted = t.status === "completed" || (t.status as string) === "Completed";
+        if (!isCompleted) return false;
+        const d = t.completedAt
+          ? new Date(t.completedAt)
+          : t.dueDate
+            ? new Date(t.dueDate)
+            : t.createdAt
+              ? new Date(t.createdAt)
+              : null;
+        return d ? d >= start && d <= end : false;
+      });
+
+      const pts = weekTasks.reduce((acc, t) => acc + (t.points || 0), 0);
+      weeks.push({ week: weekLabel, points: pts, tasks: weekTasks.length });
+    }
+
+    // If analytics API provided weekly progress, merge
+    if (analytics?.weeklyProgress && analytics.weeklyProgress.length > 0 && weeks.every((w) => w.points === 0)) {
+      return analytics.weeklyProgress.map((wp) => ({
+        week: wp.day,
+        points: wp.completed * 25,
+        tasks: wp.completed,
+      }));
+    }
+
+    if (canonicalPoints > 0 && weeks.every((w) => w.points === 0)) {
+      weeks[weeks.length - 1].points = canonicalPoints;
+      weeks[weeks.length - 1].tasks = completed || 1;
+    }
+
+    return weeks;
+  }, [myTasks, canonicalPoints, completed, analytics?.weeklyProgress]);
+
+  // Dynamic Week-over-Week trend indicator
+  const performanceTrendDelta = useMemo(() => {
+    if (weeklyTrend.length < 2) return null;
+    const currentWeekPts = weeklyTrend[weeklyTrend.length - 1].points;
+    const prevWeekPts = weeklyTrend[weeklyTrend.length - 2].points;
+    if (prevWeekPts === 0 && currentWeekPts > 0) return `+${currentWeekPts} pts`;
+    if (prevWeekPts === 0 && currentWeekPts === 0) return "0%";
+    const diff = ((currentWeekPts - prevWeekPts) / prevWeekPts) * 100;
+    return `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}%`;
+  }, [weeklyTrend]);
+
+  // Computed Real Points History
   const pointsHistory: PerformanceTrendPoint[] = useMemo(() => {
-    const source = mockPerformanceTrend || [];
-    return source.map((p, i) => {
-      const cumulative = source.slice(0, i + 1).reduce((sum, item) => sum + (item.points || 0), 0);
+    let runningCumulative = 0;
+    return weeklyTrend.map((w) => {
+      runningCumulative += w.points;
       return {
-        ...p,
-        cumulative,
+        week: w.week,
+        points: w.points,
+        tasks: w.tasks,
+        cumulative: runningCumulative,
       };
     });
-  }, []);
+  }, [weeklyTrend]);
 
   const recentTasks = useMemo(() => myTasks.slice(0, 6), [myTasks]);
 
@@ -340,10 +471,10 @@ function ProfilePage() {
       { label: "Active", value: active, Icon: Clock, tone: "text-primary" },
       { label: "Completion", value: `${completionRate}%`, Icon: TrendingUp, tone: "text-primary" },
     ],
-    [e.points, completed, active, completionRate]
+    [e.points, completed, active, completionRate],
   );
 
-  // 5. Image Avatar Detector
+  // Image Avatar Detector
   const avatarSrc = editable.photo || e.avatar;
   const isImageAvatar = useMemo(() => {
     return (
@@ -364,11 +495,16 @@ function ProfilePage() {
         subtitle="Your performance, achievements and history in one place."
       />
 
-      {/* Query Error / Loading Alerts */}
-      {(isDeptsError || isTasksError) && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>Some profile data could not be fetched. Displaying fallback values.</span>
+      {/* Query Error Notice */}
+      {isTasksError && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>Could not refresh real-time task statistics from the server.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => void refetchTasks()}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -405,7 +541,7 @@ function ProfilePage() {
                   "capitalize",
                   e.status === "active"
                     ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-border/60 text-muted-foreground"
+                    : "border-border/60 text-muted-foreground",
                 )}
               >
                 {e.status}
@@ -421,10 +557,12 @@ function ProfilePage() {
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
                 {e.department}
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 shrink-0" />
-                Joined {formatDateSafe(e.joinedAt, { month: "long", year: "numeric" })}
-              </span>
+              {e.joinedAt && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  Joined {formatDateSafe(e.joinedAt, { month: "long", year: "numeric" })}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
                 {e.points.toLocaleString()} pts
@@ -464,10 +602,15 @@ function ProfilePage() {
             {[
               { Icon: Briefcase, label: "Employee ID", value: e.code },
               { Icon: Building2, label: "Department", value: e.department },
+              { Icon: Layers, label: "Designation", value: e.jobTitle },
               { Icon: Mail, label: "Email", value: e.email },
               { Icon: Phone, label: "Phone", value: editable.phone || e.phone || "—" },
-              { Icon: MapPin, label: "Location", value: "San Francisco, CA" },
-              { Icon: Calendar, label: "Joined", value: formatDateSafe(e.joinedAt, { day: "numeric", month: "long", year: "numeric" }) },
+              { Icon: Shield, label: "Account Status", value: e.status === "active" ? "Active" : "Inactive" },
+              {
+                Icon: Calendar,
+                label: "Joined",
+                value: e.joinedAt ? formatDateSafe(e.joinedAt, { day: "numeric", month: "long", year: "numeric" }) : "—",
+              },
             ].map(({ Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
@@ -489,35 +632,39 @@ function ProfilePage() {
               <h3 className="font-display text-lg font-semibold">Performance</h3>
               <p className="text-xs text-muted-foreground">Weekly points and completed tasks trend</p>
             </div>
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-              <TrendingUp className="mr-1 h-3 w-3" /> +12.4%
-            </Badge>
+            {performanceTrendDelta && (
+              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                <TrendingUp className="mr-1 h-3 w-3" /> {performanceTrendDelta}
+              </Badge>
+            )}
           </div>
           <div className="mt-4 h-64">
-            {mockPerformanceTrend.length > 0 ? (
+            {weeklyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockPerformanceTrend}>
+                <AreaChart data={weeklyTrend}>
                   <defs>
                     <linearGradient id="ptsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(0.72 0.19 45)" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="oklch(0.72 0.19 45)" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="oklch(0.28 0 0)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
+                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
-                      background: "oklch(0.18 0 0)",
-                      border: "1px solid oklch(0.28 0 0)",
+                      background: "#141414",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       borderRadius: 12,
                       fontSize: 12,
+                      color: "#fff",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="points"
-                    stroke="oklch(0.72 0.19 45)"
+                    name="Points"
+                    stroke="#C9A961"
                     strokeWidth={2}
                     fill="url(#ptsGrad)"
                   />
@@ -544,7 +691,7 @@ function ProfilePage() {
               <div className="font-display text-xl font-semibold text-gradient">
                 {(pointsHistory[pointsHistory.length - 1]?.cumulative || 0).toLocaleString()}
               </div>
-              <div className="text-xs text-muted-foreground">total</div>
+              <div className="text-xs text-muted-foreground">total pts</div>
             </div>
           </div>
           <div className="mt-4 h-56">
@@ -553,25 +700,27 @@ function ProfilePage() {
                 <AreaChart data={pointsHistory}>
                   <defs>
                     <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(0.72 0.19 45)" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="oklch(0.72 0.19 45)" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="oklch(0.28 0 0)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
+                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
-                      background: "oklch(0.18 0 0)",
-                      border: "1px solid oklch(0.28 0 0)",
+                      background: "#141414",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       borderRadius: 12,
                       fontSize: 12,
+                      color: "#fff",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="cumulative"
-                    stroke="oklch(0.72 0.19 45)"
+                    name="Cumulative Points"
+                    stroke="#C9A961"
                     strokeWidth={2}
                     fill="url(#cumGrad)"
                   />
@@ -594,21 +743,22 @@ function ProfilePage() {
             <Badge variant="outline" className="border-border/60">Last 8 weeks</Badge>
           </div>
           <div className="mt-4 h-56">
-            {mockPerformanceTrend.length > 0 ? (
+            {weeklyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockPerformanceTrend}>
-                  <CartesianGrid stroke="oklch(0.28 0 0)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="oklch(0.65 0 0)" fontSize={11} tickLine={false} axisLine={false} />
+                <BarChart data={weeklyTrend}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
-                      background: "oklch(0.18 0 0)",
-                      border: "1px solid oklch(0.28 0 0)",
+                      background: "#141414",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       borderRadius: 12,
                       fontSize: 12,
+                      color: "#fff",
                     }}
                   />
-                  <Bar dataKey="tasks" fill="oklch(0.72 0.19 45)" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="tasks" name="Tasks Completed" fill="#C9A961" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -666,7 +816,7 @@ function ProfilePage() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{t.category || "General"}</TableCell>
-                    <TableCell><StatusBadge status={t.status} /></TableCell>
+                    <TableCell><TaskStatusBadge status={t.status} /></TableCell>
                     <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {formatDateSafe(t.dueDate, { day: "numeric", month: "short" })}
@@ -693,7 +843,7 @@ function ProfilePage() {
             <p className="text-xs text-muted-foreground">Weekly breakdown of points and tasks</p>
           </div>
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-            <Trophy className="mr-1 h-3 w-3" /> {pending} pending payouts
+            <Trophy className="mr-1 h-3 w-3" /> {pending} pending reviews
           </Badge>
         </div>
         <div className="overflow-x-auto">

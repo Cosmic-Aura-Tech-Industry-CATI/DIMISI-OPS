@@ -35,12 +35,12 @@ import {
   auditCategoryMeta,
   auditStatusMeta,
   formatAuditTime,
-  useAuditLogs,
   type AuditCategory,
   type AuditEntry,
   type AuditStatus,
 } from "@/lib/audit-log";
 import { exportAuditLogs } from "@/lib/audit-export";
+import { useOrgActivityQuery, type ActivityLog } from "@/features/activity";
 
 export const Route = createFileRoute("/admin/audit-logs")({
   head: () => ({
@@ -55,6 +55,66 @@ export const Route = createFileRoute("/admin/audit-logs")({
 });
 
 type DateRange = "all" | "today" | "7d" | "30d" | "custom";
+
+function getDateFilters(range: DateRange, from: string, to: string) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (range === "today") return { startDate: startOfToday.toISOString() };
+  if (range === "7d") return { startDate: new Date(startOfToday.getTime() - 6 * 86400_000).toISOString() };
+  if (range === "30d") return { startDate: new Date(startOfToday.getTime() - 29 * 86400_000).toISOString() };
+  if (range === "custom") {
+    return {
+      ...(from ? { startDate: new Date(`${from}T00:00:00`).toISOString() } : {}),
+      ...(to ? { endDate: new Date(`${to}T23:59:59.999`).toISOString() } : {}),
+    };
+  }
+  return {};
+}
+
+function getMetadataText(metadata: ActivityLog["metadata"], ...keys: string[]) {
+  for (const key of keys) {
+    const value = metadata?.[key];
+    if (typeof value === "string" || typeof value === "number") return String(value);
+    if (value && typeof value === "object") return JSON.stringify(value);
+  }
+  return "";
+}
+
+function toAuditEntry(log: ActivityLog): AuditEntry {
+  const actor = typeof log.actorId === "object" && log.actorId !== null ? log.actorId : null;
+  const actorName = actor?.name || actor?.email || "Unknown";
+  const actorId = actor?.empId || actor?._id || actor?.id || (typeof log.actorId === "string" ? log.actorId : "—");
+  const action = log.action.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const categoryValue = log.entityType.toLowerCase().replace(/s$/, "");
+  const category = (auditCategories as string[]).includes(categoryValue)
+    ? categoryValue as AuditCategory
+    : "settings";
+  const normalizedStatus = log.status?.toLowerCase();
+  const status: AuditStatus = normalizedStatus === "failed"
+    ? "failed"
+    : normalizedStatus === "warning" || /reject|delete|archiv/i.test(log.action)
+      ? "warning"
+      : "success";
+
+  return {
+    id: log._id || log.id || `${log.createdAt}-${log.action}`,
+    timestamp: new Date(log.createdAt).toISOString(),
+    actorName,
+    actorId,
+    category,
+    action,
+    target: getMetadataText(log.metadata, "title", "target", "name") || log.entityType,
+    targetId: log.entityId,
+    details: log.description || getMetadataText(log.metadata, "details", "description", "reason"),
+    status,
+    previousValue: getMetadataText(log.metadata, "previousValue", "before"),
+    updatedValue: getMetadataText(log.metadata, "updatedValue", "after"),
+    device: getMetadataText(log.metadata, "device") || "—",
+    browser: getMetadataText(log.metadata, "browser") || "—",
+    ip: getMetadataText(log.metadata, "ip", "ipAddress") || "—",
+  };
+}
 
 function CategoryBadge({ category }: { category: AuditCategory }) {
   const meta = auditCategoryMeta[category];
@@ -76,7 +136,6 @@ function StatusBadge({ status }: { status: AuditStatus }) {
 }
 
 function AuditLogsPage() {
-  const logs = useAuditLogs();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<"all" | AuditCategory>("all");
   const [status, setStatus] = useState<"all" | AuditStatus>("all");
@@ -86,6 +145,16 @@ function AuditLogsPage() {
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [active, setActive] = useState<AuditEntry | null>(null);
+
+  const activityFilters = useMemo(() => ({
+    page,
+    limit: perPage,
+    entityType: category === "all" ? undefined : category,
+    ...getDateFilters(range, from, to),
+  }), [page, perPage, category, range, from, to]);
+  const activityQuery = useOrgActivityQuery(activityFilters);
+  const response = activityQuery.data;
+  const logs = useMemo(() => (response?.data ?? []).map(toAuditEntry), [response]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,9 +179,10 @@ function AuditLogsPage() {
     });
   }, [logs, query, category, status, range, from, to]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const totalRecords = response?.total ?? filtered.length;
+  const totalPages = Math.max(1, response?.totalPages ?? Math.ceil(totalRecords / perPage));
   const current = Math.min(page, totalPages);
-  const rows = filtered.slice((current - 1) * perPage, current * perPage);
+  const rows = filtered;
 
   const reset = () => setPage(1);
 
@@ -203,7 +273,17 @@ function AuditLogsPage() {
         )}
       </section>
 
-      {filtered.length === 0 ? (
+      {activityQuery.isPending ? (
+        <div className="rounded-md border border-border/60 bg-card/40 p-8 text-center text-sm text-muted-foreground" role="status">
+          Loading organization audit logs…
+        </div>
+      ) : activityQuery.isError ? (
+        <EmptyState
+          icon={ScrollText}
+          title="Unable to load audit logs"
+          description="The organization activity service could not be reached. Please try again."
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={ScrollText}
           title="No audit entries found"
@@ -284,7 +364,7 @@ function AuditLogsPage() {
                 </SelectContent>
               </Select>
               <span className="ml-2">
-                {(current - 1) * perPage + 1}–{Math.min(current * perPage, filtered.length)} of {filtered.length}
+                {totalRecords === 0 ? 0 : (current - 1) * perPage + 1}–{Math.min((current - 1) * perPage + rows.length, totalRecords)} of {totalRecords}
               </span>
             </div>
             <div className="flex items-center gap-2">

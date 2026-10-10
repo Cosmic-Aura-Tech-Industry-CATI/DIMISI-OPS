@@ -63,6 +63,9 @@ export function useCreateNotice(
     ...options,
     onSuccess: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.notices.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
       options?.onSuccess?.(...args);
     },
   });
@@ -79,6 +82,8 @@ export function useUpdateNotice(
     ...options,
     onSuccess: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.notices.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
       if (args[1]?.id) {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.notices.detail(args[1].id),
@@ -100,6 +105,8 @@ export function useDeleteNotice(
     ...options,
     onSuccess: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.notices.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
       options?.onSuccess?.(...args);
     },
   });

@@ -116,6 +116,9 @@ export function TaskForm({
   onSubmit: (values: TaskFormValues) => void;
 }) {
   const [form, setForm] = useState<TaskFormValues>(initial);
+  const [pointsInput, setPointsInput] = useState<string>(
+    initial.points !== undefined && initial.points !== null ? String(initial.points) : "50"
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
@@ -126,18 +129,27 @@ export function TaskForm({
 
   const set = <K extends keyof TaskFormValues>(k: K, v: TaskFormValues[K]) => setForm({ ...form, [k]: v });
 
+  const handlePointsChange = (raw: string) => {
+    // Allow empty string or numbers only
+    if (raw !== "" && !/^\d+$/.test(raw)) return;
+    setPointsInput(raw);
+    const parsed = raw === "" ? 0 : parseInt(raw, 10);
+    setForm((prev) => ({ ...prev, points: parsed }));
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!form.title.trim()) errs.title = "Title is required";
     if (!form.description.trim()) errs.description = "Add a short description";
     if (!form.dueDate) errs.dueDate = "Pick a deadline";
-    if (form.points <= 0) errs.points = "Points must be greater than 0";
+    const numericPoints = pointsInput.trim() === "" ? 0 : Number(pointsInput);
+    if (numericPoints <= 0 || isNaN(numericPoints)) errs.points = "Points must be greater than 0";
     if (form.taskType === "project" && !form.projectId) errs.projectId = "Pick a project";
     if (form.taskType === "direct" && !form.assigneeId) errs.assigneeId = "Pick an employee";
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    onSubmit(form);
+    onSubmit({ ...form, points: numericPoints });
   };
 
   const handleFiles = (files: FileList | null) => {
@@ -375,9 +387,12 @@ export function TaskForm({
           <div className="relative">
             <Trophy className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warning" />
             <Input
-              type="number" min={0} step={5}
-              value={form.points}
-              onChange={(e) => set("points", Number(e.target.value))}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="e.g. 50"
+              value={pointsInput}
+              onChange={(e) => handlePointsChange(e.target.value)}
               className="h-11 pl-9"
             />
           </div>

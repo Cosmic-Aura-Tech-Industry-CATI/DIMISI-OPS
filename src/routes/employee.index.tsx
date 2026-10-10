@@ -40,6 +40,7 @@ import {
   useEmployeeTasksDeadlinesQuery,
   useEmployeeProgressAnalyticsQuery,
 } from "@/features/employee-dashboard";
+import { useLeaderboardQuery } from "@/features/leaderboard";
 import { usePersonalActivityQuery, type ActivityLog } from "@/features/activity";
 
 export const Route = createFileRoute("/employee/")({
@@ -66,6 +67,7 @@ function EmployeeOverview() {
   const { data: tasksDeadlines } = useEmployeeTasksDeadlinesQuery();
   const { data: analytics } = useEmployeeProgressAnalyticsQuery();
   const { data: activityData } = usePersonalActivityQuery({ limit: 6 });
+  const { data: leaderboard = [] } = useLeaderboardQuery(100);
 
   const currentUserId = auth.user?.id || auth.user?._id || "";
 
@@ -119,23 +121,51 @@ function EmployeeOverview() {
       .slice(0, 4);
   }, [tasksDeadlines?.upcomingDeadlines, mine]);
 
-  const defaultWeekProgress = [
-    { day: "Mon", done: 0, planned: 0 },
-    { day: "Tue", done: 0, planned: 0 },
-    { day: "Wed", done: 0, planned: 0 },
-    { day: "Thu", done: 0, planned: 0 },
-    { day: "Fri", done: 0, planned: 0 },
-    { day: "Sat", done: 0, planned: 0 },
-    { day: "Sun", done: 0, planned: 0 },
-  ];
+  const weekProgress = useMemo(() => {
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const now = new Date();
+    const currentDayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
 
-  const weekProgress = analytics?.weeklyProgress?.length
-    ? analytics.weeklyProgress.map((w) => ({
-      day: w.day,
-      done: w.completed,
-      planned: w.planned,
-    }))
-    : defaultWeekProgress;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - currentDayIndex);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    return days.map((day, idx) => {
+      const dayStart = new Date(startOfWeek);
+      dayStart.setDate(startOfWeek.getDate() + idx);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      // Tasks completed on this specific day
+      const dayDone = mine.filter((t) => {
+        const isDone = t.status === "completed" || (t.status as string) === "Completed";
+        if (!isDone) return false;
+        const d = t.updatedAt ? new Date(t.updatedAt) : t.dueDate ? new Date(t.dueDate) : t.createdAt ? new Date(t.createdAt) : null;
+        return d ? d >= dayStart && d <= dayEnd : false;
+      }).length;
+
+      // Tasks planned/due on this specific day
+      const dayPlannedFromTasks = mine.filter((t) => {
+        const d = t.dueDate ? new Date(t.dueDate) : t.createdAt ? new Date(t.createdAt) : null;
+        return d ? d >= dayStart && d <= dayEnd : false;
+      }).length;
+
+      const fromAnalytics = analytics?.weeklyProgress?.find((w) => w.day === day);
+      const analyticPlanned = fromAnalytics ? fromAnalytics.planned : 0;
+      const analyticCompleted = fromAnalytics ? fromAnalytics.completed : 0;
+
+      const finalDone = Math.max(dayDone, analyticCompleted);
+      const finalPlanned = Math.max(finalDone, dayPlannedFromTasks, analyticPlanned);
+
+      return {
+        day,
+        done: finalDone,
+        planned: finalPlanned,
+      };
+    });
+  }, [mine, analytics?.weeklyProgress]);
 
   const monthlyGoal = analytics?.monthlyPerformance?.pointsGoal ?? 600;
   const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
@@ -155,7 +185,42 @@ function EmployeeOverview() {
 
   const userName = auth.user?.name || "Employee";
   const userAvatar = userName.slice(0, 2).toUpperCase();
-  const userPoints = (auth.user as any)?.rewardPoints ?? (auth.user as any)?.points ?? monthlyPoints;
+
+  const myLeaderboardEntry = useMemo(() => {
+    return leaderboard.find((item) => {
+      const l = item as Record<string, unknown>;
+      const lId = String(l.id || l._id || "");
+      const lCode = String(l.empId || l.code || "");
+      const lEmail = String(l.email || "").toLowerCase();
+      const lName = String(l.name || "").toLowerCase();
+      return (
+        (currentUserId && (lId === currentUserId || lCode === currentUserId)) ||
+        (auth.user?.email && lEmail === auth.user.email.toLowerCase()) ||
+        (auth.user?.name && lName === auth.user.name.toLowerCase())
+      );
+    });
+  }, [leaderboard, currentUserId, auth.user?.email, auth.user?.name]);
+
+  const completedTasksPoints = useMemo(() => {
+    return completed.reduce((sum, t) => {
+      const rec = t as unknown as Record<string, unknown>;
+      const pt = typeof t.points === "number" ? t.points : typeof rec.rewardPoints === "number" ? (rec.rewardPoints as number) : 0;
+      return sum + pt;
+    }, 0);
+  }, [completed]);
+
+  const userPoints = useMemo(() => {
+    const userRec = auth.user as unknown as Record<string, unknown> | null;
+    const fromAuth = typeof userRec?.points === "number" ? (userRec.points as number) : typeof userRec?.rewardPoints === "number" ? (userRec.rewardPoints as number) : undefined;
+    const fromLeaderboard = myLeaderboardEntry?.points;
+    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, monthlyPoints].filter(
+      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0
+    );
+    if (candidates.length > 0) {
+      return Math.max(...candidates);
+    }
+    return fromAuth ?? monthlyPoints;
+  }, [auth.user, myLeaderboardEntry, completedTasksPoints, monthlyPoints]);
 
   const performanceTrend = useMemo(() => {
     const weeks: { week: string; points: number; tasks: number }[] = [];
@@ -187,7 +252,8 @@ function EmployeeOverview() {
 
   const activityLogs: ActivityLog[] = useMemo(() => {
     if (Array.isArray(activityData)) return activityData;
-    return (activityData as any)?.data || [];
+    const rec = activityData as unknown as { data?: ActivityLog[] };
+    return rec?.data || [];
   }, [activityData]);
 
   return (

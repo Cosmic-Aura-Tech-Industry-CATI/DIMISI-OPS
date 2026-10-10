@@ -45,10 +45,10 @@ export type ActivityType =
 export interface ActivityActor {
   _id: string;
   id?: string;
+  empId?: string;
   name?: string;
   email?: string;
   avatar?: string;
-  empId?: string;
 }
 
 export interface ActivityLog {
@@ -58,10 +58,12 @@ export interface ActivityLog {
   action: ActivityType | string;
   entityType: AuditCategory | string;
   entityId?: string;
-  scope: ActivityScope;
-  status?: AuditStatus;
+  scope: ActivityScope | string;
+  status?: AuditStatus | string;
+  description?: string;
   metadata?: Record<string, unknown>;
   createdAt: string | Date;
+  __v?: number;
 }
 
 export interface PaginatedActivityResponse {
@@ -75,6 +77,11 @@ export interface ActivityQueryFilters {
   page?: number;
   limit?: number;
   entityType?: string;
+  scope?: string;
+  status?: string;
+  action?: string;
+  actorId?: string;
+  search?: string;
   startDate?: string | Date;
   endDate?: string | Date;
 }

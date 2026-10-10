@@ -11,6 +11,8 @@ export type AuditCategory =
   | "admin"
   | "task"
   | "project"
+  | "department"
+  | "designation"
   | "notice"
   | "authentication"
   // | "system"
@@ -43,6 +45,8 @@ export const auditCategoryMeta: Record<AuditCategory, { label: string; className
   admin: { label: "Admin", className: "bg-primary/15 text-primary" },
   task: { label: "Task", className: "bg-success/15 text-success" },
   project: { label: "Project", className: "bg-warning/15 text-warning" },
+  department: { label: "Department", className: "bg-info/15 text-info" },
+  designation: { label: "Designation", className: "bg-info/15 text-info" },
   notice: { label: "Notice", className: "bg-primary/15 text-primary" },
   authentication: { label: "Authentication", className: "bg-muted text-muted-foreground" },
   // system: { label: "System", className: "bg-muted text-muted-foreground" },

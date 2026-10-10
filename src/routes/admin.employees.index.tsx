@@ -80,7 +80,33 @@ function initials(name: string) {
 
 function EmployeesPage() {
   const navigate = useNavigate();
-  const { data: responseData, isLoading, isError, error, refetch, isRefetching } = useEmployeesQuery();
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [dept, setDept] = useState("all");
+  const [role, setRole] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<AuthUser | null>(null);
+
+  const queryFilters = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      status: status === "active" || status === "inactive" ? status : undefined,
+    }),
+    [page, status],
+  );
+
+  const {
+    data: responseData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useEmployeesQuery(queryFilters);
   const revokeMutation = useRevokeEmployeeAccess();
 
   const rawEmployees = responseData?.employees || [];
@@ -123,16 +149,6 @@ function EmployeesPage() {
     [all],
   );
 
-  const [query, setQuery] = useState("");
-  const [dept, setDept] = useState("all");
-  const [role, setRole] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(1);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
-  const [editingEmployee, setEditingEmployee] = useState<AuthUser | null>(null);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = all.filter((e) => {
@@ -158,9 +174,18 @@ function EmployeesPage() {
     });
   }, [all, query, dept, role, status, sortKey, sortDir]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const isServerPaginated = Boolean(responseData?.pagination);
+  const totalRecords = responseData?.pagination?.totalRecords ?? filtered.length;
+  const pages = Math.max(
+    1,
+    responseData?.pagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
+  );
   const current = Math.min(page, pages);
-  const slice = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  // If server-paginated, filtered already holds current page data; otherwise slice locally
+  const slice = isServerPaginated
+    ? filtered
+    : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -513,18 +538,20 @@ function EmployeesPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border/60 px-5 py-3 sm:flex-row">
             <span className="text-xs text-muted-foreground">
               Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–
-              {(current - 1) * PAGE_SIZE + slice.length} of {filtered.length}
+              {Math.min((current - 1) * PAGE_SIZE + slice.length, totalRecords)} of {totalRecords} employees
+              (Page {current} of {pages})
             </span>
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 rounded-md"
-                disabled={current === 1}
+                disabled={current <= 1 || isRefetching}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous Page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -537,19 +564,24 @@ function EmployeesPage() {
                       key={n}
                       variant={n === current ? "default" : "outline"}
                       size="sm"
-                      className="h-8 w-8 rounded-full p-0"
+                      className="h-8 w-8 rounded-full p-0 text-xs"
+                      disabled={isRefetching}
                       onClick={() => setPage(n)}
                     >
                       {n}
                     </Button>
                   );
                 })}
+              {pages > 5 && (
+                <span className="px-1 text-xs text-muted-foreground">…</span>
+              )}
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 rounded-md"
-                disabled={current === pages}
+                disabled={current >= pages || isRefetching}
                 onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                aria-label="Next Page"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

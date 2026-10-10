@@ -1,36 +1,148 @@
-/** API services for the activity module. */
-import { http } from "@/api/client/client";
+import { apiClient } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import type {
+  ActivityLog,
   ActivityQueryFilters,
   PaginatedActivityResponse,
 } from "../types";
+
+/**
+ * Parses any backend activity response structure (raw array, { data: [...] }, { logs: [...] }, { total, totalPages, page })
+ */
+function parseActivityResponse(
+  raw: any,
+  defaultPage = 1,
+  defaultLimit = 25,
+): PaginatedActivityResponse {
+  if (!raw) {
+    return { data: [], total: 0, page: defaultPage, totalPages: 0 };
+  }
+
+  let items: ActivityLog[] = [];
+  let total = 0;
+  let page = defaultPage;
+  let totalPages = 1;
+
+  if (Array.isArray(raw)) {
+    items = raw;
+    total = raw.length;
+    totalPages = Math.ceil(total / defaultLimit) || 1;
+  } else if (typeof raw === "object") {
+    // Check possible locations for items array
+    if (Array.isArray(raw.data)) {
+      items = raw.data;
+    } else if (Array.isArray(raw.logs)) {
+      items = raw.logs;
+    } else if (Array.isArray(raw.activities)) {
+      items = raw.activities;
+    } else if (raw.data && typeof raw.data === "object") {
+      if (Array.isArray(raw.data.data)) {
+        items = raw.data.data;
+      } else if (Array.isArray(raw.data.logs)) {
+        items = raw.data.logs;
+      } else if (Array.isArray(raw.data.activities)) {
+        items = raw.data.activities;
+      }
+    }
+
+    // Extract total
+    const parsedTotal = Number(
+      raw.total ??
+        raw.totalRecords ??
+        raw.count ??
+        raw.data?.total ??
+        raw.data?.totalRecords ??
+        raw.data?.count ??
+        raw.pagination?.totalRecords ??
+        raw.pagination?.total ??
+        items.length,
+    );
+    total = isNaN(parsedTotal) ? items.length : parsedTotal;
+
+    // Extract page
+    const parsedPage = Number(
+      raw.page ??
+        raw.currentPage ??
+        raw.data?.page ??
+        raw.data?.currentPage ??
+        raw.pagination?.currentPage ??
+        raw.pagination?.page ??
+        defaultPage,
+    );
+    page = isNaN(parsedPage) || parsedPage < 1 ? defaultPage : parsedPage;
+
+    // Extract totalPages
+    const parsedTotalPages = Number(
+      raw.totalPages ??
+        raw.pages ??
+        raw.data?.totalPages ??
+        raw.data?.pages ??
+        raw.pagination?.totalPages ??
+        (Math.ceil(total / defaultLimit) || 1),
+    );
+    totalPages =
+      isNaN(parsedTotalPages) || parsedTotalPages < 1
+        ? Math.max(1, Math.ceil(total / defaultLimit))
+        : parsedTotalPages;
+  }
+
+  return {
+    data: items,
+    total,
+    page,
+    totalPages,
+  };
+}
+
+function cleanActivityFilters(filters?: ActivityQueryFilters): Record<string, unknown> | undefined {
+  if (!filters) return undefined;
+  const cleaned: Record<string, unknown> = {};
+
+  if (filters.page !== undefined && filters.page !== null && !isNaN(Number(filters.page))) {
+    cleaned.page = Math.max(1, Number(filters.page));
+  }
+  if (filters.limit !== undefined && filters.limit !== null && !isNaN(Number(filters.limit))) {
+    cleaned.limit = Math.max(1, Number(filters.limit));
+  }
+  if (filters.entityType && filters.entityType !== "all") {
+    cleaned.entityType = filters.entityType;
+  }
+  if (filters.scope && filters.scope !== "all") {
+    cleaned.scope = filters.scope;
+  }
+  if (filters.status && filters.status !== "all") {
+    cleaned.status = filters.status;
+  }
+  if (filters.action && filters.action !== "all") {
+    cleaned.action = filters.action;
+  }
+  if (filters.actorId && filters.actorId !== "all") {
+    cleaned.actorId = filters.actorId;
+  }
+  if (filters.search && filters.search.trim()) {
+    cleaned.search = filters.search.trim();
+  }
+  if (filters.startDate) {
+    cleaned.startDate = filters.startDate instanceof Date ? filters.startDate.toISOString() : filters.startDate;
+  }
+  if (filters.endDate) {
+    cleaned.endDate = filters.endDate instanceof Date ? filters.endDate.toISOString() : filters.endDate;
+  }
+
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
 
 export const activityService = {
   getPersonalLogs: async (
     filters?: ActivityQueryFilters,
   ): Promise<PaginatedActivityResponse> => {
     try {
-      const res = await http.get<any>(
-        API_ENDPOINTS.activity.personal,
-        { params: filters },
-      );
-      const data = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
-          ? res.data
-          : Array.isArray(res?.logs)
-            ? res.logs
-            : Array.isArray(res?.data?.data)
-              ? res.data.data
-              : [];
-      const total = res?.total ?? res?.data?.total ?? data.length;
-      const page = res?.page ?? res?.data?.page ?? 1;
-      const totalPages = res?.totalPages ?? res?.data?.totalPages ?? 1;
-      return { data, total, page, totalPages };
+      const params = cleanActivityFilters(filters);
+      const res = await apiClient.get<any>(API_ENDPOINTS.activity.personal, { params });
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getPersonalLogs] Failed:", err);
-      return { data: [], total: 0, page: 1, totalPages: 0 };
+      return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
     }
   },
 
@@ -38,26 +150,12 @@ export const activityService = {
     filters?: ActivityQueryFilters,
   ): Promise<PaginatedActivityResponse> => {
     try {
-      const res = await http.get<any>(
-        API_ENDPOINTS.activity.admin,
-        { params: filters },
-      );
-      const data = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
-          ? res.data
-          : Array.isArray(res?.logs)
-            ? res.logs
-            : Array.isArray(res?.data?.data)
-              ? res.data.data
-              : [];
-      const total = res?.total ?? res?.data?.total ?? data.length;
-      const page = res?.page ?? res?.data?.page ?? 1;
-      const totalPages = res?.totalPages ?? res?.data?.totalPages ?? 1;
-      return { data, total, page, totalPages };
+      const params = cleanActivityFilters(filters);
+      const res = await apiClient.get<any>(API_ENDPOINTS.activity.admin, { params });
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getAdminLogs] Failed:", err);
-      return { data: [], total: 0, page: 1, totalPages: 0 };
+      return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
     }
   },
 
@@ -65,26 +163,12 @@ export const activityService = {
     filters?: ActivityQueryFilters,
   ): Promise<PaginatedActivityResponse> => {
     try {
-      const res = await http.get<any>(
-        API_ENDPOINTS.activity.org,
-        { params: filters },
-      );
-      const data = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.data)
-          ? res.data
-          : Array.isArray(res?.logs)
-            ? res.logs
-            : Array.isArray(res?.data?.data)
-              ? res.data.data
-              : [];
-      const total = res?.total ?? res?.data?.total ?? data.length;
-      const page = res?.page ?? res?.data?.page ?? 1;
-      const totalPages = res?.totalPages ?? res?.data?.totalPages ?? 1;
-      return { data, total, page, totalPages };
+      const params = cleanActivityFilters(filters);
+      const res = await apiClient.get<any>(API_ENDPOINTS.activity.org, { params });
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getOrgLogs] Failed:", err);
-      return { data: [], total: 0, page: 1, totalPages: 0 };
+      return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
     }
   },
 };

@@ -27,7 +27,18 @@ import { useLeaderboardQuery } from "@/features/leaderboard";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+export interface LeaderboardSearch {
+  period?: "weekly" | "monthly" | "yearly";
+}
+
 export const Route = createFileRoute("/employee/leaderboard")({
+  validateSearch: (search: Record<string, unknown>): LeaderboardSearch => {
+    const p = search.period as string;
+    if (p === "weekly" || p === "yearly") {
+      return { period: p };
+    }
+    return { period: "monthly" };
+  },
   head: () => ({
     meta: [
       { title: "Leaderboard — Dimisi" },
@@ -74,11 +85,21 @@ function badgesFor(points: number, completionRate: number) {
 
 function EmployeeLeaderboardPage() {
   const { user: currentUser } = useAuth();
+  const navigate = Route.useNavigate();
+  const searchParams = Route.useSearch();
+  const range: Range = searchParams.period === "weekly" || searchParams.period === "yearly" ? searchParams.period : "monthly";
+
   const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
 
-  const [range, setRange] = useState<Range>("monthly");
   const [department, setDepartment] = useState<string>("all");
   const [search, setSearch] = useState("");
+
+  const handleRangeChange = (newRange: Range) => {
+    navigate({
+      search: (prev: Record<string, unknown>) => ({ ...prev, period: newRange }),
+      replace: true,
+    });
+  };
 
   const leaderboardEntries = useMemo(() => {
     return rawLeaderboard.map((item, index) => {
@@ -143,7 +164,7 @@ function EmployeeLeaderboardPage() {
 
       {/* Range + Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={range} onValueChange={(v) => setRange(v as Range)}>
+        <Tabs value={range} onValueChange={(v) => handleRangeChange(v as Range)}>
           <TabsList>
             <TabsTrigger value="weekly">Weekly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
