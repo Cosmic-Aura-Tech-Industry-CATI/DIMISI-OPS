@@ -75,6 +75,9 @@ function HistoryPage() {
                   <span>{actionText}</span>
                   <span className="font-medium">{targetText}</span>
                 </div>
+                {a.description && (
+                  <p className="mt-1 text-xs text-foreground/80">{a.description}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   {a.createdAt
                     ? new Date(a.createdAt).toLocaleString(undefined, {

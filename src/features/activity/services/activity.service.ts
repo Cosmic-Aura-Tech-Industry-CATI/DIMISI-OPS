@@ -12,7 +12,7 @@ import type {
 function parseActivityResponse(
   raw: any,
   defaultPage = 1,
-  defaultLimit = 10,
+  defaultLimit = 25,
 ): PaginatedActivityResponse {
   if (!raw) {
     return { data: [], total: 0, page: defaultPage, totalPages: 0 };
@@ -107,6 +107,21 @@ function cleanActivityFilters(filters?: ActivityQueryFilters): Record<string, un
   if (filters.entityType && filters.entityType !== "all") {
     cleaned.entityType = filters.entityType;
   }
+  if (filters.scope && filters.scope !== "all") {
+    cleaned.scope = filters.scope;
+  }
+  if (filters.status && filters.status !== "all") {
+    cleaned.status = filters.status;
+  }
+  if (filters.action && filters.action !== "all") {
+    cleaned.action = filters.action;
+  }
+  if (filters.actorId && filters.actorId !== "all") {
+    cleaned.actorId = filters.actorId;
+  }
+  if (filters.search && filters.search.trim()) {
+    cleaned.search = filters.search.trim();
+  }
   if (filters.startDate) {
     cleaned.startDate = filters.startDate instanceof Date ? filters.startDate.toISOString() : filters.startDate;
   }
@@ -124,7 +139,7 @@ export const activityService = {
     try {
       const params = cleanActivityFilters(filters);
       const res = await apiClient.get<any>(API_ENDPOINTS.activity.personal, { params });
-      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 10);
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getPersonalLogs] Failed:", err);
       return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
@@ -137,7 +152,7 @@ export const activityService = {
     try {
       const params = cleanActivityFilters(filters);
       const res = await apiClient.get<any>(API_ENDPOINTS.activity.admin, { params });
-      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 10);
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getAdminLogs] Failed:", err);
       return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
@@ -150,7 +165,7 @@ export const activityService = {
     try {
       const params = cleanActivityFilters(filters);
       const res = await apiClient.get<any>(API_ENDPOINTS.activity.org, { params });
-      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 10);
+      return parseActivityResponse(res.data, filters?.page || 1, filters?.limit || 25);
     } catch (err) {
       console.warn("[activityService.getOrgLogs] Failed:", err);
       return { data: [], total: 0, page: filters?.page || 1, totalPages: 0 };
