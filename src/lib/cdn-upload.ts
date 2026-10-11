@@ -147,14 +147,19 @@ export async function uploadFileToCdn(
 
   const data = response.data;
   const secureUrl = data.secure_url || data.url;
+  const publicId = data.public_id;
 
   if (!secureUrl) {
     throw new Error("Storage provider did not return a public image URL.");
   }
 
+  if (!publicId) {
+    throw new Error("Storage provider did not return a public image ID.");
+  }
+
   return {
     secureUrl,
-    publicId: signData.publicId,
+    publicId,
   };
 }
 
