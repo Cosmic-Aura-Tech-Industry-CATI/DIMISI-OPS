@@ -137,7 +137,35 @@ export interface UpdatePasswordPayload {
 export interface UpdateProfilePayload {
   phone?: string;
   avatar?: string;
+  avatarPublicId?: string;
   avtar?: string;
   photo?: string;
   profileImage?: string;
 }
+
+export interface UpdateProfileResult {
+  user?: {
+    id?: string;
+    _id?: string;
+    phone?: string;
+    avatar?: string;
+    avatarPublicId?: string;
+    [key: string]: unknown;
+  };
+  data?: {
+    user?: {
+      id?: string;
+      _id?: string;
+      phone?: string;
+      avatar?: string;
+      avatarPublicId?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  phone?: string;
+  avatar?: string;
+  avatarPublicId?: string;
+  [key: string]: unknown;
+}
+

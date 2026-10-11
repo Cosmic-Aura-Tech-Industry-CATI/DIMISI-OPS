@@ -1,9 +1,14 @@
+import { getApiV2Endpoint } from "./config";
+
 /**
  * Single source of truth for every backend path.
  * Add new endpoints here — never inline a path in a service.
  */
 export const API_ENDPOINTS = {
   health: "/",
+  upload: {
+    sign: "/upload/sign",
+  },
   auth: {
     login: "/auth/login",
     verifyLogin: "/auth/verify-login",
@@ -108,6 +113,7 @@ export const API_ENDPOINTS = {
     checkPassword: "/settings/passwords/check",
     updatePassword: "/settings/passwords/update",
     profile: "/settings/profile",
+    profileV2: getApiV2Endpoint("/settings/profile"),
     sessions: "/settings/sessions",
     revokeOtherSessions: "/settings/sessions/others",
     revokeSession: (id: string) => `/settings/sessions/${id}`,
