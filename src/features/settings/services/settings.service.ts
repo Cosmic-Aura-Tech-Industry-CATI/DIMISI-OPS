@@ -8,6 +8,7 @@ import type {
   UpdatePasswordPayload,
   UpdatePreferencesPayload,
   UpdateProfilePayload,
+  UpdateProfileResult,
   UpdateWorkspaceSettingsPayload,
   UserPreferences,
   UserSession,
@@ -161,20 +162,33 @@ export const settingsService = {
     return res;
   },
 
-  updateProfile: async (payload: UpdateProfilePayload | Record<string, any>): Promise<any> => {
-    const avatarValue = payload.avatar || payload.avtar || payload.photo || payload.profileImage;
-    const body: Record<string, any> = {};
+  updateProfile: async (payload: UpdateProfilePayload): Promise<UpdateProfileResult> => {
+    const avatarValue =
+      payload.avatar !== undefined
+        ? payload.avatar
+        : payload.photo !== undefined
+          ? payload.photo
+          : payload.profileImage;
+    const avatarPublicIdValue = payload.avatarPublicId;
+
+    const body: Record<string, unknown> = {};
 
     if (payload.phone !== undefined) {
       body.phone = payload.phone;
     }
+
+    // Pass avatar and avatarPublicId matching backend v2 contract
     if (avatarValue !== undefined) {
       body.avatar = avatarValue;
-      body.avtar = avatarValue;
+    }
+    if (avatarPublicIdValue !== undefined) {
+      body.avatarPublicId = avatarPublicIdValue;
     }
 
-    const res = await http.patch<any>(API_ENDPOINTS.settings.profile, body);
-    return res?.user || res?.data?.user || res?.data || res;
+    // Call PATCH /api/v2/settings/profile
+    const endpoint = API_ENDPOINTS.settings.profileV2;
+    const res = await http.patch<UpdateProfileResult>(endpoint, body);
+    return res;
   },
 
   getSessions: async (): Promise<SessionsData> => {

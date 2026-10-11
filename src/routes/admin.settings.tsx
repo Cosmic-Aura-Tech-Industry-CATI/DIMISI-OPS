@@ -439,9 +439,9 @@ function SecuritySection() {
                         {s.location || s.ipAddress || "Active"} ·{" "}
                         {s.lastActive
                           ? new Date(s.lastActive).toLocaleString(undefined, {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })
                           : "Active now"}
                       </p>
                     </div>
@@ -593,12 +593,7 @@ function SecuritySection() {
 
 export function ThemeSection() {
   const { theme, setTheme } = useTheme();
-  const {
-    data: preferences,
-    isLoading,
-    isError,
-    refetch,
-  } = useUserPreferencesQuery();
+  const { data: preferences, isLoading, isError, refetch } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
   const options: Array<{ value: "light" | "dark"; label: string; icon: typeof Sun }> = [
@@ -633,12 +628,7 @@ export function ThemeSection() {
               <AlertCircle className="h-4 w-4 shrink-0" />
               Failed to load appearance preferences.
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => refetch()}
-            >
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => refetch()}>
               <RotateCcw className="mr-1 h-3 w-3" /> Retry
             </Button>
           </div>
@@ -687,12 +677,7 @@ export function ThemeSection() {
 /* ---------------- Notifications ---------------- */
 
 export function NotificationsSection() {
-  const {
-    data: preferences,
-    isLoading,
-    isError,
-    refetch,
-  } = useUserPreferencesQuery();
+  const { data: preferences, isLoading, isError, refetch } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
   const emailNotifs = preferences?.notifications?.email;
@@ -763,7 +748,10 @@ export function NotificationsSection() {
             <Skeleton className="h-16 w-full rounded-xl" />
           </div>
         </SettingCard>
-        <SettingCard title="In-app notifications" description="What shows in your notification tray.">
+        <SettingCard
+          title="In-app notifications"
+          description="What shows in your notification tray."
+        >
           <div className="space-y-3">
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />
@@ -921,29 +909,29 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
 
   const handleSaveProfile = async () => {
     try {
-      const payload: Record<string, any> = { phone, avatar: photo };
+      const payload: Record<string, any> = { phone: phone.trim() };
 
       const res = await updateProfile.mutateAsync(payload);
-      const updatedUser = res?.user || res?.data?.user || res?.data || res;
+      const updatedUser = (res?.user || res?.data?.user || res?.data || res) as
+        Record<string, unknown> | undefined;
 
-      const newAvatar = updatedUser?.avatar || updatedUser?.avtar || photo;
-      const newPhone = updatedUser?.phone ?? phone;
+      const newPhone =
+        (typeof updatedUser?.phone === "string" ? updatedUser.phone : undefined) ?? phone.trim();
 
       if (user) {
         setUser({
           ...user,
           phone: newPhone,
-          avatar: newAvatar,
         });
       }
 
-      updateProfileStore({ phone: newPhone, photo: newAvatar });
+      updateProfileStore({ phone: newPhone });
 
       logAudit({
         category: "settings",
         action: "Updated Profile",
         target: "Personal Information",
-        details: "User updated contact details and profile picture.",
+        details: "User updated contact details.",
       });
       toast.success("Profile saved successfully.");
       setSelectedFile(null);
@@ -960,31 +948,24 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
       : user?.department || "Operations";
   const code = (user as any)?.empId || user?.code || user?.id || (user as any)?._id || "—";
 
-  const getInitials = (n: string) => {
-    const parts = n.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  const isImageAvatar =
-    Boolean(photo) &&
-    (photo.startsWith("data:") || photo.startsWith("http") || photo.startsWith("/") || photo.includes("/"));
-
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <SettingCard title="Avatar" description="Profile photo and visual identifier.">
         <AvatarUpload
           value={photo}
           name={name}
-          onChange={async (photoUrl, file) => {
-            const nextPhoto = photoUrl || "";
-            setPhoto(nextPhoto);
-            setSelectedFile(file ?? null);
+          autoUpload={true}
+          disabled={updateProfile.isPending}
+          onUploadSuccess={async ({ avatar, avatarPublicId }) => {
             try {
-              const payload = { phone, avatar: nextPhoto };
-              const res = await updateProfile.mutateAsync(payload);
-              const updatedUser = res?.user || res?.data?.user || res?.data || res;
-              const newAvatar = updatedUser?.avatar || updatedUser?.avtar || nextPhoto;
+              const res = await updateProfile.mutateAsync({ avatar, avatarPublicId });
+              const updatedUser = (res?.user || res?.data?.user || res?.data || res) as
+                Record<string, unknown> | undefined;
+              const newAvatar =
+                (typeof updatedUser?.avatar === "string" ? updatedUser.avatar : undefined) ||
+                avatar;
+
+              setPhoto(newAvatar);
               if (user) {
                 setUser({
                   ...user,
@@ -992,9 +973,39 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
                 });
               }
               updateProfileStore({ photo: newAvatar });
+              logAudit({
+                category: "settings",
+                action: "Updated Profile",
+                target: "Avatar",
+                details: "User uploaded a new profile picture.",
+              });
               toast.success("Profile photo updated successfully.");
             } catch (err: any) {
-              toast.error(err?.message || "Failed to update profile photo.");
+              toast.error(err?.message || "Failed to save profile with new photo.");
+              throw err;
+            }
+          }}
+          onRemove={async () => {
+            try {
+              await updateProfile.mutateAsync({ avatar: "", avatarPublicId: "" });
+              setPhoto("");
+              if (user) {
+                setUser({
+                  ...user,
+                  avatar: "",
+                });
+              }
+              updateProfileStore({ photo: null });
+              logAudit({
+                category: "settings",
+                action: "Updated Profile",
+                target: "Avatar",
+                details: "User removed profile picture.",
+              });
+              toast.success("Profile photo removed.");
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to remove profile photo.");
+              throw err;
             }
           }}
         />
@@ -1041,7 +1052,11 @@ export function ProfileSection({ role }: { role: "admin" | "employee" }) {
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Input value={role === "admin" ? "Operations Admin" : "Employee"} disabled className="bg-muted/50" />
+              <Input
+                value={role === "admin" ? "Operations Admin" : "Employee"}
+                disabled
+                className="bg-muted/50"
+              />
             </div>
           </div>
         </SettingCard>
