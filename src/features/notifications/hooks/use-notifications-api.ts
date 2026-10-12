@@ -12,8 +12,8 @@ export function useNotificationsQuery() {
   return useQuery({
     queryKey: queryKeys.notifications.list(),
     queryFn: () => notificationsService.getNotifications(),
-    staleTime: 10 * 1000,
-    refetchInterval: 20 * 1000, // Background polling fallback
+    staleTime: 60 * 1000,
+    refetchInterval: false, // Long polling replaced by real-time Socket.IO events
   });
 }
 

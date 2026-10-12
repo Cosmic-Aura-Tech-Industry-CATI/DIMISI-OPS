@@ -20,6 +20,7 @@ class RealtimeSocketService {
   private currentUserId: string | null = null;
   private eventListeners: Map<string, Set<EventCallback>> = new Map();
   private isConnecting = false;
+  private hasConnectedBefore = false;
 
   /**
    * Resolves the WebSocket server URL based on the environment configuration.
@@ -68,7 +69,7 @@ class RealtimeSocketService {
       return this.socket;
     }
 
-    if (this.isConnecting) return this.socket;
+    if (this.isConnecting && this.socket) return this.socket;
     this.isConnecting = true;
 
     try {
@@ -81,7 +82,7 @@ class RealtimeSocketService {
         withCredentials: true,
         transports: ["websocket", "polling"],
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         autoConnect: true,
@@ -93,6 +94,20 @@ class RealtimeSocketService {
         if (this.currentUserId) {
           this.joinUserRoom(this.currentUserId);
         }
+        if (this.hasConnectedBefore) {
+          console.log("[Socket] Reconnected to backend. Dispatching reconnected signal.");
+          this.dispatchLocalEvent("reconnected", { socketId: this.socket?.id });
+        } else {
+          this.hasConnectedBefore = true;
+          this.dispatchLocalEvent("connected", { socketId: this.socket?.id });
+        }
+      });
+
+      this.socket.io.on("reconnect", () => {
+        if (this.currentUserId) {
+          this.joinUserRoom(this.currentUserId);
+        }
+        this.dispatchLocalEvent("reconnected", { socketId: this.socket?.id });
       });
 
       this.socket.on("connect_error", (error) => {
@@ -109,12 +124,6 @@ class RealtimeSocketService {
       this.socket.on("user_event", (payload: SocketUserEvent) => {
         if (!payload) return;
         this.dispatchLocalEvent("user_event", payload);
-        if (payload.event) {
-          this.dispatchLocalEvent(payload.event, payload);
-        }
-        if (payload.event === "notification_created" && payload.notification) {
-          this.dispatchLocalEvent("notification_created", payload.notification);
-        }
       });
 
       // Register standard call and notification event forwarding
@@ -269,6 +278,7 @@ class RealtimeSocketService {
       this.socket = null;
     }
     this.isConnecting = false;
+    this.hasConnectedBefore = false;
     this.currentUserId = null;
   }
 
