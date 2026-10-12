@@ -63,6 +63,14 @@ function ReviewCenterPage() {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
+      // Ensure only tasks actively pending review are displayed
+      const raw = (t.rawStatus || "").toLowerCase().trim();
+      const st = (t.status || "").toLowerCase().trim();
+      const rev = (t.reviewState || "").toLowerCase().trim();
+      if (raw === "completed" || st === "completed" || rev === "approved") return false;
+      if (rev === "rejected" || Boolean(t.rejectionReason)) return false;
+      if (raw === "in_progress" && rev !== "in_review") return false;
+
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -270,7 +278,7 @@ function ReviewCenterPage() {
 
                       {/* Status */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <TaskStatusBadge status="IN_REVIEW" />
+                        <TaskStatusBadge status={task.status || "IN_REVIEW"} />
                       </td>
 
                       {/* Actions */}
@@ -298,6 +306,10 @@ function ReviewCenterPage() {
         open={Boolean(selectedTask)}
         onOpenChange={(open) => {
           if (!open) setSelectedTask(null);
+        }}
+        onSuccess={() => {
+          setSelectedTask(null);
+          void refetch();
         }}
       />
     </>

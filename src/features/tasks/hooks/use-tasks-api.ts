@@ -262,6 +262,21 @@ export function useReviewTaskMutation(
     mutationFn: ({ id, isApproved, feedback }) => tasksService.reviewTask(id, isApproved, feedback),
     onSuccess: (...args) => {
       const [, variables] = args;
+      // Immediately remove the reviewed task from the Review Center query cache
+      queryClient.setQueryData<ReviewCenterResponse>(taskKeys.reviewCenter, (old) => {
+        if (!old) return old;
+        const remaining = old.tasks.filter((t) => (t.id || t._id) !== variables.id);
+        return {
+          ...old,
+          kpis: {
+            ...old.kpis,
+            pendingReview: remaining.length,
+            highPriority: remaining.filter((t) => t.priority === "high").length,
+            pointsAtStake: remaining.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0),
+          },
+          tasks: remaining,
+        };
+      });
       invalidateAllTaskQueries(queryClient, variables.id);
       if (variables.isApproved) {
         toast.success("Task approved and marked as completed!");

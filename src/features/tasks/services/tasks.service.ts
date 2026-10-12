@@ -166,9 +166,20 @@ export const tasksService = {
   async getReviewCenter(): Promise<ReviewCenterResponse> {
     const res = await http.get<any>(API_ENDPOINTS.tasks.reviewCenter);
     const rawList = res?.tasks || res?.data?.tasks || (Array.isArray(res) ? res : []);
-    const tasks = Array.isArray(rawList) ? rawList.map(mapTaskResponse) : [];
+    const allTasks = Array.isArray(rawList) ? rawList.map(mapTaskResponse) : [];
 
-    const kpis = res?.kpis || res?.data?.kpis || {
+    // Filter strictly to tasks waiting for review (exclude completed, approved, rejected, or active in-progress tasks)
+    const tasks = allTasks.filter((t) => {
+      const raw = (t.rawStatus || "").toLowerCase().trim();
+      const st = (t.status || "").toLowerCase().trim();
+      const rev = (t.reviewState || "").toLowerCase().trim();
+      if (raw === "completed" || st === "completed" || rev === "approved") return false;
+      if (rev === "rejected" || Boolean(t.rejectionReason)) return false;
+      if (raw === "in_progress" && rev !== "in_review") return false;
+      return raw === "in_review" || rev === "in_review" || st === "in_review";
+    });
+
+    const kpis = {
       pendingReview: tasks.length,
       highPriority: tasks.filter((t) => t.priority === "high").length,
       pointsAtStake: tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0),

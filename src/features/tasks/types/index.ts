@@ -463,7 +463,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     notes: doc.notes,
     attachments,
     rawAttachmentUrls,
-    reviewState: defaultReviewState,
+    reviewState: defaultReviewState ?? (rejectionReason && (doc.status === "in_progress" || !doc.status) ? "rejected" : undefined),
     rejectionReason,
     projectId,
     projectName,
