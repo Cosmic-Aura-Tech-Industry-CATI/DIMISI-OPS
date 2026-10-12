@@ -34,7 +34,7 @@ import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, getCategoryLabel } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import {
   useEmployeeTasksDeadlinesQuery,
@@ -373,7 +373,7 @@ function EmployeeOverview() {
                 <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{t.title}</p>
-                    <p className="text-xs text-muted-foreground">{t.category}</p>
+                    <p className="text-xs text-muted-foreground">{getCategoryLabel(t.category)}</p>
                   </div>
                   <span className={`rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
                     {days === 0 ? "Today" : `${days}d`}

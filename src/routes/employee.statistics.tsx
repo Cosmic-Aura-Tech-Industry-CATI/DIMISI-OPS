@@ -49,7 +49,7 @@ import {
 import { ACCENT, GRID_STROKE, axisStyle, chartColorAt, tooltipStyle } from "@/components/reports/chart-theme";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, getCategoryLabel } from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 
@@ -406,9 +406,10 @@ function StatisticsPage() {
     mine.forEach((t) => {
       const rec = t as unknown as Record<string, unknown>;
       const tType = String(rec.type || rec.kind || "");
+      const catLabel = getCategoryLabel(t.category);
       const cat =
-        typeof t.category === "string" && t.category.trim()
-          ? t.category.trim()
+        catLabel !== "Uncategorized"
+          ? catLabel
           : tType === "project"
             ? "Project Tasks"
             : tType === "universal"

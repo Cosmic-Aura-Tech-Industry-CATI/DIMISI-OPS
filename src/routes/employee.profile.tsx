@@ -45,7 +45,7 @@ import { useAuth } from "@/lib/auth";
 import { useEditableProfile } from "@/lib/profile-store";
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { useDepartmentsQuery } from "@/features/departments";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, getCategoryLabel } from "@/features/tasks";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 import { cn } from "@/lib/utils";
@@ -815,7 +815,7 @@ function ProfilePage() {
                         {t.title}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{t.category || "General"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{getCategoryLabel(t.category)}</TableCell>
                     <TableCell><TaskStatusBadge status={t.status} /></TableCell>
                     <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">

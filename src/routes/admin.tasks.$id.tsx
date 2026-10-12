@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { admins, employees } from "@/lib/mock-data";
-import { useTaskQuery, useDeleteTask, useAssignTask, type Task } from "@/features/tasks";
+import { useTaskQuery, useDeleteTask, useAssignTask, type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
@@ -185,7 +185,7 @@ function TaskDetailPage() {
 
       <PageHeader
         title={task.title}
-        subtitle={`${task.category} · ${taskId(task.id)}`}
+        subtitle={formatTaskSubtitle(task.category, task.id)}
         actions={
           <>
             <Button asChild variant="outline" className="rounded-md">
@@ -375,7 +375,7 @@ function TaskDetailPage() {
               </div>
             </Row>
             <Row icon={Trophy} label="Reward"><span className="font-medium">{task.points} pts</span></Row>
-            <Row icon={FileText} label="Category">{task.category}</Row>
+            <Row icon={FileText} label="Category">{getCategoryLabel(task.category)}</Row>
             <Row icon={User} label="Created by">{creator}</Row>
             <Row icon={CalendarDays} label="Created">{new Date(task.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</Row>
           </dl>

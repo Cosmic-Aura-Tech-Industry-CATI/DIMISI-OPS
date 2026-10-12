@@ -281,6 +281,97 @@ export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus;
   }
 }
 
+export function isMongoObjectId(val: unknown): boolean {
+  return typeof val === "string" && /^[a-f\d]{24}$/i.test(val.trim());
+}
+
+/**
+ * Returns a human-readable category label.
+ * Never returns a raw MongoDB ObjectId.
+ * Falls back to "Uncategorized" if category is missing or invalid.
+ */
+export function getCategoryLabel(category: unknown): string {
+  if (typeof category === "string") {
+    const value = category.trim();
+
+    // Do not display a raw MongoDB ObjectId.
+    if (isMongoObjectId(value)) {
+      return "Uncategorized";
+    }
+
+    return value || "Uncategorized";
+  }
+
+  if (category && typeof category === "object") {
+    const value = category as {
+      name?: unknown;
+      title?: unknown;
+      label?: unknown;
+      categoryName?: unknown;
+    };
+
+    for (const candidate of [
+      value.name,
+      value.title,
+      value.label,
+      value.categoryName,
+    ]) {
+      if (
+        typeof candidate === "string" &&
+        candidate.trim() &&
+        !isMongoObjectId(candidate.trim())
+      ) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return "Uncategorized";
+}
+
+/**
+ * Resolves a human-readable category name from an API task document.
+ * Checks candidate fields and populated objects while preventing raw ObjectId display.
+ */
+export function resolveTaskCategory(doc: unknown): string {
+  if (!doc || typeof doc !== "object") return "Uncategorized";
+  const d = doc as Record<string, unknown>;
+
+  const candidates = [
+    d.category,
+    d.categoryName,
+    d.category_name,
+    d.categoryTitle,
+    d.categoryLabel,
+    typeof d.category === "object" && d.category !== null ? (d.category as Record<string, unknown>).name : undefined,
+    typeof d.category === "object" && d.category !== null ? (d.category as Record<string, unknown>).title : undefined,
+    typeof d.category === "object" && d.category !== null ? (d.category as Record<string, unknown>).label : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null) {
+      const label = getCategoryLabel(candidate);
+      if (label !== "Uncategorized") {
+        return label;
+      }
+    }
+  }
+
+  return "Uncategorized";
+}
+
+/**
+ * Formats the task subtitle for display.
+ * Never displays a raw MongoDB ObjectId.
+ */
+export function formatTaskSubtitle(category: unknown, id?: string): string {
+  const catLabel = getCategoryLabel(category);
+  if (id && typeof id === "string" && id.trim() && !isMongoObjectId(id.trim())) {
+    return `${catLabel} · ${id.trim()}`;
+  }
+  return catLabel;
+}
+
 /**
  * Normalizes any backend task response (ITask or IMaskedTask) into frontend Task format.
  */
@@ -439,9 +530,9 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
   return {
     _id: id,
     id,
-    title: doc.title || "",
+    title: doc.title || (typeof (doc as Record<string, unknown>).name === "string" ? ((doc as Record<string, unknown>).name as string) : "") || "",
     description: doc.description || "",
-    category: doc.category || "General",
+    category: resolveTaskCategory(doc) !== "Uncategorized" ? resolveTaskCategory(doc) : resolveTaskCategory(raw),
     priority: toFrontendTaskPriority(doc.priority),
     status: frontendStatus,
     rawStatus: doc.status,

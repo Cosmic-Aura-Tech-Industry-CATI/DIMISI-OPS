@@ -52,11 +52,6 @@ export const Route = createFileRoute("/employee/leaderboard")({
 
 type Range = "weekly" | "monthly" | "yearly";
 
-const rangeMultiplier: Record<Range, number> = {
-  weekly: 0.18,
-  monthly: 0.6,
-  yearly: 1,
-};
 
 const podium = [
   { Icon: Crown, ring: "from-[oklch(0.85_0.16_85)] to-[oklch(0.75_0.19_65)]", label: "Champion" },
@@ -73,12 +68,12 @@ function initials(name: string) {
     .join("");
 }
 
-function badgesFor(points: number, completionRate: number) {
+function badgesFor(points: number, completionRate: number | null) {
   const badges: { label: string; Icon: typeof Star; tone: string }[] = [];
   if (points >= 1500) badges.push({ label: "Elite", Icon: Crown, tone: "bg-primary/15 text-primary border-primary/30" });
-  if (completionRate >= 92) badges.push({ label: "Consistent", Icon: Target, tone: "bg-primary/10 text-primary border-primary/30" });
+  if (completionRate !== null && completionRate >= 92) badges.push({ label: "Consistent", Icon: Target, tone: "bg-primary/10 text-primary border-primary/30" });
   if (points >= 1200) badges.push({ label: "Top 10%", Icon: Star, tone: "bg-primary/10 text-primary border-primary/30" });
-  if (completionRate >= 88 && points >= 1000) badges.push({ label: "On Fire", Icon: Flame, tone: "bg-primary/10 text-primary border-primary/30" });
+  if (completionRate !== null && completionRate >= 88 && points >= 1000) badges.push({ label: "On Fire", Icon: Flame, tone: "bg-primary/10 text-primary border-primary/30" });
   if (badges.length === 0) badges.push({ label: "Rising", Icon: Zap, tone: "bg-primary/10 text-primary border-primary/30" });
   return badges.slice(0, 3);
 }
@@ -102,28 +97,64 @@ function EmployeeLeaderboardPage() {
   };
 
   const leaderboardEntries = useMemo(() => {
-    return rawLeaderboard.map((item, index) => {
-      const deptName =
-        typeof item.department === "object" && item.department
-          ? (item.department as { name?: string }).name
-          : (item.department as string) || "General";
+    return rawLeaderboard
+      .map((item, index) => {
+        const deptName =
+          typeof item.department === "object" && item.department
+            ? (item.department as { name?: string }).name
+            : (item.department as string) || "General";
 
-      const points = item.points ?? 0;
-      const tasksCompleted = (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0;
-      const codeStr = String(item.empId || item.code || "—");
+        const points = typeof item.points === "number" ? item.points : 0;
+        const tasksCompleted =
+          (typeof item.completedTasks === "number" ? item.completedTasks : undefined) ??
+          (typeof item.tasksCompleted === "number" ? item.tasksCompleted : undefined) ??
+          (typeof item.completedTasksCount === "number" ? item.completedTasksCount : undefined) ??
+          0;
+        const codeStr = String(item.empId || item.code || "—");
 
-      return {
-        id: String(item._id || index),
-        code: codeStr,
-        name: item.name || "Teammate",
-        email: item.email || "",
-        department: deptName,
-        avatar: initials(item.name || "Teammate"),
-        points,
-        tasksCompleted,
-        rank: index + 1,
-      };
-    });
+        const rawRate =
+          typeof item.completionRate === "number"
+            ? item.completionRate
+            : typeof (item as Record<string, unknown>).completion_rate === "number"
+              ? ((item as Record<string, unknown>).completion_rate as number)
+              : undefined;
+
+        const totalTasks =
+          (typeof item.totalTasks === "number" ? item.totalTasks : undefined) ??
+          (typeof (item as Record<string, unknown>).assignedTasks === "number"
+            ? ((item as Record<string, unknown>).assignedTasks as number)
+            : undefined) ??
+          (typeof (item as Record<string, unknown>).tasksAssigned === "number"
+            ? ((item as Record<string, unknown>).tasksAssigned as number)
+            : undefined) ??
+          (typeof (item as Record<string, unknown>).totalTasksCount === "number"
+            ? ((item as Record<string, unknown>).totalTasksCount as number)
+            : undefined);
+
+        let completionRate: number | null = null;
+        if (rawRate !== undefined) {
+          completionRate = Math.min(100, Math.max(0, Math.round(rawRate)));
+        } else if (totalTasks !== undefined && totalTasks > 0) {
+          completionRate = Math.min(100, Math.max(0, Math.round((tasksCompleted / totalTasks) * 100)));
+        }
+
+        return {
+          id: String(item._id || index),
+          code: codeStr,
+          name: item.name || "Teammate",
+          email: item.email || "",
+          department: deptName,
+          avatar: initials(item.name || "Teammate"),
+          points,
+          tasksCompleted,
+          completionRate,
+        };
+      })
+      .sort((a, b) => b.points - a.points)
+      .map((entry, idx) => ({
+        ...entry,
+        rank: idx + 1,
+      }));
   }, [rawLeaderboard]);
 
   const departments = useMemo(
@@ -131,28 +162,15 @@ function EmployeeLeaderboardPage() {
     [leaderboardEntries],
   );
 
-  const scaled = useMemo(() => {
-    const m = rangeMultiplier[range];
-    return leaderboardEntries
-      .map((e) => {
-        const points = Math.round(e.points * m);
-        const tasksCompleted = Math.max(1, Math.round(e.tasksCompleted * m));
-        const completionRate = Math.min(99, 70 + ((e.points % 30) + (tasksCompleted % 10)));
-        return { ...e, points, tasksCompleted, completionRate };
-      })
-      .sort((a, b) => b.points - a.points)
-      .map((e, i) => ({ ...e, rank: i + 1 }));
-  }, [leaderboardEntries, range]);
-
   const filtered = useMemo(() => {
-    return scaled.filter((e) => {
+    return leaderboardEntries.filter((e) => {
       if (department !== "all" && e.department !== department) return false;
       if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [scaled, department, search]);
+  }, [leaderboardEntries, department, search]);
 
-  const top3 = scaled.slice(0, 3);
+  const top3 = leaderboardEntries.slice(0, 3);
   const table = filtered;
 
   return (
@@ -231,7 +249,13 @@ function EmployeeLeaderboardPage() {
             <div className="grid gap-4 sm:grid-cols-3">
               {top3.map((e, i) => {
                 const { Icon, ring, label } = podium[i] || podium[0];
-                const isMe = Boolean(currentUser?.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase());
+                const isMe = Boolean(
+                  currentUser &&
+                    ((currentUser.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
+                      (currentUser.id && (e.id === currentUser.id || e.code === currentUser.id)) ||
+                      (currentUser._id && (e.id === currentUser._id || e.code === currentUser._id)) ||
+                      (currentUser.empId && (e.code === currentUser.empId || e.id === currentUser.empId)))
+                );
                 return (
                   <div
                     key={e.id}
@@ -265,7 +289,7 @@ function EmployeeLeaderboardPage() {
                     <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
                       <span><span className="font-medium text-foreground">{e.tasksCompleted}</span> tasks</span>
                       <span className="h-3 w-px bg-border/60" />
-                      <span><span className="font-medium text-foreground">{e.completionRate}%</span> rate</span>
+                      <span><span className="font-medium text-foreground">{e.completionRate !== null ? `${e.completionRate}%` : "—"}</span> rate</span>
                     </div>
                   </div>
                 );
@@ -302,7 +326,13 @@ function EmployeeLeaderboardPage() {
                 </TableHeader>
                 <TableBody>
                   {table.map((e) => {
-                    const isMe = Boolean(currentUser?.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase());
+                    const isMe = Boolean(
+                      currentUser &&
+                        ((currentUser.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
+                          (currentUser.id && (e.id === currentUser.id || e.code === currentUser.id)) ||
+                          (currentUser._id && (e.id === currentUser._id || e.code === currentUser._id)) ||
+                          (currentUser.empId && (e.code === currentUser.empId || e.id === currentUser.empId)))
+                    );
                     const badges = badgesFor(e.points, e.completionRate);
                     return (
                       <TableRow
@@ -345,15 +375,19 @@ function EmployeeLeaderboardPage() {
                         </TableCell>
                         <TableCell className="text-right text-sm">{e.tasksCompleted}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-                                style={{ width: `${e.completionRate}%` }}
-                              />
+                          {e.completionRate !== null ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
+                                  style={{ width: `${e.completionRate}%` }}
+                                />
+                              </div>
+                              <span className="w-10 text-right text-xs text-muted-foreground">{e.completionRate}%</span>
                             </div>
-                            <span className="w-10 text-right text-xs text-muted-foreground">{e.completionRate}%</span>
-                          </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1.5">

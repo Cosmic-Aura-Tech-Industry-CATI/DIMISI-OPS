@@ -16,7 +16,7 @@ import { PriorityBadge } from "@/components/status-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { SubmissionDetailDialog } from "@/components/submission-detail-dialog";
 import type { TaskReviewState } from "@/lib/mock-data";
-import { type Task, useStartTask } from "@/features/tasks";
+import { type Task, useStartTask, getCategoryLabel } from "@/features/tasks";
 
 type Bucket = "assigned" | "review" | "completed" | "rejected";
 
@@ -57,7 +57,7 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <PriorityBadge priority={task.priority} />
             <span className="rounded-sm bg-secondary/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {task.category}
+              {getCategoryLabel(task.category)}
             </span>
           </div>
           <Link

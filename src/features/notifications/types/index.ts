@@ -105,3 +105,9 @@ export interface SocketUserEvent<T = any> {
   notification?: NotificationItem;
   [key: string]: any;
 }
+
+export interface SocketNotificationCreatedPayload {
+  event?: "notification_created" | string;
+  notification?: NotificationItem;
+  [key: string]: any;
+}

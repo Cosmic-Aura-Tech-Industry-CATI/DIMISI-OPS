@@ -126,9 +126,8 @@ class RealtimeSocketService {
         this.dispatchLocalEvent("user_event", payload);
       });
 
-      // Register standard call and notification event forwarding
+      // Register standard call event forwarding
       const forwardEvents: CallEventName[] = [
-        "notification_created",
         "incoming_call",
         "call_accepted",
         "call_rejected",

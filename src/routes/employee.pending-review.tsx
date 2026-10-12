@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { TableSkeleton } from "@/components/skeletons";
 import { TaskStatusBadge, TaskPriorityBadge } from "@/components/task-status-badge";
-import { usePendingTasks } from "@/features/tasks";
+import { usePendingTasks, getCategoryLabel } from "@/features/tasks";
 
 export const Route = createFileRoute("/employee/pending-review")({
   head: () => ({
@@ -32,7 +32,7 @@ function PendingReviewPage() {
       return (
         t.title.toLowerCase().includes(q) ||
         (t.notes && t.notes.toLowerCase().includes(q)) ||
-        (t.category && t.category.toLowerCase().includes(q))
+        getCategoryLabel(t.category).toLowerCase().includes(q)
       );
     });
   }, [tasks, query]);
@@ -123,9 +123,9 @@ function PendingReviewPage() {
                         >
                           {task.title}
                         </Link>
-                        {task.category && (
+                        {getCategoryLabel(task.category) !== "Uncategorized" && (
                           <span className="mt-1 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
-                            {task.category}
+                            {getCategoryLabel(task.category)}
                           </span>
                         )}
                       </td>
