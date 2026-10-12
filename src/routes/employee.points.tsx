@@ -6,7 +6,7 @@ import { StatCard } from "@/components/stat-card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { useLeaderboardQuery } from "@/features/leaderboard";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, getCategoryLabel } from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
 export const Route = createFileRoute("/employee/points")({
@@ -144,7 +144,7 @@ function PointsPage() {
                 <div>
                   <div className="font-medium">{t.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Completed"} · {t.category}
+                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Completed"} · {getCategoryLabel(t.category)}
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-sm font-medium text-success">

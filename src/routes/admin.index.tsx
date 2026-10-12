@@ -31,6 +31,7 @@ import { useDashboardOverviewQuery } from "@/features/dashboard";
 import { useLeaderboardQuery } from "@/features/leaderboard/hooks/use-leaderboard-api";
 import { useEmployeesQuery } from "@/features/employees/hooks/use-employees-api";
 import { useTasksQuery } from "@/features/tasks/hooks/use-tasks-api";
+import { getCategoryLabel } from "@/features/tasks";
 import { useNoticesQuery } from "@/features/notices/hooks/use-notices-api";
 import { useAdminsQuery } from "@/features/admins/hooks/use-admins-api";
 
@@ -207,10 +208,7 @@ function AdminOverview() {
     }
     const deptMap: Record<string, number> = {};
     tasksList.forEach((t) => {
-      const dept =
-        typeof t.category === "object" && t.category !== null
-          ? (t.category as any).name || "General"
-          : String(t.category || "General");
+      const dept = getCategoryLabel(t.category);
       deptMap[dept] = (deptMap[dept] || 0) + 1;
     });
     return Object.entries(deptMap).map(([department, count]) => ({
@@ -223,20 +221,14 @@ function AdminOverview() {
   const departmentPerformanceData = useMemo(() => {
     if (dashboard?.departmentPerformance && dashboard.departmentPerformance.length > 0) {
       return dashboard.departmentPerformance.map((d) => ({
-        department:
-          typeof d.department === "object" && d.department !== null
-            ? (d.department as any).name || "General"
-            : String(d.department || "General"),
+        department: getCategoryLabel(d.department),
         tasks: Number(d.tasks || 0),
         completionRate: Number(d.completionRate || 0),
       }));
     }
     const deptMap: Record<string, { total: number; completed: number }> = {};
     tasksList.forEach((t) => {
-      const dept =
-        typeof t.category === "object" && t.category !== null
-          ? (t.category as any).name || "General"
-          : String(t.category || "General");
+      const dept = getCategoryLabel(t.category);
       if (!deptMap[dept]) deptMap[dept] = { total: 0, completed: 0 };
       deptMap[dept].total += 1;
       if (t.status === "completed") deptMap[dept].completed += 1;

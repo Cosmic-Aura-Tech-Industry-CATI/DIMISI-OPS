@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { useTaskQuery, useStartTask, type Task } from "@/features/tasks";
+import { useTaskQuery, useStartTask, type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/employee/tasks/$id/")({
@@ -122,7 +122,7 @@ function EmployeeTaskDetail() {
 
       <PageHeader
         title={task.title}
-        subtitle={`${task.category} · ${taskId(task.id || task._id || id)}`}
+        subtitle={formatTaskSubtitle(task.category, task.id || task._id || id)}
         actions={
           isAssigned ? (
             <Button
@@ -288,7 +288,7 @@ function EmployeeTaskDetail() {
             <h3 className="font-display font-semibold">Task info</h3>
             <dl className="mt-4 space-y-3 text-sm">
               <Row label="Task ID">{taskId(task.id)}</Row>
-              <Row label="Category">{task.category}</Row>
+              <Row label="Category">{getCategoryLabel(task.category)}</Row>
               <Row label="Priority"><PriorityBadge priority={task.priority} /></Row>
               <Row label="Status"><StatusBadge status={task.status} /></Row>
               <Row label="Assigned by">{creator}</Row>

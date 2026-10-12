@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge } from "@/components/status-badge";
-import type { Task } from "@/features/tasks";
+import { type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 
 const statusLabel: Record<Task["status"], string> = {
   pending: "Pending",
@@ -77,7 +77,7 @@ export function TaskDetailDialog({
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             <PriorityBadge priority={task.priority} />
             <span className="rounded-sm bg-secondary/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {task.category}
+              {getCategoryLabel(task.category)}
             </span>
             <span className="rounded-sm bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
               {statusLabel[task.status]}
@@ -86,7 +86,7 @@ export function TaskDetailDialog({
           <DialogTitle className="text-left font-display text-xl leading-snug">
             {task.title}
           </DialogTitle>
-          <DialogDescription className="text-left">{task.id}</DialogDescription>
+          <DialogDescription className="text-left">{formatTaskSubtitle(task.category, task.id)}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
