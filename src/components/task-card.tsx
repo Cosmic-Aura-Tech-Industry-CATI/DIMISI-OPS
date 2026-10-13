@@ -33,6 +33,8 @@ const statusPill: Record<Task["status"], { label: string; className: string }> =
   overdue: { label: "Overdue", className: "bg-destructive/15 text-destructive" },
   available: { label: "Available", className: "bg-primary/15 text-primary" },
   assigned: { label: "Assigned", className: "bg-info/15 text-info" },
+  in_review: { label: "Pending review", className: "bg-amber-500/15 text-amber-400" },
+  rejected: { label: "Rejected", className: "bg-rose-500/15 text-rose-400" },
 };
 
 export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Bucket; index?: number }) {

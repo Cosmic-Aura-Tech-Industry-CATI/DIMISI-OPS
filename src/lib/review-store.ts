@@ -111,7 +111,7 @@ export function applyReviewDecisions(list: Task[], map: Record<string, ReviewRec
     return {
       ...t,
       reviewState: r.decision,
-      status: r.decision === "approved" ? ("completed" as const) : t.status,
+      status: r.decision === "approved" ? ("completed" as const) : r.decision === "rejected" ? ("rejected" as const) : t.status,
       rejectionReason: r.decision === "rejected" ? r.remarks : t.rejectionReason,
     };
   });

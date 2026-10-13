@@ -99,7 +99,16 @@ export function TaskReviewModal({
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{task.description}</p>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                <TaskStatusBadge status={task.status || "IN_REVIEW"} />
+                <TaskStatusBadge
+                  status={
+                    task.reviewState === "in_review" ||
+                    (task.rawStatus || "").toLowerCase() === "in_review" ||
+                    (task.status || "").toLowerCase() === "in_review"
+                      ? "IN_REVIEW"
+                      : task.status || "IN_REVIEW"
+                  }
+                  reviewState={task.reviewState}
+                />
                 <TaskPriorityBadge priority={task.priority} />
               </div>
             </div>

@@ -1,5 +1,13 @@
 import { assignEmployeeCodes } from "@/lib/ids";
-export type TaskStatus = "pending" | "in_progress" | "completed" | "overdue" | "available" | "assigned";
+export type TaskStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "overdue"
+  | "available"
+  | "assigned"
+  | "in_review"
+  | "rejected";
 export type TaskPriority = "low" | "medium" | "high";
 export type TaskReviewState = "in_review" | "approved" | "rejected";
 /** How a task reaches an employee. */

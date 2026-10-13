@@ -97,6 +97,9 @@ export interface TaskEntity {
   createdAt?: string;
   completedAt?: string;
   category: string;
+  reviewState?: string;
+  rejectionReason?: string;
+  rawStatus?: string;
 }
 
 export interface PerformanceTrendPoint {
@@ -837,7 +840,7 @@ function ProfilePage() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{getCategoryLabel(t.category)}</TableCell>
-                    <TableCell><TaskStatusBadge status={t.status} /></TableCell>
+                    <TableCell><TaskStatusBadge status={t.status} reviewState={t.reviewState} /></TableCell>
                     <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {formatDateSafe(t.dueDate, { day: "numeric", month: "short" })}

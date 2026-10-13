@@ -126,7 +126,7 @@ export function applySubmissions(list: Task[], map: Record<string, Submission>):
   return list.map((t) => {
     const s = map[t.id] || (t._id ? map[t._id] : undefined);
     if (!s || s.status !== "submitted") return t;
-    return { ...t, status: "in_progress", reviewState: "in_review" as const, rejectionReason: undefined };
+    return { ...t, status: "in_review", reviewState: "in_review" as const, rejectionReason: undefined };
   });
 }
 
