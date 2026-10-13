@@ -34,7 +34,7 @@ import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, useCompletedTasks, useAssignedTasks, getCategoryLabel } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import {
   useEmployeeTasksDeadlinesQuery,
@@ -64,6 +64,8 @@ const statusTone: Record<string, string> = {
 function EmployeeOverview() {
   const auth = useAuth();
   const { data: tasks = [] } = useTasksQuery();
+  const { data: completedTasks = [] } = useCompletedTasks();
+  const { data: assignedTasks = [] } = useAssignedTasks();
   const { data: tasksDeadlines } = useEmployeeTasksDeadlinesQuery();
   const { data: analytics } = useEmployeeProgressAnalyticsQuery();
   const { data: activityData } = usePersonalActivityQuery({ limit: 6 });
@@ -71,28 +73,68 @@ function EmployeeOverview() {
 
   const currentUserId = auth.user?.id || auth.user?._id || "";
 
-  const mine = useMemo(() => {
-    return tasks.filter((t) => {
-      return (
+  const allMyTasks = useMemo(() => {
+    const map = new Map<string, (typeof tasks)[number]>();
+    [...assignedTasks, ...completedTasks].forEach((t) => {
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (id) map.set(id, t);
+    });
+    tasks.forEach((t) => {
+      const isMine =
         (currentUserId && t.assigneeId === currentUserId) ||
         (auth.user?.name && t.assignee === auth.user.name) ||
-        (auth.user?.email && t.assignee === auth.user.email)
-      );
+        (auth.user?.email && t.assignee === auth.user.email);
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (isMine && id && !map.has(id)) {
+        map.set(id, t);
+      }
     });
-  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+    return Array.from(map.values());
+  }, [assignedTasks, completedTasks, tasks, currentUserId, auth.user?.name, auth.user?.email]);
 
-  const completed = mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
-  const pending = mine.filter((t) => t.status === "pending" || t.status === "in_progress" || (t.status as string) === "In Progress" || (t.status as string) === "Assigned");
+  const mine = allMyTasks;
+
+  const completed = useMemo(() => {
+    if (completedTasks.length > 0) return completedTasks;
+    return mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
+  }, [completedTasks, mine]);
+
+  const pending = useMemo(() => {
+    const activeFromAssigned = assignedTasks.filter(
+      (t) =>
+        (t.status || "").toLowerCase() !== "completed" &&
+        (t.status || "").toLowerCase() !== "overdue"
+    );
+    if (activeFromAssigned.length > 0) return activeFromAssigned;
+
+    const fromDeadlines = [
+      ...(tasksDeadlines?.todayTasks || []),
+      ...(tasksDeadlines?.upcomingDeadlines || []),
+    ].filter((t) => {
+      const s = (t.status || "").toLowerCase();
+      return s !== "completed" && s !== "overdue";
+    });
+    if (fromDeadlines.length > 0) return fromDeadlines;
+
+    return mine.filter(
+      (t) =>
+        t.status === "pending" ||
+        t.status === "in_progress" ||
+        (t.status as string) === "In Progress" ||
+        (t.status as string) === "Assigned"
+    );
+  }, [assignedTasks, tasksDeadlines?.todayTasks, tasksDeadlines?.upcomingDeadlines, mine]);
 
   const displayToday = useMemo(() => {
-    if (tasksDeadlines?.todayTasks) {
+    if (tasksDeadlines?.todayTasks && tasksDeadlines.todayTasks.length > 0) {
       return tasksDeadlines.todayTasks.filter((t) => {
         const s = (t.status || "").toLowerCase();
         return s !== "completed" && s !== "overdue";
       });
     }
+    const pool = assignedTasks.length > 0 ? assignedTasks : mine;
     const now = Date.now();
-    return mine
+    return pool
       .filter((t) => {
         const s = (t.status || "").toLowerCase();
         if (s === "completed" || s === "overdue") return false;
@@ -100,7 +142,7 @@ function EmployeeOverview() {
         return true;
       })
       .slice(0, 3);
-  }, [tasksDeadlines?.todayTasks, mine]);
+  }, [tasksDeadlines?.todayTasks, assignedTasks, mine]);
 
   const displayDeadlines = useMemo(() => {
     if (tasksDeadlines?.upcomingDeadlines) {
@@ -281,7 +323,11 @@ function EmployeeOverview() {
                 Hi, {userName.split(" ")[0]} 👋
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                You have <span className="font-medium text-foreground">{pending.length} active tasks</span> on your plate. Keep it going.
+                You have{" "}
+                <span className="font-medium text-foreground">
+                  {pending.length} active {pending.length === 1 ? "task" : "tasks"}
+                </span>{" "}
+                on your plate. Keep it going.
               </p>
             </div>
           </div>
@@ -373,7 +419,7 @@ function EmployeeOverview() {
                 <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{t.title}</p>
-                    <p className="text-xs text-muted-foreground">{t.category}</p>
+                    <p className="text-xs text-muted-foreground">{getCategoryLabel(t.category)}</p>
                   </div>
                   <span className={`rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
                     {days === 0 ? "Today" : `${days}d`}

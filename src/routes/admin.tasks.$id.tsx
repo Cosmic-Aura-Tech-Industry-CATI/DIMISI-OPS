@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { admins, employees } from "@/lib/mock-data";
-import { useTaskQuery, useDeleteTask, useAssignTask, type Task } from "@/features/tasks";
+import { useTaskQuery, useDeleteTask, useAssignTask, type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
@@ -59,30 +59,6 @@ function formatRequestedAt(dateStr?: string) {
   }
 }
 
-const DUMMY_REQUESTS: NonNullable<Task["requests"]> = [
-  {
-    _id: "req_dummy_1",
-    employeeId: {
-      _id: "emp_dummy_1",
-      name: "Mridul Mishra",
-      email: "2022bds017@axiscolleges.in",
-    },
-    employeeName: "Mridul Mishra",
-    employeeEmail: "2022bds017@axiscolleges.in",
-    requestedAt: "2026-09-25T07:36:33.937Z",
-  },
-  {
-    _id: "req_dummy_2",
-    employeeId: {
-      _id: "emp_dummy_2",
-      name: "Priya Nair",
-      email: "priya@poll.io",
-    },
-    employeeName: "Priya Nair",
-    employeeEmail: "priya@poll.io",
-    requestedAt: "2026-09-25T08:15:20.100Z",
-  },
-];
 
 function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });
@@ -137,11 +113,8 @@ function TaskDetailPage() {
   const creator = task.createdBy || "Admin";
   const daysLeft = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
 
-  // Resolve employee requests directly from task.requests API payload or dummy demo requests
-  const rawRequests =
-    Array.isArray(task.requests) && task.requests.length > 0
-      ? task.requests
-      : DUMMY_REQUESTS;
+  // Resolve employee requests directly from task.requests API payload
+  const rawRequests = Array.isArray(task.requests) ? task.requests : [];
 
   const pendingRequests = rawRequests
     .filter((r) => {
@@ -178,17 +151,12 @@ function TaskDetailPage() {
     if (!targetId) return;
     setProcessing({ id: targetId, action: "accept" });
     try {
-      if (targetId.startsWith("emp_dummy_") || req._id?.startsWith("req_dummy_")) {
-        await new Promise((resolve) => setTimeout(resolve, 350));
-        setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
-        toast.success(`Request accepted! Task assigned to ${req.name}.`);
-      } else {
-        await assignTaskMutation.mutateAsync({
-          id: task.id || task._id,
-          employeeId: req.employeeId,
-        });
-        toast.success(`Request accepted! Task assigned to ${req.name}.`);
-      }
+      await assignTaskMutation.mutateAsync({
+        id: task.id || task._id,
+        employeeId: req.employeeId,
+      });
+      setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+      toast.success(`Request accepted! Task assigned to ${req.name}.`);
     } catch (err: any) {
       toast.error("Failed to accept request", {
         description: err?.message || "An error occurred while assigning the task.",
@@ -202,11 +170,9 @@ function TaskDetailPage() {
     const targetId = req.employeeId || req._id;
     if (!targetId) return;
     setProcessing({ id: targetId, action: "reject" });
-    setTimeout(() => {
-      setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
-      setProcessing(null);
-      toast.info(`Request from ${req.name} rejected.`);
-    }, 250);
+    setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+    setProcessing(null);
+    toast.info(`Request from ${req.name} dismissed.`);
   };
 
   return (
@@ -219,7 +185,7 @@ function TaskDetailPage() {
 
       <PageHeader
         title={task.title}
-        subtitle={`${task.category} · ${taskId(task.id)}`}
+        subtitle={formatTaskSubtitle(task.category, task.id)}
         actions={
           <>
             <Button asChild variant="outline" className="rounded-md">
@@ -381,7 +347,9 @@ function TaskDetailPage() {
               </div>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">
-                No employee requests yet.
+                {task.status !== "available" && task.status !== "pending" && task.assignee
+                  ? "No pending requests. Task is already assigned."
+                  : "No employee requests yet."}
               </p>
             )}
           </div>
@@ -407,7 +375,7 @@ function TaskDetailPage() {
               </div>
             </Row>
             <Row icon={Trophy} label="Reward"><span className="font-medium">{task.points} pts</span></Row>
-            <Row icon={FileText} label="Category">{task.category}</Row>
+            <Row icon={FileText} label="Category">{getCategoryLabel(task.category)}</Row>
             <Row icon={User} label="Created by">{creator}</Row>
             <Row icon={CalendarDays} label="Created">{new Date(task.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</Row>
           </dl>

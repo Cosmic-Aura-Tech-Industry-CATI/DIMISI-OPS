@@ -33,7 +33,7 @@ import {
 import { PriorityBadge } from "@/components/status-badge";
 import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
 import { type Task } from "@/features/tasks";
-import { useTaskQuery, useSubmitTaskForReview, useStartTask } from "@/features/tasks";
+import { useTaskQuery, useSubmitTaskForReview, useStartTask, getCategoryLabel } from "@/features/tasks";
 import { useProjectsQuery } from "@/features/projects";
 import { saveDraft, submitForReview, useSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
@@ -212,7 +212,7 @@ function SubmitProofPage() {
   const info: { label: string; value: React.ReactNode; icon?: typeof Trophy }[] = [
     { label: "Task Name", value: task.title },
     { label: "Project Name", value: project?.name ?? (task.taskType === "project" ? "—" : "General"), icon: FolderKanban },
-    { label: "Task Category", value: `${task.category} · ${taskTypeLabel[task.taskType ?? "direct"]}` },
+    { label: "Task Category", value: `${getCategoryLabel(task.category)} · ${taskTypeLabel[task.taskType ?? "direct"]}` },
     { label: "Priority", value: <PriorityBadge priority={task.priority} /> },
     { label: "Reward Points", value: `${task.points} pts`, icon: Trophy },
     { label: "Assigned Date", value: fmtDate(task.assignedAt ?? task.createdAt) },

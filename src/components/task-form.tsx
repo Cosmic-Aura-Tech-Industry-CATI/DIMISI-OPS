@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type Task, type TaskPriority, type TaskType } from "@/features/tasks";
+import { type Task, type TaskPriority, type TaskType, getCategoryLabel } from "@/features/tasks";
 import { useEmployeesQuery } from "@/features/employees";
 import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
@@ -61,7 +61,10 @@ export function taskToValues(t: Task): TaskFormValues {
   return {
     title: t.title,
     description: t.description,
-    category: t.category,
+    category:
+      getCategoryLabel(t.category) !== "Uncategorized"
+        ? getCategoryLabel(t.category)
+        : (taskCategories[0] || "Engineering"),
     priority: t.priority,
     assigneeId: t.assigneeId,
     points: t.points,

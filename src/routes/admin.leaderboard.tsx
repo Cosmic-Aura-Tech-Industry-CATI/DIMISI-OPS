@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { Trophy, Medal, Award, AlertCircle } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
@@ -33,12 +34,6 @@ export const Route = createFileRoute("/admin/leaderboard")({
 
 type Range = "weekly" | "monthly" | "yearly";
 
-const rangeMultiplier: Record<Range, number> = {
-  weekly: 0.18,
-  monthly: 0.6,
-  yearly: 1,
-};
-
 const podium = [Trophy, Medal, Award];
 const podiumColor = [
   "from-[oklch(0.85_0.16_85)] to-[oklch(0.75_0.19_65)]",
@@ -69,29 +64,33 @@ function LeaderboardPage() {
     });
   };
 
-  const mult = rangeMultiplier[range] || 1;
+  const leaderboard = useMemo(() => {
+    return rawLeaderboard
+      .map((item, index) => {
+        const deptName =
+          typeof item.department === "object" && item.department
+            ? (item.department as { name?: string }).name
+            : (item.department as string) || "General";
 
-  const leaderboard = rawLeaderboard.map((item, index) => {
-    const deptName =
-      typeof item.department === "object" && item.department
-        ? (item.department as { name?: string }).name
-        : (item.department as string) || "General";
+        const codeStr = String(item.empId || item.code || "—");
+        const points = typeof item.points === "number" ? item.points : 0;
 
-    const codeStr = String(item.empId || item.code || "—");
-    const rawPoints = item.points ?? 0;
-    const scaledPoints = range === "yearly" ? rawPoints : Math.round(rawPoints * mult);
-
-    return {
-      id: String(item._id || index),
-      name: item.name || "Employee",
-      code: codeStr,
-      department: deptName,
-      avatar: initials(item.name || "Employee"),
-      points: scaledPoints,
-      tasksCompleted: (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0,
-      rank: index + 1,
-    };
-  });
+        return {
+          id: String(item._id || index),
+          name: item.name || "Employee",
+          code: codeStr,
+          department: deptName,
+          avatar: initials(item.name || "Employee"),
+          points,
+          tasksCompleted: (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0,
+        };
+      })
+      .sort((a, b) => b.points - a.points)
+      .map((entry, idx) => ({
+        ...entry,
+        rank: idx + 1,
+      }));
+  }, [rawLeaderboard]);
 
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);

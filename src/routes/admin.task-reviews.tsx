@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { TaskStatusBadge, TaskPriorityBadge } from "@/components/task-status-badge";
 import { TaskReviewModal } from "@/features/task-reviews/components/task-review-modal";
-import { useReviewCenter, type Task } from "@/features/tasks";
+import { useReviewCenter, type Task, getCategoryLabel } from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/task-reviews")({
   head: () => ({
@@ -63,6 +63,14 @@ function ReviewCenterPage() {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
+      // Ensure only tasks actively pending review are displayed
+      const raw = (t.rawStatus || "").toLowerCase().trim();
+      const st = (t.status || "").toLowerCase().trim();
+      const rev = (t.reviewState || "").toLowerCase().trim();
+      if (raw === "completed" || st === "completed" || rev === "approved") return false;
+      if (rev === "rejected" || Boolean(t.rejectionReason)) return false;
+      if (raw === "in_progress" && rev !== "in_review") return false;
+
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -70,7 +78,7 @@ function ReviewCenterPage() {
         t.assignee.toLowerCase().includes(q) ||
         (t.assigneeEmail && t.assigneeEmail.toLowerCase().includes(q)) ||
         (t.notes && t.notes.toLowerCase().includes(q)) ||
-        (t.category && t.category.toLowerCase().includes(q));
+        getCategoryLabel(t.category).toLowerCase().includes(q);
 
       const matchesPriority =
         priorityFilter === "all" ||
@@ -209,9 +217,9 @@ function ReviewCenterPage() {
                         >
                           {task.title}
                         </Link>
-                        {task.category && (
+                        {getCategoryLabel(task.category) !== "Uncategorized" && (
                           <span className="mt-1 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
-                            {task.category}
+                            {getCategoryLabel(task.category)}
                           </span>
                         )}
                       </td>
@@ -270,7 +278,7 @@ function ReviewCenterPage() {
 
                       {/* Status */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <TaskStatusBadge status="IN_REVIEW" />
+                        <TaskStatusBadge status={task.status || "IN_REVIEW"} />
                       </td>
 
                       {/* Actions */}
@@ -298,6 +306,10 @@ function ReviewCenterPage() {
         open={Boolean(selectedTask)}
         onOpenChange={(open) => {
           if (!open) setSelectedTask(null);
+        }}
+        onSuccess={() => {
+          setSelectedTask(null);
+          void refetch();
         }}
       />
     </>

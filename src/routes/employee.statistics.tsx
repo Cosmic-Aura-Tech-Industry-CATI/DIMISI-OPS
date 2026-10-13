@@ -49,7 +49,14 @@ import {
 import { ACCENT, GRID_STROKE, axisStyle, chartColorAt, tooltipStyle } from "@/components/reports/chart-theme";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { useTasksQuery } from "@/features/tasks";
+import {
+  useTasksQuery,
+  useCompletedTasks,
+  useAssignedTasks,
+  usePendingTasks,
+  getCategoryLabel,
+  type Task,
+} from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 
@@ -70,43 +77,53 @@ function StatisticsPage() {
   const auth = useAuth();
   const currentUserId = auth.user?.id || auth.user?._id || "";
   const { data: tasks = [], isLoading: isTasksLoading } = useTasksQuery();
+  const { data: completedTasks = [] } = useCompletedTasks();
+  const { data: assignedTasks = [] } = useAssignedTasks();
+  const { data: pendingTasks = [] } = usePendingTasks();
   const { data: analytics, isLoading: isAnalyticsLoading } = useEmployeeProgressAnalyticsQuery();
   const { data: leaderboard = [] } = useLeaderboardQuery(100);
 
   const mine = useMemo(() => {
-    return tasks.filter((t) => {
-      const rec = t as unknown as Record<string, unknown>;
-      const assignedId = String(t.assigneeId || rec.assignedTo || "");
-      return (
-        (currentUserId && assignedId === currentUserId) ||
-        (auth.user?.name && t.assignee === auth.user.name) ||
-        (auth.user?.email && t.assignee === auth.user.email)
-      );
+    const map = new Map<string, Task>();
+    [...assignedTasks, ...pendingTasks, ...completedTasks].forEach((t) => {
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (id) map.set(id, t);
     });
-  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+    tasks.forEach((t) => {
+      const isMine =
+        (currentUserId && t.assigneeId === currentUserId) ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email);
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (isMine && id && !map.has(id)) {
+        map.set(id, t);
+      }
+    });
+    return Array.from(map.values());
+  }, [assignedTasks, pendingTasks, completedTasks, tasks, currentUserId, auth.user?.name, auth.user?.email]);
 
-  const completed = useMemo(
-    () => mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed"),
-    [mine]
-  );
+  const completed = useMemo(() => {
+    if (completedTasks.length > 0) return completedTasks;
+    return mine.filter((t) => t.status === "completed" || (t.status as string) === "Completed");
+  }, [completedTasks, mine]);
 
-  const inReview = useMemo(
-    () =>
-      mine.filter(
-        (t) =>
-          t.reviewState === "in_review" ||
-          (t.status as string) === "in_review" ||
-          (t.status as string) === "In Review"
-      ),
-    [mine]
-  );
+  const inReview = useMemo(() => {
+    if (pendingTasks.length > 0) return pendingTasks;
+    return mine.filter(
+      (t) =>
+        t.reviewState === "in_review" ||
+        (t.status as string) === "in_review" ||
+        (t.status as string) === "In Review"
+    );
+  }, [pendingTasks, mine]);
 
   const rejectedTasks = useMemo(
     () =>
       mine.filter((t) => {
-        const s = (t.status as string) || "";
-        const r = (t as unknown as Record<string, unknown>).reviewState as string;
-        return s === "rejected" || s === "Rejected" || r === "rejected";
+        const s = ((t.status as string) || "").toLowerCase();
+        const r = ((t as unknown as Record<string, unknown>).reviewState as string || "").toLowerCase();
+        const notes = t.notes || "";
+        return s === "rejected" || r === "rejected" || Boolean(t.rejectionReason) || notes.includes("Admin Feedback");
       }),
     [mine]
   );
@@ -406,9 +423,10 @@ function StatisticsPage() {
     mine.forEach((t) => {
       const rec = t as unknown as Record<string, unknown>;
       const tType = String(rec.type || rec.kind || "");
+      const catLabel = getCategoryLabel(t.category);
       const cat =
-        typeof t.category === "string" && t.category.trim()
-          ? t.category.trim()
+        catLabel !== "Uncategorized"
+          ? catLabel
           : tType === "project"
             ? "Project Tasks"
             : tType === "universal"

@@ -17,7 +17,13 @@ import {
 } from "recharts";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth";
-import { useTasksQuery } from "@/features/tasks";
+import {
+  useTasksQuery,
+  useCompletedTasks,
+  useAssignedTasks,
+  usePendingTasks,
+  type Task,
+} from "@/features/tasks";
 
 export const Route = createFileRoute("/employee/performance")({
   head: () => ({
@@ -35,16 +41,28 @@ function PerformancePage() {
   const auth = useAuth();
   const currentUserId = auth.user?.id || auth.user?._id || "";
   const { data: tasks = [] } = useTasksQuery();
+  const { data: completedTasks = [] } = useCompletedTasks();
+  const { data: assignedTasks = [] } = useAssignedTasks();
+  const { data: pendingTasks = [] } = usePendingTasks();
 
   const mine = useMemo(() => {
-    return tasks.filter((t) => {
-      return (
+    const map = new Map<string, Task>();
+    [...assignedTasks, ...pendingTasks, ...completedTasks].forEach((t) => {
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (id) map.set(id, t);
+    });
+    tasks.forEach((t) => {
+      const isMine =
         (currentUserId && t.assigneeId === currentUserId) ||
         (auth.user?.name && t.assignee === auth.user.name) ||
-        (auth.user?.email && t.assignee === auth.user.email)
-      );
+        (auth.user?.email && t.assignee === auth.user.email);
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (isMine && id && !map.has(id)) {
+        map.set(id, t);
+      }
     });
-  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+    return Array.from(map.values());
+  }, [assignedTasks, pendingTasks, completedTasks, tasks, currentUserId, auth.user?.name, auth.user?.email]);
 
   const performanceTrend = useMemo(() => {
     const weeks: { week: string; points: number; tasks: number }[] = [];

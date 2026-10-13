@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { taskKeys, queryKeys } from "@/api/client/query-keys";
 import type { ApiError } from "@/api/client/client";
+import { authService } from "@/auth/services/auth.service";
 import { tasksService } from "../services/tasks.service";
 import type {
   CreateTaskInput,
@@ -148,6 +149,9 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
   void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+  try {
+    void authService.refreshSession().catch(() => {});
+  } catch {}
 }
 
 /**
@@ -262,6 +266,21 @@ export function useReviewTaskMutation(
     mutationFn: ({ id, isApproved, feedback }) => tasksService.reviewTask(id, isApproved, feedback),
     onSuccess: (...args) => {
       const [, variables] = args;
+      // Immediately remove the reviewed task from the Review Center query cache
+      queryClient.setQueryData<ReviewCenterResponse>(taskKeys.reviewCenter, (old) => {
+        if (!old) return old;
+        const remaining = old.tasks.filter((t) => (t.id || t._id) !== variables.id);
+        return {
+          ...old,
+          kpis: {
+            ...old.kpis,
+            pendingReview: remaining.length,
+            highPriority: remaining.filter((t) => t.priority === "high").length,
+            pointsAtStake: remaining.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0),
+          },
+          tasks: remaining,
+        };
+      });
       invalidateAllTaskQueries(queryClient, variables.id);
       if (variables.isApproved) {
         toast.success("Task approved and marked as completed!");

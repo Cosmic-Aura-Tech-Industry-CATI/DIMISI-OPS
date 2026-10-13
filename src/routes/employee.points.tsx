@@ -6,7 +6,7 @@ import { StatCard } from "@/components/stat-card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { useLeaderboardQuery } from "@/features/leaderboard";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, useCompletedTasks, getCategoryLabel } from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
 export const Route = createFileRoute("/employee/points")({
@@ -33,9 +33,11 @@ function PointsPage() {
   const currentUserId = auth.user?.id || auth.user?._id || "";
   const { data: leaderboard = [] } = useLeaderboardQuery(100);
   const { data: tasks = [] } = useTasksQuery();
+  const { data: completedTasks = [] } = useCompletedTasks();
   const { data: analytics } = useEmployeeProgressAnalyticsQuery();
 
   const recent = useMemo(() => {
+    if (completedTasks.length > 0) return completedTasks;
     return tasks.filter((t) => {
       const isMine =
         (currentUserId && t.assigneeId === currentUserId) ||
@@ -43,7 +45,7 @@ function PointsPage() {
         (auth.user?.email && t.assignee === auth.user.email);
       return isMine && (t.status === "completed" || (t.status as string) === "Completed");
     });
-  }, [tasks, currentUserId, auth.user?.name, auth.user?.email]);
+  }, [completedTasks, tasks, currentUserId, auth.user?.name, auth.user?.email]);
 
   const completedTasksPoints = useMemo(() => {
     return recent.reduce((sum, t) => {
@@ -144,7 +146,7 @@ function PointsPage() {
                 <div>
                   <div className="font-medium">{t.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Completed"} · {t.category}
+                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Completed"} · {getCategoryLabel(t.category)}
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-sm font-medium text-success">

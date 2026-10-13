@@ -40,6 +40,7 @@ import {
   useRequestTaskMutation,
   type Task,
   type TaskPriority,
+  getCategoryLabel,
 } from "@/features/tasks";
 
 export const Route = createFileRoute("/employee/tasks/")({
@@ -120,7 +121,7 @@ function EmployeeTasksPage() {
         !q ||
         t.title.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
-        (t.category && t.category.toLowerCase().includes(q));
+        getCategoryLabel(t.category).toLowerCase().includes(q);
 
       const matchesPriority =
         priorityFilter === "all" ||
@@ -345,7 +346,7 @@ function EmployeeTasksPage() {
                     <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                       <PriorityBadge priority={task.priority} />
                       <span className="rounded-sm bg-secondary/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        {task.category || "General"}
+                        {getCategoryLabel(task.category)}
                       </span>
                     </div>
                     <Link
@@ -479,9 +480,9 @@ function EmployeeTasksPage() {
                         <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {task.description || "No description provided."}
                         </div>
-                        {task.category && (
+                        {getCategoryLabel(task.category) !== "Uncategorized" && (
                           <span className="mt-1.5 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
-                            {task.category}
+                            {getCategoryLabel(task.category)}
                           </span>
                         )}
                       </td>

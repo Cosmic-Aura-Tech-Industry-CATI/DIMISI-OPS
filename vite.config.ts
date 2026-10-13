@@ -51,6 +51,12 @@ export default defineConfig(({ mode }) => {
               }
             });
           }
+        },
+        '/socket.io': {
+          target: targetUrl,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
         }
       }
     }

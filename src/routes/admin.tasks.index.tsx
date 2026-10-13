@@ -49,7 +49,7 @@ import {
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { admins, type Task, type TaskPriority, type TaskStatus, type TaskType } from "@/lib/mock-data";
-import { useTasksQuery, useDeleteTask } from "@/features/tasks";
+import { useTasksQuery, useDeleteTask, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 import { TaskTypeBadge } from "@/components/status-badge";
 import { projectName } from "@/lib/projects";
 import { IdBadge } from "@/components/id-badge";
@@ -88,7 +88,7 @@ function TasksPage() {
       });
     },
   });
-  const categories = useMemo(() => Array.from(new Set(tasks.map((t) => t.category))).sort(), [tasks]);
+  const categories = useMemo(() => Array.from(new Set(tasks.map((t) => getCategoryLabel(t.category)))).sort(), [tasks]);
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | TaskStatus | "submitted" | "rejected">("all");
@@ -109,14 +109,14 @@ function TasksPage() {
         if (t.reviewState !== "rejected") return false;
       } else if (status !== "all" && t.status !== status) return false;
       if (priority !== "all" && t.priority !== priority) return false;
-      if (category !== "all" && t.category !== category) return false;
+      if (category !== "all" && getCategoryLabel(t.category) !== category) return false;
       if (taskType !== "all" && (t.taskType ?? "direct") !== taskType) return false;
       if (!q) return true;
       return (
         t.title.toLowerCase().includes(q) ||
         t.assignee.toLowerCase().includes(q) ||
         taskId(t.id).toLowerCase().includes(q) ||
-        t.category.toLowerCase().includes(q)
+        getCategoryLabel(t.category).toLowerCase().includes(q)
       );
     });
     return list.sort((a, b) => {
@@ -257,7 +257,7 @@ function TasksPage() {
                 title={
                   <Link to="/admin/tasks/$id" params={{ id: t.id }} className="hover:text-primary">{t.title}</Link>
                 }
-                subtitle={`${t.category} · ${taskId(t.id)}`}
+                subtitle={formatTaskSubtitle(t.category, t.id)}
                 badges={<><TaskTypeBadge type={t.taskType} /><StatusBadge status={t.status} /><PriorityBadge priority={t.priority} /></>}
                 fields={[
                   {
@@ -325,7 +325,7 @@ function TasksPage() {
                   >
                     <td className="px-5 py-3.5">
                       <Link to="/admin/tasks/$id" params={{ id: t.id }} className="block font-medium hover:text-primary">{t.title}</Link>
-                      <div className="text-xs text-muted-foreground">{t.category} · {taskId(t.id)}</div>
+                      <div className="text-xs text-muted-foreground">{formatTaskSubtitle(t.category, t.id)}</div>
                     </td>
                     <td className="px-5 py-3.5">
                       <TaskTypeBadge type={t.taskType} />
