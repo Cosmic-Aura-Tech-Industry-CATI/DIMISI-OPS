@@ -3,10 +3,11 @@ import { XCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { TaskCardGrid } from "@/components/task-card";
-import { useTasksQuery } from "@/features/tasks";
+import { useTasksQuery, useAssignedTasks, type Task } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import { applySubmissions, useSubmissionMap } from "@/lib/submission-store";
 import { applyReviewDecisions, useReviewMap } from "@/lib/review-store";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/employee/rejected")({
   head: () => ({
@@ -25,15 +26,34 @@ function RejectedTasksPage() {
   const reviewMap = useReviewMap();
   const subs = useSubmissionMap();
   const { data: rawTasks = [] } = useTasksQuery();
+  const { data: assignedTasks = [] } = useAssignedTasks();
   const currentUserId = auth.user?.id || auth.user?._id || "";
 
-  const list = applyReviewDecisions(applySubmissions(rawTasks, subs), reviewMap).filter((t) => {
-    const isMine =
-      t.assigneeId === currentUserId ||
-      (auth.user?.name && t.assignee === auth.user.name) ||
-      (auth.user?.email && t.assignee === auth.user.email);
-    return isMine && (t.reviewState === "rejected" || t.rejectionReason);
-  });
+  const combined = useMemo(() => {
+    const map = new Map<string, Task>();
+    [...assignedTasks, ...rawTasks].forEach((t) => {
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (id && !map.has(id)) {
+        map.set(id, t);
+      }
+    });
+    return Array.from(map.values());
+  }, [assignedTasks, rawTasks]);
+
+  const list = useMemo(() => {
+    return applyReviewDecisions(applySubmissions(combined, subs), reviewMap).filter((t) => {
+      const isMine =
+        t.assigneeId === currentUserId ||
+        (auth.user?.name && t.assignee === auth.user.name) ||
+        (auth.user?.email && t.assignee === auth.user.email);
+      const isRejected =
+        t.reviewState === "rejected" ||
+        (t.status as string) === "rejected" ||
+        Boolean(t.rejectionReason) ||
+        (Boolean(t.notes) && (t.notes?.includes("Admin Feedback") ?? false));
+      return isMine && isRejected;
+    });
+  }, [combined, subs, reviewMap, currentUserId, auth.user?.name, auth.user?.email]);
 
   return (
     <>

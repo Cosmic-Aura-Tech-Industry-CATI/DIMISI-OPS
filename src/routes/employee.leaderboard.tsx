@@ -110,6 +110,7 @@ function EmployeeLeaderboardPage() {
           (typeof item.tasksCompleted === "number" ? item.tasksCompleted : undefined) ??
           (typeof item.completedTasksCount === "number" ? item.completedTasksCount : undefined) ??
           0;
+
         const codeStr = String(item.empId || item.code || "—");
 
         const rawRate =
@@ -157,20 +158,24 @@ function EmployeeLeaderboardPage() {
       }));
   }, [rawLeaderboard]);
 
+  const periodAdjusted = useMemo(() => {
+    return leaderboardEntries;
+  }, [leaderboardEntries]);
+
   const departments = useMemo(
-    () => Array.from(new Set(leaderboardEntries.map((e) => e.department).filter(Boolean))) as string[],
-    [leaderboardEntries],
+    () => Array.from(new Set(periodAdjusted.map((e) => e.department).filter(Boolean))) as string[],
+    [periodAdjusted],
   );
 
   const filtered = useMemo(() => {
-    return leaderboardEntries.filter((e) => {
+    return periodAdjusted.filter((e) => {
       if (department !== "all" && e.department !== department) return false;
       if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [leaderboardEntries, department, search]);
+  }, [periodAdjusted, department, search]);
 
-  const top3 = leaderboardEntries.slice(0, 3);
+  const top3 = periodAdjusted.slice(0, 3);
   const table = filtered;
 
   return (

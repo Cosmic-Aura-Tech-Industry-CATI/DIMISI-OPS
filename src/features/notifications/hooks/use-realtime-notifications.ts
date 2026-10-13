@@ -61,8 +61,12 @@ export function normalizeNotification(raw: unknown): NotificationItem | null {
   if (!item || typeof item !== "object") return null;
   const doc = item as Record<string, unknown>;
 
-  const rawId = String(doc._id || doc.id || "");
-  if (!rawId) return null;
+  const rawId = String(
+    doc._id ||
+      doc.id ||
+      (doc as any).notificationId ||
+      `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+  );
 
   return {
     _id: rawId,
@@ -154,6 +158,22 @@ function handleNotificationCreated(data: unknown) {
 
   // 2. Display instant notification toast with tone and deduplication
   showNotificationToast(notification);
+
+  // 3. Immediately invalidate related tasks, dashboard, and leaderboard caches
+  if (activeQueryClient) {
+    const typeStr = String(notification.type || "").toLowerCase();
+    if (
+      typeStr.includes("approved") ||
+      typeStr.includes("points") ||
+      typeStr.includes("assignment") ||
+      typeStr.includes("submission")
+    ) {
+      void activeQueryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void activeQueryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void activeQueryClient.invalidateQueries({ queryKey: queryKeys.employeeDashboard.all });
+      void activeQueryClient.invalidateQueries({ queryKey: queryKeys.leaderboard.all });
+    }
+  }
 }
 
 /**
