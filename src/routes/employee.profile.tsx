@@ -45,7 +45,13 @@ import { useAuth } from "@/lib/auth";
 import { useEditableProfile } from "@/lib/profile-store";
 import { EditProfileDialog } from "@/components/edit-profile-dialog";
 import { useDepartmentsQuery } from "@/features/departments";
-import { useTasksQuery, getCategoryLabel } from "@/features/tasks";
+import {
+  useTasksQuery,
+  useAssignedTasks,
+  usePendingTasks,
+  useCompletedTasks,
+  getCategoryLabel,
+} from "@/features/tasks";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 import { cn } from "@/lib/utils";
@@ -216,22 +222,37 @@ function ProfilePage() {
     isError: isTasksError,
     refetch: refetchTasks,
   } = useTasksQuery();
+  const { data: assignedTasks = [] } = useAssignedTasks();
+  const { data: pendingTasks = [] } = usePendingTasks();
+  const { data: completedTasks = [] } = useCompletedTasks();
 
   const { data: leaderboard = [] } = useLeaderboardQuery(100);
   const { data: analytics } = useEmployeeProgressAnalyticsQuery();
 
   // 1. Filtered User Tasks directly from API
   const myTasks: TaskEntity[] = useMemo(() => {
-    if (!liveTasks || liveTasks.length === 0) return [];
-    const uId = user?.id || user?._id || "";
-    const uCode = user?.empId || user?.code || "";
-    const uName = user?.name || "";
-    const uEmail = user?.email || "";
+    const map = new Map<string, TaskEntity>();
+    [...assignedTasks, ...pendingTasks, ...completedTasks].forEach((t) => {
+      const id = t.id || (t as unknown as { _id?: string })._id;
+      if (id) map.set(id, t as unknown as TaskEntity);
+    });
+    if (liveTasks && liveTasks.length > 0) {
+      const uId = user?.id || user?._id || "";
+      const uCode = user?.empId || user?.code || "";
+      const uName = user?.name || "";
+      const uEmail = user?.email || "";
 
-    return (liveTasks as TaskEntity[]).filter((t) =>
-      isTaskAssignedToUser(t, uId, uCode, uName, uEmail),
-    );
-  }, [liveTasks, user]);
+      (liveTasks as TaskEntity[]).forEach((t) => {
+        if (isTaskAssignedToUser(t, uId, uCode, uName, uEmail)) {
+          const id = t.id || (t as unknown as { _id?: string })._id;
+          if (id && !map.has(id)) {
+            map.set(id, t);
+          }
+        }
+      });
+    }
+    return Array.from(map.values());
+  }, [assignedTasks, pendingTasks, completedTasks, liveTasks, user]);
 
   const completed = useMemo(
     () => myTasks.filter((t) => t.status === "completed" || (t.status as string) === "Completed").length,

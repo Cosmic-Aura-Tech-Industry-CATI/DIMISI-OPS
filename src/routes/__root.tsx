@@ -14,6 +14,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaController } from "@/components/pwa-controller";
+import { RealtimeNotificationListener } from "@/features/notifications";
 
 function NotFoundComponent() {
   return (
@@ -167,6 +168,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <RealtimeNotificationListener />
           <Outlet />
           <PwaController />
           <Toaster />

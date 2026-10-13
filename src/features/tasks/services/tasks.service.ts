@@ -179,10 +179,16 @@ export const tasksService = {
       return raw === "in_review" || rev === "in_review" || st === "in_review";
     });
 
+    const calculatedPoints = tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0);
+    const backendPoints = typeof res?.kpis?.pointsAtStake === "number" ? res.kpis.pointsAtStake : undefined;
+
     const kpis = {
-      pendingReview: tasks.length,
-      highPriority: tasks.filter((t) => t.priority === "high").length,
-      pointsAtStake: tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0),
+      pendingReview: typeof res?.kpis?.pendingReview === "number" ? res.kpis.pendingReview : tasks.length,
+      highPriority:
+        typeof res?.kpis?.highPriority === "number"
+          ? res.kpis.highPriority
+          : tasks.filter((t) => t.priority === "high").length,
+      pointsAtStake: backendPoints !== undefined && backendPoints > 0 ? backendPoints : calculatedPoints,
     };
 
     return { kpis, tasks };

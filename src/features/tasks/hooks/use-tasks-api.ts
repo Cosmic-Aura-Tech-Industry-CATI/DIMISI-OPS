@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { taskKeys, queryKeys } from "@/api/client/query-keys";
 import type { ApiError } from "@/api/client/client";
+import { authService } from "@/auth/services/auth.service";
 import { tasksService } from "../services/tasks.service";
 import type {
   CreateTaskInput,
@@ -148,6 +149,9 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
   void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+  try {
+    void authService.refreshSession().catch(() => {});
+  } catch {}
 }
 
 /**
