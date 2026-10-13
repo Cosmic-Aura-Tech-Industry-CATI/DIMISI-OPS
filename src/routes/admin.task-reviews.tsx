@@ -278,7 +278,16 @@ function ReviewCenterPage() {
 
                       {/* Status */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <TaskStatusBadge status={task.status || "IN_REVIEW"} />
+                        <TaskStatusBadge
+                          status={
+                            task.reviewState === "in_review" ||
+                            (task.rawStatus || "").toLowerCase() === "in_review" ||
+                            (task.status || "").toLowerCase() === "in_review"
+                              ? "IN_REVIEW"
+                              : task.status || "IN_REVIEW"
+                          }
+                          reviewState={task.reviewState}
+                        />
                       </td>
 
                       {/* Actions */}
