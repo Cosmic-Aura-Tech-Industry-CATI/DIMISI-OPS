@@ -63,6 +63,8 @@ const statusLabel: Record<Task["status"], string> = {
   overdue: "Overdue",
   available: "Available",
   assigned: "Assigned",
+  in_review: "In Review",
+  rejected: "Rejected",
 };
 
 const fmtDate = (v?: string) =>

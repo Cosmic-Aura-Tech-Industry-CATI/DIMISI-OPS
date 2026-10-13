@@ -24,6 +24,7 @@ export type TaskStatusType =
 
 interface TaskStatusBadgeProps {
   status: TaskStatusType | string;
+  reviewState?: string;
   className?: string;
   showIcon?: boolean;
 }
@@ -100,8 +101,18 @@ const statusConfig: Record<
   },
 };
 
-export function TaskStatusBadge({ status, className, showIcon = true }: TaskStatusBadgeProps) {
-  const { key, label } = normalizeTaskStatus(status);
+export function TaskStatusBadge({ status, reviewState, className, showIcon = true }: TaskStatusBadgeProps) {
+  const rev = (reviewState || "").toLowerCase().trim();
+  const effectiveStatus =
+    rev === "in_review"
+      ? "IN_REVIEW"
+      : rev === "rejected"
+        ? "REJECTED"
+        : rev === "approved"
+          ? "COMPLETED"
+          : status;
+
+  const { key, label } = normalizeTaskStatus(effectiveStatus);
   const cfg = statusConfig[key];
   const IconComponent = cfg.icon;
 

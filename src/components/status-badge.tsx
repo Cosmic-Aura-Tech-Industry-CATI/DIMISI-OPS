@@ -8,6 +8,8 @@ const statusStyles: Record<TaskStatus, string> = {
   overdue: "bg-destructive/15 text-destructive",
   available: "bg-primary/15 text-primary",
   assigned: "bg-info/15 text-info",
+  in_review: "bg-amber-500/15 text-amber-500",
+  rejected: "bg-rose-500/15 text-rose-500",
 };
 const statusLabel: Record<TaskStatus, string> = {
   pending: "Pending",
@@ -16,6 +18,8 @@ const statusLabel: Record<TaskStatus, string> = {
   overdue: "Overdue",
   available: "Available",
   assigned: "Assigned",
+  in_review: "In review",
+  rejected: "Rejected",
 };
 const priorityStyles: Record<TaskPriority, string> = {
   low: "bg-muted text-muted-foreground",

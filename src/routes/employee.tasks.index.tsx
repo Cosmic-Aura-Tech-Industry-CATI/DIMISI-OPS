@@ -130,10 +130,13 @@ function EmployeeTasksPage() {
       const normalizedStatus = (t.status || "").toLowerCase().trim();
       const rawStatus = (t.rawStatus || "").toLowerCase().trim();
       const isInProgress =
-        normalizedStatus === "in_progress" ||
+        (normalizedStatus === "in_progress" ||
         normalizedStatus === "in progress" ||
         rawStatus === "in_progress" ||
-        rawStatus === "in progress";
+        rawStatus === "in progress") &&
+        normalizedStatus !== "in_review" &&
+        rawStatus !== "in_review" &&
+        t.reviewState !== "in_review";
 
       const matchesStatus =
         statusFilter === "all" ||
@@ -305,10 +308,13 @@ function EmployeeTasksPage() {
             const normalizedStatus = (task.status || "").toLowerCase().trim();
             const rawStatus = (task.rawStatus || "").toLowerCase().trim();
             const isInProgress =
-              normalizedStatus === "in_progress" ||
+              (normalizedStatus === "in_progress" ||
               normalizedStatus === "in progress" ||
               rawStatus === "in_progress" ||
-              rawStatus === "in progress";
+              rawStatus === "in progress") &&
+              normalizedStatus !== "in_review" &&
+              rawStatus !== "in_review" &&
+              task.reviewState !== "in_review";
 
             const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
             const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
@@ -455,10 +461,13 @@ function EmployeeTasksPage() {
                   const normalizedStatus = (task.status || "").toLowerCase().trim();
                   const rawStatus = (task.rawStatus || "").toLowerCase().trim();
                   const isInProgress =
-                    normalizedStatus === "in_progress" ||
+                    (normalizedStatus === "in_progress" ||
                     normalizedStatus === "in progress" ||
                     rawStatus === "in_progress" ||
-                    rawStatus === "in progress";
+                    rawStatus === "in progress") &&
+                    normalizedStatus !== "in_review" &&
+                    rawStatus !== "in_review" &&
+                    task.reviewState !== "in_review";
 
                   const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
                   const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
@@ -512,7 +521,7 @@ function EmployeeTasksPage() {
 
                       {/* Status */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <TaskStatusBadge status={isInProgress ? "IN_PROGRESS" : task.status} />
+                        <TaskStatusBadge status={isInProgress ? "IN_PROGRESS" : task.status} reviewState={task.reviewState} />
                       </td>
 
                       {/* Actions */}

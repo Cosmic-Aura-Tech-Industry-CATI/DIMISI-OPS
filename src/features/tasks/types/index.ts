@@ -268,11 +268,14 @@ export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus;
     case "in_progress":
       return { status: "in_progress" };
     case "in_review":
-      return { status: "in_progress", reviewState: "in_review" };
+    case "pending_review":
+    case "review":
+      return { status: "in_review", reviewState: "in_review" };
     case "completed":
+    case "approved":
       return { status: "completed", reviewState: "approved" };
     case "rejected":
-      return { status: "in_progress", reviewState: "rejected" };
+      return { status: "rejected", reviewState: "rejected" };
     case "cancelled":
     case "overdue":
       return { status: "overdue" };
