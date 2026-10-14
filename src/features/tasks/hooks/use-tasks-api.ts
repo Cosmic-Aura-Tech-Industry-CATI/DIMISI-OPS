@@ -215,7 +215,7 @@ export const useRequestTask = useRequestTaskMutation;
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
 type SubmitTaskVariables =
-  | { id: string; notes?: string }
+  | { id: string; notes?: string; files?: File[]; proofFiles?: any[]; formData?: FormData }
   | { id: string; payload?: SubmitTaskPayload }
   | string;
 
@@ -227,13 +227,26 @@ export function useSubmitTaskMutation(
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
       const id = typeof variables === "string" ? variables : variables.id;
-      const notes =
-        typeof variables === "string"
-          ? ""
-          : "payload" in variables && variables.payload?.notes
-            ? variables.payload.notes
-            : (variables as { notes?: string }).notes || "";
-      return tasksService.submitTask(id, { notes });
+      if (typeof variables === "string") {
+        return tasksService.submitTask(id, { notes: "" });
+      }
+      const vars = variables as {
+        id: string;
+        notes?: string;
+        files?: File[];
+        proofFiles?: any[];
+        formData?: FormData;
+        payload?: SubmitTaskPayload;
+      };
+      if (vars.payload) {
+        return tasksService.submitTask(id, vars.payload);
+      }
+      return tasksService.submitTask(id, {
+        notes: vars.notes || "",
+        files: vars.files,
+        proofFiles: vars.proofFiles,
+        formData: vars.formData,
+      });
     },
     onSuccess: (...args) => {
       const [, variables] = args;

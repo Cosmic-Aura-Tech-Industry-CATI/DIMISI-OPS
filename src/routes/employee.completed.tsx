@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CheckCircle2, Search, Calendar, Trophy } from "lucide-react";
+import { CheckCircle2, Search, Calendar, Trophy, MessageSquare } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
@@ -106,6 +106,7 @@ function CompletedTasksPage() {
                 <tr>
                   <th className="px-5 py-3.5 font-semibold">Task</th>
                   <th className="px-5 py-3.5 font-semibold">Priority</th>
+                  <th className="px-5 py-3.5 font-semibold">Feedback Received</th>
                   <th className="px-5 py-3.5 font-semibold">Completed / Due Date</th>
                   <th className="px-5 py-3.5 font-semibold">Reward Points</th>
                   <th className="px-5 py-3.5 font-semibold">Status</th>
@@ -141,6 +142,30 @@ function CompletedTasksPage() {
                       {/* Priority */}
                       <td className="px-5 py-4 whitespace-nowrap">
                         <TaskPriorityBadge priority={task.priority} />
+                      </td>
+
+                      {/* Feedback Received */}
+                      <td className="px-5 py-4 max-w-xs">
+                        {task.feedback ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                              <MessageSquare className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{task.reviewedBy || "Admin"}</span>
+                              {task.isFeedbackTemporary && (
+                                <span className="text-[9px] text-muted-foreground border border-border/40 rounded px-1">
+                                  temp
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2 italic">
+                              "{task.feedback}"
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">
+                            No feedback available yet.
+                          </span>
+                        )}
                       </td>
 
                       {/* Completed / Due Date */}
