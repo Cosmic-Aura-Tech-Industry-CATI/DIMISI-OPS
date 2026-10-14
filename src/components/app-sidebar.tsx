@@ -102,12 +102,22 @@ export function AppSidebar({ role }: { role: Role }) {
   const isActive = (url: string) =>
     url === `/${role}` ? pathname === url : pathname.startsWith(url);
 
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
+
+  const adminMainItems = isDirector
+    ? adminNav.main
+    : adminNav.main.filter((item) => item.url !== "/admin/accounts");
+
+  const adminInsightsItems = isDirector
+    ? adminNav.insights
+    : adminNav.insights.filter((item) => item.url !== "/admin/audit-logs");
+
   const groups =
     role === "admin"
       ? [
-          { label: "Main", items: adminNav.main },
+          { label: "Main", items: adminMainItems },
           { label: "Work", items: adminNav.work },
-          { label: "Insights", items: adminNav.insights },
+          { label: "Insights", items: adminInsightsItems },
         ]
       : [
           { label: "Main", items: employeeNav.main },
