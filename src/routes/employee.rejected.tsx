@@ -49,6 +49,7 @@ function RejectedTasksPage() {
       const isRejected =
         t.reviewState === "rejected" ||
         (t.status as string) === "rejected" ||
+        t.reviewStatus === "rejected" ||
         Boolean(t.rejectionReason) ||
         (Boolean(t.notes) && (t.notes?.includes("Admin Feedback") ?? false));
       return isMine && isRejected;

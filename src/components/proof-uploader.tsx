@@ -17,6 +17,7 @@ export type ProofFile = {
   previewUrl?: string;
   /** Inlined content for small files so reviewers can download the proof. */
   dataUrl?: string;
+  rawFile?: File;
 };
 
 const ACCEPTED =
@@ -76,6 +77,7 @@ export function ProofUploader({
           type: f.type || "application/octet-stream",
           previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
           dataUrl: await readAsDataUrl(f),
+          rawFile: f,
         })),
       );
       onChange([...files, ...next]);

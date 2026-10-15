@@ -104,8 +104,33 @@ export const tasksService = {
   /**
    * Employee submits an in-progress task for Admin review (IN_PROGRESS -> IN_REVIEW).
    */
-  async submitTask(id: string, payload: SubmitTaskPayload | { notes?: string } | string): Promise<Task> {
-    const body = typeof payload === "string" ? { notes: payload } : payload;
+  async submitTask(
+    id: string,
+    payload: SubmitTaskPayload | FormData | { notes?: string; files?: File[]; proofFiles?: any[] } | string,
+  ): Promise<Task> {
+    let body: any;
+    if (payload instanceof FormData) {
+      body = payload;
+    } else if (typeof payload === "string") {
+      body = { notes: payload };
+    } else if ("formData" in payload && payload.formData) {
+      body = payload.formData;
+    } else if ("files" in payload && Array.isArray(payload.files) && payload.files.length > 0) {
+      const fd = new FormData();
+      if (payload.notes) fd.append("notes", payload.notes);
+      for (const file of payload.files) {
+        if (file instanceof File) {
+          fd.append("proofFiles", file);
+        }
+      }
+      if (payload.proofFiles && payload.proofFiles.length > 0) {
+        fd.append("proofFiles", JSON.stringify(payload.proofFiles));
+      }
+      body = fd;
+    } else {
+      body = payload;
+    }
+
     try {
       const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
       const raw = res?.task || res?.data?.task || res;
@@ -138,8 +163,14 @@ export const tasksService = {
   /**
    * Alias for submitTask matching existing codebase usages.
    */
-  async submitTaskForReview(id: string, notes?: string): Promise<Task> {
-    return this.submitTask(id, { notes: notes || "" });
+  async submitTaskForReview(
+    id: string,
+    notesOrPayload?: string | SubmitTaskPayload | FormData,
+  ): Promise<Task> {
+    if (typeof notesOrPayload === "string" || !notesOrPayload) {
+      return this.submitTask(id, { notes: notesOrPayload || "" });
+    }
+    return this.submitTask(id, notesOrPayload);
   },
 
   /**

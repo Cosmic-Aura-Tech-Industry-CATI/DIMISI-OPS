@@ -159,10 +159,8 @@ function SubmitProofPage() {
   const isPending = submitMutation.isPending || startTaskMutation.isPending;
 
   const handleOpenConfirm = () => {
-    if (!workSummary.trim() && !deliverableLinks.trim() && files.length === 0) {
-      toast.error("Proof or Work Summary required", {
-        description: "Please enter a work summary, deliverable link, or attach proof files before submitting.",
-      });
+    if (files.length === 0) {
+      toast.error("Please upload proof of your completed task.");
       return;
     }
     setConfirmOpen(true);
@@ -175,11 +173,25 @@ function SubmitProofPage() {
 
   const handleSubmit = async () => {
     if (!task) return;
-    const fileSummary = files.length > 0 ? `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}` : "";
+    if (files.length === 0) {
+      toast.error("Please upload proof of your completed task.");
+      return;
+    }
+
+    const rawFiles = files.map((f) => f.rawFile).filter((f): f is File => f instanceof File);
+    const existingProofFiles = files.map((f) => ({
+      name: f.name,
+      size: f.size,
+      mimeType: f.type,
+      url: f.previewUrl || f.dataUrl || "",
+      dataUrl: f.dataUrl,
+    }));
+
+    const fileSummary = `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}`;
     const formattedNotes = [
       workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
       deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
-      fileSummary ? fileSummary : "",
+      fileSummary,
       issues.trim() ? `Issues & Blockers:\n${issues.trim()}` : "",
       additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
     ].filter(Boolean).join("\n\n") || "Task completed and submitted for review.";
@@ -205,6 +217,8 @@ function SubmitProofPage() {
       await submitMutation.mutateAsync({
         id: targetId,
         notes: formattedNotes,
+        files: rawFiles,
+        proofFiles: existingProofFiles,
       });
     } catch (err: any) {
       // Handled via submitMutation onError callback
@@ -354,12 +368,19 @@ function SubmitProofPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <UploadCloud className="h-4 w-4 text-primary" />
-                <h2 className="font-display text-base font-semibold">Upload Proof Files</h2>
+                <h2 className="font-display text-base font-semibold">
+                  Upload Proof Files <span className="text-destructive">*</span>
+                </h2>
               </div>
-              <span className="rounded-sm bg-secondary/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {files.length} file{files.length === 1 ? "" : "s"} attached
+              <span className={`rounded-sm px-2.5 py-0.5 text-[11px] font-medium ${files.length > 0 ? "bg-primary/15 text-primary" : "bg-destructive/15 text-destructive"}`}>
+                {files.length} file{files.length === 1 ? "" : "s"} attached {files.length === 0 ? "(Required)" : ""}
               </span>
             </div>
+            {files.length === 0 && (
+              <p className="mb-3 text-xs text-amber-500 font-medium">
+                Please upload proof of your completed task before submitting for review.
+              </p>
+            )}
             <ProofUploader files={files} onChange={setFiles} />
           </section>
 
