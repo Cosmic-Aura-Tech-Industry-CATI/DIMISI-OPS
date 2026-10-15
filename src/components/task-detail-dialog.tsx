@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge } from "@/components/status-badge";
-import { type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
+import { type Task, getCategoryLabel, formatTaskSubtitle, TaskFeedbackCard } from "@/features/tasks";
 
 const statusLabel: Record<Task["status"], string> = {
   pending: "Pending",
@@ -171,6 +171,9 @@ export function TaskDetailDialog({
               </ul>
             </div>
           )}
+
+          {/* Admin Feedback Section */}
+          <TaskFeedbackCard task={task} />
         </div>
 
         <DialogFooter className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">

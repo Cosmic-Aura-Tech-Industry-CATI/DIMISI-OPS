@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { PageSpinner } from "@/components/loading";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -50,8 +52,31 @@ import {
 
 export const Route = createFileRoute("/admin/accounts")({
   head: () => ({ meta: [{ title: "Accounts & Financial Ledger — Dimisi" }] }),
-  component: AccountsPage,
+  component: AccountsRoute,
 });
+
+function AccountsRoute() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      navigate({ to: "/login", replace: true });
+    } else if (!isDirector) {
+      const isEmployee = user.role === "employee" || user.role === "intern";
+      navigate({ to: isEmployee ? "/employee" : "/admin", replace: true });
+    }
+  }, [user, loading, isDirector, navigate]);
+
+  if (loading || !user || !isDirector) {
+    return <PageSpinner />;
+  }
+
+  return <AccountsPage />;
+}
 
 type SortKey = "date" | "name" | "credit" | "debit" | "balance";
 type SortDir = "asc" | "desc";

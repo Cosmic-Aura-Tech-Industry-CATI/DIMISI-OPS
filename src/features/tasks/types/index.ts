@@ -57,6 +57,27 @@ export interface BackendTaskRequest {
   requestedAt: string;
 }
 
+export interface TaskProofFile {
+  name: string;
+  url: string;
+  size?: number | string;
+  publicId?: string;
+  mimeType?: string;
+  dataUrl?: string;
+  uploadedAt?: string;
+}
+
+export interface TaskReviewFeedback {
+  _id?: string;
+  reviewerId?: string;
+  reviewerName: string;
+  reviewerEmail?: string;
+  employeeId?: string;
+  feedback: string;
+  status: "approved" | "rejected";
+  reviewedAt: string;
+}
+
 export interface BackendTask {
   _id: string;
   id?: string;
@@ -70,6 +91,30 @@ export interface BackendTask {
   assignedTo?: PopulatedUser | string;
   requests?: BackendTaskRequest[];
   createdBy?: PopulatedUser | string;
+  submittedBy?: PopulatedUser | string;
+  submittedAt?: string;
+  proofFiles?: Array<string | {
+    url: string;
+    publicId?: string;
+    name?: string;
+    size?: number | string;
+    mimeType?: string;
+    uploadedAt?: string;
+  }>;
+  reviews?: Array<{
+    _id?: string;
+    reviewerId?: PopulatedUser | string;
+    reviewerName?: string;
+    reviewerEmail?: string;
+    employeeId?: PopulatedUser | string;
+    feedback: string;
+    status: "approved" | "rejected";
+    reviewedAt: string;
+  }>;
+  feedback?: string;
+  reviewedBy?: PopulatedUser | string;
+  reviewedAt?: string;
+  reviewStatus?: "approved" | "rejected";
   notes?: string;
   estimatedTime?: string;
   rewardPoints: number;
@@ -110,6 +155,18 @@ export interface Task {
   createdBy?: string;
   creatorId?: string;
   creatorUser?: PopulatedUser;
+  submittedBy?: string;
+  submittedById?: string;
+  submittedByUser?: PopulatedUser;
+  submittedAt?: string;
+  feedback?: string;
+  isFeedbackTemporary?: boolean;
+  reviewedBy?: string;
+  reviewedById?: string;
+  reviewedByUser?: PopulatedUser;
+  reviewedAt?: string;
+  reviewStatus?: "approved" | "rejected";
+  reviews?: TaskReviewFeedback[];
   notes?: string;
   projectId?: string;
   projectName?: string;
@@ -119,6 +176,7 @@ export interface Task {
   estimatedTime?: string;
   attachments?: { name: string; size: string; url?: string }[];
   rawAttachmentUrls?: string[];
+  proofFiles?: TaskProofFile[];
   reviewState?: TaskReviewState;
   rejectionReason?: string;
   rawStatus?: BackendTaskStatus;
@@ -195,7 +253,10 @@ export interface AssignTaskPayload {
 }
 
 export interface SubmitTaskPayload {
-  notes: string;
+  notes?: string;
+  files?: File[];
+  proofFiles?: TaskProofFile[] | any[];
+  formData?: FormData;
 }
 
 export interface ReviewTaskPayload {
@@ -520,6 +581,191 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     })
     .filter((att): att is { name: string; size: string; url: string } => att !== null);
 
+  // Parse submittedBy info
+  let submittedById = "";
+  let submittedBy = "";
+  let submittedByUser: PopulatedUser | undefined;
+  let submittedAt = doc.submittedAt;
+  if (doc.submittedBy) {
+    if (typeof doc.submittedBy === "object") {
+      submittedByUser = doc.submittedBy;
+      submittedById = doc.submittedBy._id;
+      submittedBy = doc.submittedBy.name || "";
+    } else {
+      submittedById = String(doc.submittedBy);
+      submittedBy = String(doc.submittedBy);
+    }
+  }
+
+  // Parse proof files
+  const rawProofFiles = Array.isArray(doc.proofFiles) ? doc.proofFiles : [];
+  const proofFiles: TaskProofFile[] = [];
+
+  for (const item of rawProofFiles) {
+    if (!item) continue;
+    if (typeof item === "string") {
+      let fileName = "Proof File";
+      try {
+        const parts = item.split("/");
+        const lastPart = parts[parts.length - 1];
+        if (lastPart) fileName = decodeURIComponent(lastPart.split("?")[0]);
+      } catch {}
+      proofFiles.push({
+        url: item,
+        name: fileName,
+        size: "File",
+      });
+    } else if (typeof item === "object") {
+      const it = item as any;
+      const fileUrl = it.url || it.secure_url || it.path || "";
+      let fileName = it.name || it.filename || it.originalName || "Proof File";
+      if (fileName === "Proof File" && fileUrl) {
+        try {
+          const parts = fileUrl.split("/");
+          const lastPart = parts[parts.length - 1];
+          if (lastPart) fileName = decodeURIComponent(lastPart.split("?")[0]);
+        } catch {}
+      }
+      proofFiles.push({
+        url: fileUrl,
+        name: fileName,
+        size: it.size !== undefined ? (typeof it.size === "number" ? `${Math.round(it.size / 1024)} KB` : String(it.size)) : "File",
+        mimeType: it.mimeType || it.type,
+        publicId: it.publicId,
+        uploadedAt: it.uploadedAt,
+      });
+    }
+  }
+
+  // Fallback to local submission store if proof files empty
+  if (proofFiles.length === 0 && id && typeof window !== "undefined") {
+    try {
+      const rawSub = localStorage.getItem("dimisi-submissions");
+      if (rawSub) {
+        const list = JSON.parse(rawSub);
+        const sub = list.find((s: any) => s.taskId === id);
+        if (sub) {
+          if (!submittedBy && sub.employeeName) {
+            submittedBy = sub.employeeName;
+            submittedById = sub.employeeId || "";
+          }
+          if (!submittedAt && sub.submittedAt) {
+            submittedAt = sub.submittedAt;
+          }
+          if (Array.isArray(sub.files)) {
+            for (const sf of sub.files) {
+              proofFiles.push({
+                url: sf.dataUrl || "",
+                name: sf.name,
+                size: typeof sf.size === "number" ? `${Math.round(sf.size / 1024)} KB` : String(sf.size),
+                mimeType: sf.type,
+                dataUrl: sf.dataUrl,
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // Parse review & feedback info
+  let feedback = doc.feedback;
+  let reviewStatus = doc.reviewStatus;
+  let reviewedAt = doc.reviewedAt;
+  let reviewedBy = "";
+  let reviewedById = "";
+  let reviewedByUser: PopulatedUser | undefined;
+
+  if (doc.reviewedBy) {
+    if (typeof doc.reviewedBy === "object") {
+      reviewedByUser = doc.reviewedBy;
+      reviewedById = doc.reviewedBy._id;
+      reviewedBy = doc.reviewedBy.name || "";
+    } else {
+      reviewedById = String(doc.reviewedBy);
+      reviewedBy = String(doc.reviewedBy);
+    }
+  }
+
+  // Parse structured reviews list
+  const rawReviews = Array.isArray(doc.reviews) ? doc.reviews : [];
+  const reviews: TaskReviewFeedback[] = rawReviews.map((r: any) => {
+    let rName = r.reviewerName;
+    let rEmail = r.reviewerEmail;
+    let rId = "";
+    if (r.reviewerId && typeof r.reviewerId === "object") {
+      rId = r.reviewerId._id;
+      if (!rName) rName = r.reviewerId.name;
+      if (!rEmail) rEmail = r.reviewerId.email;
+    } else if (r.reviewerId) {
+      rId = String(r.reviewerId);
+    }
+    return {
+      _id: r._id ? String(r._id) : undefined,
+      reviewerId: rId,
+      reviewerName: rName || "Admin",
+      reviewerEmail: rEmail,
+      employeeId: r.employeeId ? (typeof r.employeeId === "object" ? r.employeeId._id : String(r.employeeId)) : undefined,
+      feedback: r.feedback || "",
+      status: r.status === "approved" ? "approved" : "rejected",
+      reviewedAt: r.reviewedAt ? new Date(r.reviewedAt).toISOString() : new Date().toISOString(),
+    };
+  });
+
+  // If latest review exists in reviews array, use its details if not directly on doc
+  if (reviews.length > 0) {
+    const latest = reviews[reviews.length - 1];
+    if (!feedback) feedback = latest.feedback;
+    if (!reviewStatus) reviewStatus = latest.status;
+    if (!reviewedAt) reviewedAt = latest.reviewedAt;
+    if (!reviewedBy) reviewedBy = latest.reviewerName;
+  }
+
+  // Fallback to rejectionReason if feedback is missing
+  if (!feedback && rejectionReason) {
+    feedback = rejectionReason;
+    if (!reviewStatus) reviewStatus = "rejected";
+  }
+
+  // Fallback to Admin Feedback extracted from notes (returned by backend review endpoint)
+  if (!feedback && doc.notes && typeof doc.notes === "string" && doc.notes.includes("Admin Feedback:")) {
+    const parts = doc.notes.split("Admin Feedback:");
+    const extracted = parts[parts.length - 1]?.trim();
+    if (extracted) {
+      feedback = extracted;
+      if (!reviewStatus) reviewStatus = frontendStatus === "completed" ? "approved" : "rejected";
+    }
+  }
+
+  // Fallback to temporary local storage review store if needed
+  let isFeedbackTemporary = false;
+  if (id && typeof window !== "undefined") {
+    try {
+      const rawStore = localStorage.getItem("dimisi-task-reviews");
+      if (rawStore) {
+        const storeMap = JSON.parse(rawStore);
+        const saved = storeMap[id];
+        if (saved && saved.feedback) {
+          if (!feedback) {
+            feedback = saved.feedback;
+            isFeedbackTemporary = true;
+          }
+          if (!reviewStatus) reviewStatus = saved.reviewStatus || (saved.isApproved ? "approved" : "rejected");
+          if (!reviewedAt) reviewedAt = saved.reviewedAt;
+          if (!reviewedBy) reviewedBy = saved.reviewerName || "Admin";
+          if (reviews.length === 0 && saved.feedback) {
+            reviews.push({
+              reviewerName: saved.reviewerName || "Admin",
+              feedback: saved.feedback,
+              status: saved.reviewStatus || (saved.isApproved ? "approved" : "rejected"),
+              reviewedAt: saved.reviewedAt || new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
   const dueDate = doc.deadline
     ? new Date(doc.deadline).toISOString().slice(0, 10)
     : doc.dueDate
@@ -554,9 +800,22 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     createdBy,
     creatorId,
     creatorUser,
+    submittedBy: submittedBy || assignee,
+    submittedById: submittedById || assigneeId,
+    submittedByUser,
+    submittedAt,
+    feedback,
+    isFeedbackTemporary,
+    reviewedBy: reviewedBy || (feedback ? "Admin" : undefined),
+    reviewedById,
+    reviewedByUser,
+    reviewedAt,
+    reviewStatus,
+    reviews,
     notes: doc.notes,
     attachments,
     rawAttachmentUrls,
+    proofFiles,
     reviewState: defaultReviewState ?? (rejectionReason && (doc.status === "in_progress" || !doc.status) ? "rejected" : undefined),
     rejectionReason,
     projectId,
