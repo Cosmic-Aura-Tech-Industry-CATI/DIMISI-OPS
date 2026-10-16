@@ -15,6 +15,7 @@ import {
   Clock,
   UserCheck,
   Layers,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -38,10 +39,14 @@ import {
   useTasksQuery,
   useStartTaskMutation,
   useRequestTaskMutation,
+  mapTaskResponse,
   type Task,
   type TaskPriority,
   getCategoryLabel,
 } from "@/features/tasks";
+import { useAuth } from "@/lib/auth";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchTasks } from "@/features/search";
 
 export const Route = createFileRoute("/employee/tasks/")({
   head: () => ({
@@ -56,8 +61,12 @@ export const Route = createFileRoute("/employee/tasks/")({
 });
 
 function EmployeeTasksPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"assigned" | "all">("assigned");
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -83,6 +92,36 @@ function EmployeeTasksPage() {
     refetch: refetchAll,
   } = useTasksQuery();
 
+  // Endpoint 3: GET /api/v1/search/tasks?q=...&priority=...
+  const backendPriorityFilter = priorityFilter !== "all" ? priorityFilter : undefined;
+  const {
+    data: searchResponse,
+    isFetching: isSearching,
+  } = useSearchTasks(
+    debouncedQuery,
+    {
+      priority: backendPriorityFilter,
+      limit: 50,
+    },
+    { enabled: isSearchActive },
+  );
+
+  const searchTasksList = useMemo(() => {
+    if (!searchResponse?.tasks) return [];
+    const mapped = searchResponse.tasks.map((t) => mapTaskResponse(t));
+    if (activeTab === "assigned") {
+      const myId = user?.id || (user as any)?._id;
+      const myEmpId = user?.empId || user?.code;
+      return mapped.filter((t) => {
+        return (
+          (myId && (t.assigneeId === myId || t.assignedTo === myId)) ||
+          (myEmpId && t.assigneeCode === myEmpId)
+        );
+      });
+    }
+    return mapped;
+  }, [searchResponse, activeTab, user]);
+
   const startTaskMutation = useStartTaskMutation({
     onSettled: () => {
       setStartingTaskId(null);
@@ -107,9 +146,12 @@ function EmployeeTasksPage() {
     requestTaskMutation.mutate(id);
   };
 
-  // Switch active dataset strictly based on tab selected
-  const activeRawTasks = activeTab === "assigned" ? assignedTasks : allTasks;
-  const isLoading = activeTab === "assigned" ? isLoadingAssigned : isLoadingAll;
+  // Switch active dataset strictly based on tab selected or search results
+  const baseTasks = activeTab === "assigned" ? assignedTasks : allTasks;
+  const activeRawTasks = isSearchActive ? searchTasksList : baseTasks;
+  const isLoading = isSearchActive
+    ? isSearching && !searchResponse
+    : (activeTab === "assigned" ? isLoadingAssigned : isLoadingAll);
   const isError = activeTab === "assigned" ? isErrorAssigned : isErrorAll;
   const error = activeTab === "assigned" ? errorAssigned : errorAll;
   const refetch = activeTab === "assigned" ? refetchAssigned : refetchAll;
@@ -119,6 +161,7 @@ function EmployeeTasksPage() {
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
+        isSearchActive ||
         t.title.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
         getCategoryLabel(t.category).toLowerCase().includes(q);
@@ -233,8 +276,11 @@ function EmployeeTasksPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={activeTab === "assigned" ? "Search assigned tasks…" : "Search all tasks…"}
-            className="h-10 rounded-full pl-9"
+            className="h-10 rounded-full pl-9 pr-9"
           />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

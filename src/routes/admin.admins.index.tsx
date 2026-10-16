@@ -50,6 +50,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
 import { useAdminsQuery, useAdminStatsQuery, useRevokeAdminAccess, EditAdminDialog } from "@/features/admins";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchUsers } from "@/features/search";
 
 export const Route = createFileRoute("/admin/admins/")({
   head: () => ({
@@ -79,11 +81,52 @@ function initials(name: string) {
 
 function AdminsPage() {
   const navigate = useNavigate();
-  const { data: responseData, isLoading, isError, error, refetch, isRefetching } = useAdminsQuery();
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
+  const { data: responseData, isLoading: isBaseLoading, isError, error, refetch, isRefetching } = useAdminsQuery();
   const { data: statsData } = useAdminStatsQuery();
   const revokeMutation = useRevokeAdminAccess();
 
-  const rawAdmins = responseData?.admins || [];
+  // Integrate backend search API: GET /api/v1/search/users?q=...&role=admin
+  const {
+    data: searchResponse,
+    isFetching: isSearching,
+  } = useSearchUsers(
+    debouncedQuery,
+    {
+      role: "admin",
+      page,
+      limit: PAGE_SIZE,
+    },
+    { enabled: isSearchActive },
+  );
+
+  const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
+
+  const rawAdmins = useMemo(() => {
+    if (isSearchActive) {
+      return (searchResponse?.users || []).map(
+        (u) =>
+          ({
+            id: u._id,
+            _id: u._id,
+            empId: u.empId,
+            code: u.empId,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatar: u.avatar,
+            department: typeof u.department === "object" ? u.department?.name : u.department,
+            designation: typeof u.designation === "object" ? u.designation?.name : u.designation,
+            isActive: true,
+          }) as AuthUser,
+      );
+    }
+    return responseData?.admins || [];
+  }, [isSearchActive, searchResponse, responseData]);
 
   const admins = useMemo(() => {
     return rawAdmins.map((a) => {
@@ -122,12 +165,10 @@ function AdminsPage() {
     [admins],
   );
 
-  const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<AuthUser | null>(null);
 
@@ -159,7 +200,7 @@ function AdminsPage() {
     const list = admins.filter((a) => {
       if (dept !== "all" && a.department !== dept) return false;
       if (status !== "all" && a.status !== status) return false;
-      if (!q) return true;
+      if (!q || isSearchActive) return true;
       return (
         a.name.toLowerCase().includes(q) ||
         a.email.toLowerCase().includes(q) ||
@@ -176,11 +217,21 @@ function AdminsPage() {
       else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [admins, query, dept, status, sortKey, sortDir]);
+  }, [admins, query, isSearchActive, dept, status, sortKey, sortDir]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalRecords = isSearchActive
+    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
+    : filtered.length;
+  const pages = Math.max(
+    1,
+    isSearchActive
+      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
+      : Math.ceil(filtered.length / PAGE_SIZE),
+  );
   const current = Math.min(page, pages);
-  const slice = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const slice = isSearchActive && searchResponse?.pagination
+    ? filtered
+    : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -245,8 +296,11 @@ function AdminsPage() {
               setPage(1);
             }}
             placeholder="Search by name, email, ID, department…"
-            className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
+            className="h-10 rounded-full border-border/60 bg-background/50 pl-9 pr-9"
           />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
           <Select

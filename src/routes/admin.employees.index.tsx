@@ -51,6 +51,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
 import { useEmployeesQuery, useRevokeEmployeeAccess, EditEmployeeDialog } from "@/features/employees";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchUsers } from "@/features/search";
 
 export const Route = createFileRoute("/admin/employees/")({
   head: () => ({
@@ -82,6 +84,9 @@ function EmployeesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
   const [dept, setDept] = useState("all");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState("all");
@@ -101,7 +106,7 @@ function EmployeesPage() {
 
   const {
     data: responseData,
-    isLoading,
+    isLoading: isBaseLoading,
     isError,
     error,
     refetch,
@@ -109,7 +114,43 @@ function EmployeesPage() {
   } = useEmployeesQuery(queryFilters);
   const revokeMutation = useRevokeEmployeeAccess();
 
-  const rawEmployees = responseData?.employees || [];
+  // Integrate backend search API: GET /api/v1/search/users?q=...&role=employee
+  const {
+    data: searchResponse,
+    isFetching: isSearching,
+  } = useSearchUsers(
+    debouncedQuery,
+    {
+      role: "employee",
+      page,
+      limit: PAGE_SIZE,
+    },
+    { enabled: isSearchActive },
+  );
+
+  const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
+
+  const rawEmployees = useMemo(() => {
+    if (isSearchActive) {
+      return (searchResponse?.users || []).map(
+        (u) =>
+          ({
+            id: u._id,
+            _id: u._id,
+            empId: u.empId,
+            code: u.empId,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatar: u.avatar,
+            department: typeof u.department === "object" ? u.department?.name : u.department,
+            designation: typeof u.designation === "object" ? u.designation?.name : u.designation,
+            isActive: true,
+          }) as AuthUser,
+      );
+    }
+    return responseData?.employees || [];
+  }, [isSearchActive, searchResponse, responseData]);
 
   const all = useMemo(() => {
     return rawEmployees.map((e) => {
@@ -155,7 +196,7 @@ function EmployeesPage() {
       if (dept !== "all" && e.department !== dept) return false;
       if (role !== "all" && e.jobTitle !== role) return false;
       if (status !== "all" && e.status !== status) return false;
-      if (!q) return true;
+      if (!q || isSearchActive) return true;
       return (
         e.name.toLowerCase().includes(q) ||
         e.email.toLowerCase().includes(q) ||
@@ -172,13 +213,19 @@ function EmployeesPage() {
       else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [all, query, dept, role, status, sortKey, sortDir]);
+  }, [all, query, isSearchActive, dept, role, status, sortKey, sortDir]);
 
-  const isServerPaginated = Boolean(responseData?.pagination);
-  const totalRecords = responseData?.pagination?.totalRecords ?? filtered.length;
+  const isServerPaginated = isSearchActive
+    ? Boolean(searchResponse?.pagination)
+    : Boolean(responseData?.pagination);
+  const totalRecords = isSearchActive
+    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
+    : responseData?.pagination?.totalRecords ?? filtered.length;
   const pages = Math.max(
     1,
-    responseData?.pagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
+    isSearchActive
+      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
+      : responseData?.pagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
   );
   const current = Math.min(page, pages);
 
@@ -253,8 +300,11 @@ function EmployeesPage() {
               setPage(1);
             }}
             placeholder="Search by name, ID, email, department…"
-            className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
+            className="h-10 rounded-full border-border/60 bg-background/50 pl-9 pr-9"
           />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center">
           <Select
