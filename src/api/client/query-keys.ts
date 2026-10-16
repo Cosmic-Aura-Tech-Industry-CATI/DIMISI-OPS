@@ -105,4 +105,11 @@ export const queryKeys = {
     all: ["notifications"] as const,
     list: () => ["notifications", "list"] as const,
   },
+  search: {
+    all: ["search"] as const,
+    global: (query: string, limit?: number) => ["search", "global", query, limit] as const,
+    users: (query: string, filters?: Record<string, unknown>) => ["search", "users", query, filters] as const,
+    tasks: (query: string, filters?: Record<string, unknown>) => ["search", "tasks", query, filters] as const,
+    projects: (query: string, filters?: Record<string, unknown>) => ["search", "projects", query, filters] as const,
+  },
 } as const;

@@ -49,10 +49,12 @@ import {
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { admins, type Task, type TaskPriority, type TaskStatus, type TaskType } from "@/lib/mock-data";
-import { useTasksQuery, useDeleteTask, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
+import { useTasksQuery, useDeleteTask, mapTaskResponse, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
 import { TaskTypeBadge } from "@/components/status-badge";
 import { projectName } from "@/lib/projects";
 import { IdBadge } from "@/components/id-badge";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchTasks } from "@/features/search";
 
 export const Route = createFileRoute("/admin/tasks/")({
   head: () => ({
@@ -76,7 +78,7 @@ const createdByFor = (t: Task) => t.createdBy || "Admin";
 
 function TasksPage() {
   const navigate = useNavigate();
-  const { data: tasks = [], isLoading, isError, refetch } = useTasksQuery();
+  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery();
   const deleteTask = useDeleteTask({
     onSuccess: () => {
       toast.success("Task deleted");
@@ -88,9 +90,11 @@ function TasksPage() {
       });
     },
   });
-  const categories = useMemo(() => Array.from(new Set(tasks.map((t) => getCategoryLabel(t.category)))).sort(), [tasks]);
 
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
   const [status, setStatus] = useState<"all" | TaskStatus | "submitted" | "rejected">("all");
   const [priority, setPriority] = useState<"all" | TaskPriority>("all");
   const [category, setCategory] = useState("all");
@@ -100,9 +104,40 @@ function TasksPage() {
   const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
 
+  // Integrate backend search API: GET /api/v1/search/tasks?q=...&status=...&priority=...
+  const backendStatusFilter =
+    status !== "all" && status !== "submitted" && status !== "rejected" ? status : undefined;
+  const backendPriorityFilter = priority !== "all" ? priority : undefined;
+
+  const {
+    data: searchResponse,
+    isFetching: isSearching,
+  } = useSearchTasks(
+    debouncedQuery,
+    {
+      status: backendStatusFilter,
+      priority: backendPriorityFilter,
+      limit: 50,
+    },
+    { enabled: isSearchActive },
+  );
+
+  const searchTasksList = useMemo(() => {
+    if (!searchResponse?.tasks) return [];
+    return searchResponse.tasks.map((t) => mapTaskResponse(t));
+  }, [searchResponse]);
+
+  const activeTaskPool = isSearchActive ? searchTasksList : tasks;
+  const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
+
+  const categories = useMemo(
+    () => Array.from(new Set(activeTaskPool.map((t) => getCategoryLabel(t.category)))).sort(),
+    [activeTaskPool],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = tasks.filter((t) => {
+    const list = activeTaskPool.filter((t) => {
       if (status === "submitted") {
         if (t.reviewState !== "in_review") return false;
       } else if (status === "rejected") {
@@ -111,7 +146,7 @@ function TasksPage() {
       if (priority !== "all" && t.priority !== priority) return false;
       if (category !== "all" && getCategoryLabel(t.category) !== category) return false;
       if (taskType !== "all" && (t.taskType ?? "direct") !== taskType) return false;
-      if (!q) return true;
+      if (!q || isSearchActive) return true;
       return (
         t.title.toLowerCase().includes(q) ||
         t.assignee.toLowerCase().includes(q) ||
@@ -127,7 +162,7 @@ function TasksPage() {
       else cmp = +new Date(a.dueDate) - +new Date(b.dueDate);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [tasks, query, status, priority, category, taskType, sortKey, sortDir]);
+  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -170,8 +205,11 @@ function TasksPage() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             placeholder="Search by title, assignee, ID, category…"
-            className="h-10 rounded-full border-border/60 bg-background/50 pl-9"
+            className="h-10 rounded-full border-border/60 bg-background/50 pl-9 pr-9"
           />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
           <Select value={status} onValueChange={(v) => { setStatus(v as typeof status); setPage(1); }}>

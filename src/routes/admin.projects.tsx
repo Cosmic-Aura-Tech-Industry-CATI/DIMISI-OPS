@@ -34,11 +34,14 @@ import { useTasksQuery } from "@/features/tasks";
 import { cn } from "@/lib/utils";
 import {
   useProjectsQuery,
+  mapProjectResponse,
   projectStatusLabel,
   projectStatusStyles,
   type Project,
   type FrontendProjectStatus as ProjectStatus,
 } from "@/features/projects";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchProjects } from "@/features/search";
 
 export const Route = createFileRoute("/admin/projects")({
   head: () => ({
@@ -69,6 +72,9 @@ function ProjectManagementPage() {
   const { data: tasks = [] } = useTasksQuery();
 
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
   const [status, setStatus] = useState<"all" | "active" | "inactive" | "archived">("all");
   const [sortKey, setSortKey] = useState<SortKey>("code");
   const [asc, setAsc] = useState(true);
@@ -78,13 +84,33 @@ function ProjectManagementPage() {
   const [editing, setEditing] = useState<Project | undefined>();
   const [removing, setRemoving] = useState<Project | undefined>();
 
+  // Integrate backend search API: GET /api/v1/search/projects?q=...&status=...
+  const {
+    data: searchResponse,
+    isFetching: isSearching,
+  } = useSearchProjects(
+    debouncedQuery,
+    {
+      status: status !== "all" ? status : undefined,
+      limit: 50,
+    },
+    { enabled: isSearchActive },
+  );
+
+  const searchProjectsList = useMemo(() => {
+    if (!searchResponse?.projects) return [];
+    return searchResponse.projects.map((p) => mapProjectResponse(p));
+  }, [searchResponse]);
+
+  const activeProjectPool = isSearchActive ? searchProjectsList : projects;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return projects
+    return activeProjectPool
       .filter((p) => {
         const pStatus = (p.status || "active").toLowerCase();
         if (status !== "all" && pStatus !== status.toLowerCase()) return false;
-        if (!q) return true;
+        if (!q || isSearchActive) return true;
         return (
           p.name.toLowerCase().includes(q) ||
           p.code.toLowerCase().includes(q) ||
@@ -103,7 +129,7 @@ function ProjectManagementPage() {
         const valB = String(b[sortKey as keyof Project] || "");
         return valA.localeCompare(valB) * dir;
       });
-  }, [projects, query, status, sortKey, asc]);
+  }, [activeProjectPool, query, isSearchActive, status, sortKey, asc]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -163,8 +189,11 @@ function ProjectManagementPage() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             placeholder="Search by name, ID, manager or status…"
-            className="h-10 rounded-full pl-9"
+            className="h-10 rounded-full pl-9 pr-9"
           />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          )}
         </div>
         <Select value={status} onValueChange={(v) => { setStatus(v as typeof status); setPage(1); }}>
           <SelectTrigger className="h-10 w-full rounded-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
