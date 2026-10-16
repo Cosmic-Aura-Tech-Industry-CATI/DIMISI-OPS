@@ -132,4 +132,10 @@ export const API_ENDPOINTS = {
     readAll: "/notifications/read-all",
     markRead: (id: string) => `/notifications/${id}/read`,
   },
+  search: {
+    global: "/search",
+    users: "/search/users",
+    tasks: "/search/tasks",
+    projects: "/search/projects",
+  },
 } as const;
