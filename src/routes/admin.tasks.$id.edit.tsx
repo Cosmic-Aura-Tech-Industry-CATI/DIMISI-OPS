@@ -62,8 +62,18 @@ function EditTaskPage() {
         apiError={updateTask.error?.message}
         onCancel={() => navigate({ to: "/admin/tasks/$id", params: { id: task.id } })}
         onSubmit={(v) => {
-          const newFiles = v.attachments.map((a) => a.file).filter((f): f is File => f instanceof File);
-          const retainedUrls = v.attachments.map((a) => a.url).filter((u): u is string => typeof u === "string" && u.length > 0);
+          const uploadedAttachments = v.attachments
+            .filter((a) => a.url && a.publicId)
+            .map((a) => ({
+              url: a.url!,
+              publicId: a.publicId!,
+              name: a.name,
+              size: a.size,
+            }));
+
+          const retainedUrls = v.attachments
+            .map((a) => a.url)
+            .filter((u): u is string => typeof u === "string" && u.length > 0);
 
           updateTask.mutate({
             id: task.id || id,
@@ -80,7 +90,7 @@ function EditTaskPage() {
               projectId: v.taskType === "project" ? v.projectId : undefined,
               assigneeId: v.taskType === "direct" ? v.assigneeId : undefined,
               existingAttachments: retainedUrls,
-              attachments: newFiles,
+              uploadedAttachments,
             },
           });
         }}

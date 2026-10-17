@@ -1,9 +1,30 @@
 import { useState } from "react";
-import { Archive, CalendarDays, FileUp, FolderKanban, FolderPlus, Globe, Loader2, Paperclip, Pencil, Save, Target, Timer, Trophy, X } from "lucide-react";
+import {
+  AlertCircle,
+  Archive,
+  CalendarDays,
+  Check,
+  ExternalLink,
+  FileUp,
+  FolderKanban,
+  FolderPlus,
+  Globe,
+  Loader2,
+  Paperclip,
+  Pencil,
+  RotateCw,
+  Save,
+  Target,
+  Timer,
+  Trophy,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -17,12 +38,23 @@ import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
 import { ArchiveProjectDialog, CreateProjectDialog, EditProjectDialog } from "@/components/project-dialogs";
 import { cn } from "@/lib/utils";
+import {
+  validateTaskAttachmentFile,
+  uploadTaskAttachment,
+  extractCloudinaryPublicId,
+  MAX_TASK_FILE_SIZE,
+} from "@/lib/cdn-upload";
 
 export interface TaskAttachment {
+  id?: string;
   name: string;
   size: string;
   file?: File;
   url?: string;
+  publicId?: string;
+  isUploading?: boolean;
+  uploadProgress?: number;
+  error?: string;
 }
 
 export interface TaskFormValues {
@@ -52,10 +84,14 @@ export function emptyTaskValues(): TaskFormValues {
 }
 
 export function taskToValues(t: Task): TaskFormValues {
-  const existingAttachments: TaskAttachment[] = (t.attachments || []).map((a) => ({
+  const existingAttachments: TaskAttachment[] = (t.attachments || []).map((a, idx) => ({
+    id: `existing-${idx}-${a.name}`,
     name: a.name,
     size: a.size,
-    url: (a as { url?: string }).url,
+    url: a.url,
+    publicId: a.publicId || extractCloudinaryPublicId(a.url),
+    isUploading: false,
+    uploadProgress: 100,
   }));
 
   return {
@@ -140,6 +176,107 @@ export function TaskForm({
     setForm((prev) => ({ ...prev, points: parsed }));
   };
 
+  const uploadSingleFile = async (item: TaskAttachment) => {
+    if (!item.file) return;
+
+    setForm((prev) => ({
+      ...prev,
+      attachments: prev.attachments.map((att) =>
+        att.id === item.id ? { ...att, isUploading: true, uploadProgress: 10, error: undefined } : att
+      ),
+    }));
+
+    try {
+      const res = await uploadTaskAttachment(item.file, (percent) => {
+        setForm((prev) => ({
+          ...prev,
+          attachments: prev.attachments.map((att) =>
+            att.id === item.id ? { ...att, uploadProgress: percent } : att
+          ),
+        }));
+      });
+
+      setForm((prev) => ({
+        ...prev,
+        attachments: prev.attachments.map((att) =>
+          att.id === item.id
+            ? {
+                ...att,
+                url: res.url,
+                publicId: res.publicId,
+                name: res.name || att.name,
+                size: res.size || att.size,
+                isUploading: false,
+                uploadProgress: 100,
+                error: undefined,
+              }
+            : att
+        ),
+      }));
+      toast.success(`${item.name} uploaded to storage.`);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Failed to upload file.";
+
+      setForm((prev) => ({
+        ...prev,
+        attachments: prev.attachments.map((att) =>
+          att.id === item.id ? { ...att, isUploading: false, error: message } : att
+        ),
+      }));
+      toast.error(`Upload failed for ${item.name}: ${message}`);
+    }
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+
+    const itemsToAdd: TaskAttachment[] = [];
+
+    for (const f of fileArray) {
+      const validation = validateTaskAttachmentFile(f);
+      if (!validation.valid) {
+        toast.error(`${f.name}: ${validation.error || "Invalid file"}`);
+        continue;
+      }
+
+      const id = `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const formattedSize =
+        f.size < 1024 * 1024
+          ? `${(f.size / 1024).toFixed(0)} KB`
+          : `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+
+      const newItem: TaskAttachment = {
+        id,
+        name: f.name,
+        size: formattedSize,
+        file: f,
+        isUploading: true,
+        uploadProgress: 10,
+      };
+
+      itemsToAdd.push(newItem);
+    }
+
+    if (itemsToAdd.length === 0) return;
+
+    // Add files to state
+    setForm((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...itemsToAdd],
+    }));
+
+    // Start direct CDN upload for each file immediately
+    itemsToAdd.forEach((item) => {
+      void uploadSingleFile(item);
+    });
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
@@ -152,18 +289,25 @@ export function TaskForm({
     if (form.taskType === "direct" && !form.assigneeId) errs.assigneeId = "Pick an employee";
     setErrors(errs);
     if (Object.keys(errs).length) return;
+
+    // Check if any attachments are actively uploading
+    const isUploading = form.attachments.some((a) => a.isUploading);
+    if (isUploading) {
+      toast.error("Please wait for all attachments to finish uploading to storage.");
+      return;
+    }
+
+    const hasFailed = form.attachments.some((a) => Boolean(a.error) && !a.url);
+    if (hasFailed) {
+      toast.error("Please retry or remove failed attachments before saving.");
+      return;
+    }
+
     onSubmit({ ...form, points: numericPoints });
   };
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files) return;
-    const next: TaskAttachment[] = Array.from(files).map((f) => ({
-      name: f.name,
-      size: f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(0)} KB` : `${(f.size / 1024 / 1024).toFixed(1)} MB`,
-      file: f,
-    }));
-    set("attachments", [...form.attachments, ...next]);
-  };
+  const isUploadingAny = form.attachments.some((a) => a.isUploading);
+  const busy = isSubmitting || isUploadingAny;
 
   return (
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-3">
@@ -206,7 +350,15 @@ export function TaskForm({
         </Field>
 
         <div>
-          <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Attachments</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Attachments (Direct CDN Upload)
+            </Label>
+            <span className="text-[11px] text-muted-foreground">
+              Up to {(MAX_TASK_FILE_SIZE / (1024 * 1024)).toFixed(0)} MB per file
+            </span>
+          </div>
+
           <label
             htmlFor="task-attachment"
             className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/40 p-8 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
@@ -215,21 +367,107 @@ export function TaskForm({
               <FileUp className="h-5 w-5" />
             </div>
             <p className="text-sm font-medium">Drop files or click to upload</p>
-            <p className="text-xs text-muted-foreground">PNG, JPG, PDF up to 20 MB (mock)</p>
-            <input id="task-attachment" type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            <p className="text-xs text-muted-foreground">
+              PDF, ZIP, DOC, DOCX, XLS, XLSX, PNG, JPG, WebP (Uploaded directly from UI)
+            </p>
+            <input
+              id="task-attachment"
+              type="file"
+              multiple
+              disabled={busy}
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
           </label>
+
           {form.attachments.length > 0 && (
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 space-y-2.5">
               {form.attachments.map((a, i) => (
-                <li key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="truncate">{a.name}</span>
-                    <span className="text-xs text-muted-foreground">{a.size}</span>
-                  </span>
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => set("attachments", form.attachments.filter((_, idx) => idx !== i))}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
+                <li
+                  key={a.id || i}
+                  className="rounded-xl border border-border/60 bg-card/40 p-3 text-sm transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate font-medium">{a.name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{a.size}</span>
+                    </span>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      {a.isUploading && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-primary font-medium">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>{a.uploadProgress || 0}%</span>
+                        </span>
+                      )}
+
+                      {!a.isUploading && a.url && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <Check className="h-3 w-3" /> Uploaded
+                          </span>
+                          <a
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="grid h-7 w-7 place-items-center rounded-md border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/40"
+                            title="Preview file"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </span>
+                      )}
+
+                      {!a.isUploading && a.error && (
+                        <div className="inline-flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-destructive">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Failed
+                          </span>
+                          {a.file && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-[11px]"
+                              onClick={() => void uploadSingleFile(a)}
+                            >
+                              <RotateCw className="mr-1 h-3 w-3" /> Retry
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() =>
+                          set(
+                            "attachments",
+                            form.attachments.filter((_, idx) => idx !== i),
+                          )
+                        }
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {a.isUploading && (
+                    <div className="mt-2 space-y-1">
+                      <Progress value={a.uploadProgress || 10} className="h-1.5" />
+                      <p className="text-[10px] text-muted-foreground">Uploading directly to CDN…</p>
+                    </div>
+                  )}
+
+                  {!a.isUploading && a.error && (
+                    <p className="mt-1 text-[11px] text-destructive">{a.error}</p>
+                  )}
                 </li>
               ))}
             </ul>

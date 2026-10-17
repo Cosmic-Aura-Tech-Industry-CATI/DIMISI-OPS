@@ -9,6 +9,7 @@ import type {
   TaskType as MockTaskType,
   TaskReviewState,
 } from "@/lib/mock-data";
+import { extractCloudinaryPublicId } from "@/lib/cdn-upload";
 
 export type TaskPriority = MockTaskPriority;
 export type TaskStatus = MockTaskStatus;
@@ -87,6 +88,13 @@ export interface BackendMaskedTask {
 
 export type RawTaskResponse = BackendTask | BackendMaskedTask;
 
+export interface TaskAttachmentItem {
+  name: string;
+  size: string;
+  url?: string;
+  publicId?: string;
+}
+
 /**
  * Standard Normalized Task Interface
  */
@@ -117,7 +125,7 @@ export interface Task {
   category: string;
   taskType?: MockTaskType;
   estimatedTime?: string;
-  attachments?: { name: string; size: string; url?: string }[];
+  attachments?: TaskAttachmentItem[];
   rawAttachmentUrls?: string[];
   reviewState?: TaskReviewState;
   rejectionReason?: string;
@@ -149,13 +157,33 @@ export interface ReviewCenterResponse {
   tasks: Task[];
 }
 
+export interface TaskPagination {
+  totalRecords: number;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  hasNextPage?: boolean;
+  hasPrevPage?: boolean;
+}
+
+export type TasksResult = Task[] & { pagination?: TaskPagination };
+
 export interface TaskQueryFilters {
+  page?: number;
+  limit?: number;
   projectId?: string;
   status?: string;
   priority?: string;
   type?: string;
   assignedTo?: string;
   [key: string]: unknown;
+}
+
+export interface TaskUploadedAttachment {
+  url: string;
+  publicId: string;
+  name?: string;
+  size?: string;
 }
 
 export interface CreateTaskInput {
@@ -171,6 +199,7 @@ export interface CreateTaskInput {
   notes?: string;
   estimatedTime?: string;
   attachments?: File[];
+  uploadedAttachments?: TaskUploadedAttachment[];
 }
 
 export interface UpdateTaskInput {
@@ -188,6 +217,7 @@ export interface UpdateTaskInput {
   status?: BackendTaskStatus | MockTaskStatus;
   existingAttachments?: string[];
   attachments?: File[];
+  uploadedAttachments?: TaskUploadedAttachment[];
 }
 
 export interface AssignTaskPayload {
@@ -196,6 +226,12 @@ export interface AssignTaskPayload {
 
 export interface SubmitTaskPayload {
   notes: string;
+  proof?: {
+    url: string;
+    publicId: string;
+  };
+  proofUrl?: string;
+  proofPublicId?: string;
 }
 
 export interface ReviewTaskPayload {
@@ -480,8 +516,8 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
   const rawAttachments = Array.isArray(doc.attachments) ? doc.attachments : [];
   const rawAttachmentUrls: string[] = [];
 
-  const attachments = rawAttachments
-    .map((item: any) => {
+  const attachments: TaskAttachmentItem[] = rawAttachments
+    .map((item: any): TaskAttachmentItem | null => {
       if (!item) return null;
 
       let fileUrl = "";
@@ -512,13 +548,19 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
         }
       }
 
+      const publicId =
+        typeof item === "object" && item !== null && item.publicId
+          ? String(item.publicId)
+          : extractCloudinaryPublicId(fileUrl);
+
       return {
         name: fileName,
         size: item?.size ? (typeof item.size === "number" ? `${Math.round(item.size / 1024)} KB` : String(item.size)) : "File",
         url: fileUrl,
+        publicId: publicId || undefined,
       };
     })
-    .filter((att): att is { name: string; size: string; url: string } => att !== null);
+    .filter((att): att is TaskAttachmentItem => att !== null);
 
   const dueDate = doc.deadline
     ? new Date(doc.deadline).toISOString().slice(0, 10)

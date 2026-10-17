@@ -44,7 +44,7 @@ function AdminOverview() {
   const { data: leaderboardData } = useLeaderboardQuery(5);
   const { data: employeesData } = useEmployeesQuery({ page: 1 });
   const { data: adminsData } = useAdminsQuery();
-  const { data: allTasks } = useTasksQuery();
+  const { data: allTasks } = useTasksQuery({ page: 1 });
   const { data: notices } = useNoticesQuery();
 
   const employeesList = useMemo(() => employeesData?.employees || [], [employeesData]);
