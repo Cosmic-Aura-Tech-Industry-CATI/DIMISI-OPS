@@ -71,7 +71,7 @@ export const Route = createFileRoute("/admin/tasks/")({
 type SortKey = "title" | "priority" | "points" | "dueDate";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE = 8;
+const DEFAULT_PAGE_SIZE = 10;
 const taskId = (id: string) => id;
 const priorityRank: Record<TaskPriority, number> = { low: 0, medium: 1, high: 2 };
 const createdByFor = (t: Task) => t.createdBy || "Admin";
@@ -79,8 +79,9 @@ const createdByFor = (t: Task) => t.createdBy || "Admin";
 function TasksPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery({
-    page,
+    limit: 100,
   });
   const deleteTask = useDeleteTask({
     onSuccess: () => {
@@ -166,26 +167,10 @@ function TasksPage() {
     });
   }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
 
-  const rawPagination = (tasks as any)?.pagination;
-  const isServerPaginated = isSearchActive
-    ? Boolean(searchResponse?.pagination)
-    : Boolean(rawPagination) || (page > 1 && filtered.length <= PAGE_SIZE);
-
-  const totalRecords = isSearchActive
-    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
-    : rawPagination?.totalRecords ?? filtered.length;
-
-  const pages = Math.max(
-    1,
-    isSearchActive
-      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
-      : rawPagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
-  );
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pages);
 
-  const slice = isServerPaginated
-    ? filtered
-    : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const slice = filtered.slice((current - 1) * pageSize, current * pageSize);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -210,7 +195,7 @@ function TasksPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard label="Total" value={totalRecords} tone="text-foreground" />
+        <SummaryCard label="Total" value={tasks.length} tone="text-foreground" />
         <SummaryCard label="Available" value={tasks.filter((t) => t.status === "available").length} tone="text-primary" />
         <SummaryCard label="Assigned" value={tasks.filter((t) => t.status === "assigned" || t.status === "pending").length} tone="text-info" />
         <SummaryCard label="In progress" value={tasks.filter((t) => t.status === "in_progress").length} tone="text-primary" />
@@ -294,7 +279,7 @@ function TasksPage() {
       ) : (
         <div className="glass overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
-            <span>{totalRecords} results</span>
+            <span>{filtered.length} results</span>
             <span>Page {current} of {pages}</span>
           </div>
           {/* Mobile: cards instead of horizontal scrolling */}
@@ -453,20 +438,44 @@ function TasksPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
-            <span className="text-xs text-muted-foreground">
-              Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–{(current - 1) * PAGE_SIZE + slice.length} of {totalRecords}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
-              {Array.from({ length: pages }).slice(0, 5).map((_, i) => {
-                const n = i + 1;
-                return (
-                  <Button key={n} variant={n === current ? "default" : "outline"} size="sm" className="h-8 w-8 rounded-md p-0" onClick={() => setPage(n)}>{n}</Button>
-                );
-              })}
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-5 py-3">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                Showing {slice.length === 0 ? 0 : (current - 1) * pageSize + 1}–{(current - 1) * pageSize + slice.length} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground/80">Rows:</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => {
+                    setPageSize(Number(val));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-20 rounded-lg text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            {pages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
+                {Array.from({ length: pages }).slice(0, 5).map((_, i) => {
+                  const n = i + 1;
+                  return (
+                    <Button key={n} variant={n === current ? "default" : "outline"} size="sm" className="h-8 w-8 rounded-md p-0" onClick={() => setPage(n)}>{n}</Button>
+                  );
+                })}
+                <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            )}
           </div>
         </div>
       )}
