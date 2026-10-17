@@ -106,7 +106,15 @@ function SubmitProofPage() {
         deliverableLinks: deliverableLinks.trim(),
         issues: issues.trim(),
         additionalRemarks: additionalRemarks.trim(),
-        files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
+        files: files.map((f) => ({
+          id: f.id,
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          url: f.url,
+          publicId: f.publicId,
+          dataUrl: f.dataUrl,
+        })),
         checklist: checks,
       });
       toast.success("Task submitted for review successfully.");
@@ -151,16 +159,38 @@ function SubmitProofPage() {
     deliverableLinks: deliverableLinks.trim(),
     issues: issues.trim(),
     additionalRemarks: additionalRemarks.trim(),
-    files: files.map((f) => ({ id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl })),
+    files: files.map((f) => ({
+      id: f.id,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      url: f.url,
+      publicId: f.publicId,
+      dataUrl: f.dataUrl,
+    })),
     checklist: checks,
   });
 
   const allChecked = checks.completed && checks.proof && checks.verified;
-  const isPending = submitMutation.isPending || startTaskMutation.isPending;
+  const isAnyUploading = files.some((f) => f.isUploading);
+  const isPending = submitMutation.isPending || startTaskMutation.isPending || isAnyUploading;
 
   const handleOpenConfirm = () => {
-    if (files.length === 0) {
-      toast.error("Please upload proof of your completed task.");
+    if (isAnyUploading) {
+      toast.error("Please wait for all proof files to finish uploading to storage.");
+      return;
+    }
+
+    const hasFailed = files.some((f) => Boolean(f.error) && !f.url);
+    if (hasFailed) {
+      toast.error("Please retry or remove failed proof files before submitting.");
+      return;
+    }
+
+    if (!workSummary.trim() && !deliverableLinks.trim() && files.length === 0) {
+      toast.error("Proof or Work Summary required", {
+        description: "Please enter a work summary, deliverable link, or attach proof files before submitting.",
+      });
       return;
     }
     setConfirmOpen(true);
@@ -173,21 +203,23 @@ function SubmitProofPage() {
 
   const handleSubmit = async () => {
     if (!task) return;
-    if (files.length === 0) {
-      toast.error("Please upload proof of your completed task.");
+
+    if (isAnyUploading) {
+      toast.error("Please wait for all proof files to finish uploading to storage.");
       return;
     }
 
-    const rawFiles = files.map((f) => f.rawFile).filter((f): f is File => f instanceof File);
-    const existingProofFiles = files.map((f) => ({
-      name: f.name,
-      size: f.size,
-      mimeType: f.type,
-      url: f.previewUrl || f.dataUrl || "",
-      dataUrl: f.dataUrl,
-    }));
+    const uploadedProofFiles = files.filter((f) => f.url && f.publicId);
+    const primaryProof = uploadedProofFiles[0];
 
-    const fileSummary = `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}`;
+    const fileSummary =
+      uploadedProofFiles.length > 0
+        ? `Proof files attached (${uploadedProofFiles.length}):\n` +
+          uploadedProofFiles.map((f) => `- ${f.name}: ${f.url}`).join("\n")
+        : files.length > 0
+          ? `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}`
+          : "";
+
     const formattedNotes = [
       workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
       deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
@@ -213,12 +245,18 @@ function SubmitProofPage() {
         }
       }
 
-      // Step 2: Submit task for review (IN_PROGRESS -> IN_REVIEW)
+      // Step 2: Submit task for review (IN_PROGRESS -> IN_REVIEW) with direct-to-CDN proof data
       await submitMutation.mutateAsync({
         id: targetId,
         notes: formattedNotes,
-        files: rawFiles,
-        proofFiles: existingProofFiles,
+        proof: primaryProof
+          ? {
+              url: primaryProof.url!,
+              publicId: primaryProof.publicId!,
+            }
+          : undefined,
+        proofUrl: primaryProof?.url,
+        proofPublicId: primaryProof?.publicId,
       });
     } catch (err: any) {
       // Handled via submitMutation onError callback

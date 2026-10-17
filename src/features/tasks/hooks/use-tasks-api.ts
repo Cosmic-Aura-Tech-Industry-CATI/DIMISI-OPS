@@ -22,6 +22,7 @@ import type {
   SubmitTaskPayload,
   Task,
   TaskQueryFilters,
+  TasksResult,
   UpdateTaskInput,
 } from "../types";
 
@@ -29,14 +30,29 @@ import type {
 
 /**
  * Hook to fetch all tasks with optional filters.
+ * Normalizes filters to guarantee 'page' is always present (defaults to 1).
  */
 export function useTasksQuery(
-  filters?: TaskQueryFilters,
-  options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
+  filters?: TaskQueryFilters | number,
+  options?: Omit<UseQueryOptions<TasksResult, ApiError>, "queryKey" | "queryFn">,
 ) {
-  return useQuery<Task[], ApiError>({
-    queryKey: queryKeys.tasks.list(filters),
-    queryFn: () => tasksService.getTasks(filters),
+  const pageNum =
+    typeof filters === "number"
+      ? filters
+      : filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))
+        ? Math.max(1, Number(filters.page))
+        : 1;
+
+  const filterObj = typeof filters === "object" && filters !== null ? filters : {};
+
+  const normalizedFilters: TaskQueryFilters = {
+    ...filterObj,
+    page: pageNum,
+  };
+
+  return useQuery<TasksResult, ApiError>({
+    queryKey: queryKeys.tasks.list(normalizedFilters),
+    queryFn: () => tasksService.getTasks(normalizedFilters),
     staleTime: 1000 * 60 * 2, // 2 mins
     retry: 1,
     ...options,
@@ -66,11 +82,12 @@ export const useTaskQuery = useTask;
  * Hook to fetch employee assigned tasks (GET /tasks/assigned).
  */
 export function useAssignedTasks(
+  filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
   return useQuery<Task[], ApiError>({
-    queryKey: taskKeys.assigned,
-    queryFn: () => tasksService.getAssignedTasks(),
+    queryKey: filters ? (["tasks", "assigned", filters] as const) : taskKeys.assigned,
+    queryFn: () => tasksService.getAssignedTasks(filters),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -83,11 +100,12 @@ export const useAssignedTasksQuery = useAssignedTasks;
  * Hook to fetch employee pending review tasks (GET /tasks/pending).
  */
 export function usePendingTasks(
+  filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
   return useQuery<Task[], ApiError>({
-    queryKey: taskKeys.pending,
-    queryFn: () => tasksService.getPendingTasks(),
+    queryKey: filters ? (["tasks", "pending", filters] as const) : taskKeys.pending,
+    queryFn: () => tasksService.getPendingTasks(filters),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -100,11 +118,12 @@ export const usePendingTasksQuery = usePendingTasks;
  * Hook to fetch employee completed tasks (GET /tasks/completed).
  */
 export function useCompletedTasks(
+  filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
   return useQuery<Task[], ApiError>({
-    queryKey: taskKeys.completed,
-    queryFn: () => tasksService.getCompletedTasks(),
+    queryKey: filters ? (["tasks", "completed", filters] as const) : taskKeys.completed,
+    queryFn: () => tasksService.getCompletedTasks(filters),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -215,7 +234,13 @@ export const useRequestTask = useRequestTaskMutation;
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
 type SubmitTaskVariables =
-  | { id: string; notes?: string; files?: File[]; proofFiles?: any[]; formData?: FormData }
+  | {
+      id: string;
+      notes?: string;
+      proof?: { url: string; publicId: string };
+      proofUrl?: string;
+      proofPublicId?: string;
+    }
   | { id: string; payload?: SubmitTaskPayload }
   | string;
 
@@ -227,26 +252,26 @@ export function useSubmitTaskMutation(
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
       const id = typeof variables === "string" ? variables : variables.id;
+      let payload: SubmitTaskPayload = { notes: "" };
       if (typeof variables === "string") {
-        return tasksService.submitTask(id, { notes: "" });
+        payload = { notes: "" };
+      } else if ("payload" in variables && variables.payload) {
+        payload = variables.payload;
+      } else {
+        const v = variables as {
+          notes?: string;
+          proof?: { url: string; publicId: string };
+          proofUrl?: string;
+          proofPublicId?: string;
+        };
+        payload = {
+          notes: v.notes || "",
+          proof: v.proof,
+          proofUrl: v.proofUrl,
+          proofPublicId: v.proofPublicId,
+        };
       }
-      const vars = variables as {
-        id: string;
-        notes?: string;
-        files?: File[];
-        proofFiles?: any[];
-        formData?: FormData;
-        payload?: SubmitTaskPayload;
-      };
-      if (vars.payload) {
-        return tasksService.submitTask(id, vars.payload);
-      }
-      return tasksService.submitTask(id, {
-        notes: vars.notes || "",
-        files: vars.files,
-        proofFiles: vars.proofFiles,
-        formData: vars.formData,
-      });
+      return tasksService.submitTask(id, payload);
     },
     onSuccess: (...args) => {
       const [, variables] = args;

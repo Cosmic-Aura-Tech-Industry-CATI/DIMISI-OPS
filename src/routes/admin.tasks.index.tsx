@@ -78,7 +78,10 @@ const createdByFor = (t: Task) => t.createdBy || "Admin";
 
 function TasksPage() {
   const navigate = useNavigate();
-  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery();
+  const [page, setPage] = useState(1);
+  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery({
+    page,
+  });
   const deleteTask = useDeleteTask({
     onSuccess: () => {
       toast.success("Task deleted");
@@ -101,7 +104,6 @@ function TasksPage() {
   const [taskType, setTaskType] = useState<"all" | TaskType>("all");
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
 
   // Integrate backend search API: GET /api/v1/search/tasks?q=...&status=...&priority=...
@@ -164,9 +166,26 @@ function TasksPage() {
     });
   }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const rawPagination = (tasks as any)?.pagination;
+  const isServerPaginated = isSearchActive
+    ? Boolean(searchResponse?.pagination)
+    : Boolean(rawPagination) || (page > 1 && filtered.length <= PAGE_SIZE);
+
+  const totalRecords = isSearchActive
+    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
+    : rawPagination?.totalRecords ?? filtered.length;
+
+  const pages = Math.max(
+    1,
+    isSearchActive
+      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
+      : rawPagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
+  );
   const current = Math.min(page, pages);
-  const slice = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  const slice = isServerPaginated
+    ? filtered
+    : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -191,7 +210,7 @@ function TasksPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard label="Total" value={tasks.length} tone="text-foreground" />
+        <SummaryCard label="Total" value={totalRecords} tone="text-foreground" />
         <SummaryCard label="Available" value={tasks.filter((t) => t.status === "available").length} tone="text-primary" />
         <SummaryCard label="Assigned" value={tasks.filter((t) => t.status === "assigned" || t.status === "pending").length} tone="text-info" />
         <SummaryCard label="In progress" value={tasks.filter((t) => t.status === "in_progress").length} tone="text-primary" />
@@ -275,7 +294,7 @@ function TasksPage() {
       ) : (
         <div className="glass overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
-            <span>{filtered.length} results</span>
+            <span>{totalRecords} results</span>
             <span>Page {current} of {pages}</span>
           </div>
           {/* Mobile: cards instead of horizontal scrolling */}
@@ -436,7 +455,7 @@ function TasksPage() {
 
           <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
             <span className="text-xs text-muted-foreground">
-              Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–{(current - 1) * PAGE_SIZE + slice.length} of {filtered.length}
+              Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–{(current - 1) * PAGE_SIZE + slice.length} of {totalRecords}
             </span>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
