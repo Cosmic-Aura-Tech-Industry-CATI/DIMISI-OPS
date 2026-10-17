@@ -47,7 +47,15 @@ function NewTaskPage() {
         apiError={createTask.error?.message}
         onCancel={() => navigate({ to: "/admin/tasks" })}
         onSubmit={(v) => {
-          const files = v.attachments.map((a) => a.file).filter((f): f is File => f instanceof File);
+          const uploadedAttachments = v.attachments
+            .filter((a) => a.url && a.publicId)
+            .map((a) => ({
+              url: a.url!,
+              publicId: a.publicId!,
+              name: a.name,
+              size: a.size,
+            }));
+
           createTask.mutate({
             title: v.title,
             description: v.description,
@@ -60,7 +68,7 @@ function NewTaskPage() {
             estimatedTime: v.estimatedTime || undefined,
             projectId: v.taskType === "project" ? v.projectId : undefined,
             assigneeId: v.taskType === "direct" ? v.assigneeId : undefined,
-            attachments: files,
+            uploadedAttachments,
           });
         }}
       />

@@ -63,7 +63,7 @@ const statusTone: Record<string, string> = {
 
 function EmployeeOverview() {
   const auth = useAuth();
-  const { data: tasks = [] } = useTasksQuery();
+  const { data: tasks = [] } = useTasksQuery({ page: 1 });
   const { data: completedTasks = [] } = useCompletedTasks();
   const { data: assignedTasks = [] } = useAssignedTasks();
   const { data: tasksDeadlines } = useEmployeeTasksDeadlinesQuery();

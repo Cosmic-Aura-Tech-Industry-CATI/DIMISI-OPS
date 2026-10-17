@@ -90,7 +90,7 @@ function EmployeeTasksPage() {
     isError: isErrorAll,
     error: errorAll,
     refetch: refetchAll,
-  } = useTasksQuery();
+  } = useTasksQuery({ page: 1 });
 
   // Endpoint 3: GET /api/v1/search/tasks?q=...&priority=...
   const backendPriorityFilter = priorityFilter !== "all" ? priorityFilter : undefined;

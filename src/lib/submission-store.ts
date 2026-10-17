@@ -12,6 +12,8 @@ export interface SubmissionFile {
   name: string;
   size: number;
   type: string;
+  url?: string;
+  publicId?: string;
   /** Inlined data for small files so admins can download the proof. */
   dataUrl?: string;
 }
@@ -136,8 +138,12 @@ export function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** Download a proof file (falls back to a metadata stub when not inlined). */
+/** Download a proof file (opens CDN URL or falls back to dataUrl/blob). */
 export function downloadSubmissionFile(file: SubmissionFile) {
+  if (file.url) {
+    window.open(file.url, "_blank", "noopener,noreferrer");
+    return;
+  }
   const href =
     file.dataUrl ??
     URL.createObjectURL(

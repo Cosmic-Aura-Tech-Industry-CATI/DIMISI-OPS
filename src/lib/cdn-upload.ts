@@ -147,14 +147,18 @@ export async function uploadFileToCdn(
 
   const data = response.data;
   const secureUrl = data.secure_url || data.url;
-  const publicId = data.public_id;
+  const publicId =
+    data.public_id ||
+    (signData.folder && signData.publicId
+      ? `${signData.folder}/${signData.publicId}`
+      : signData.publicId);
 
   if (!secureUrl) {
-    throw new Error("Storage provider did not return a public image URL.");
+    throw new Error("Storage provider did not return a public file URL.");
   }
 
   if (!publicId) {
-    throw new Error("Storage provider did not return a public image ID.");
+    throw new Error("Storage provider did not return a public asset ID.");
   }
 
   return {
@@ -196,3 +200,227 @@ export async function uploadProfileAvatar(
     avatarPublicId: cdnResult.publicId,
   };
 }
+
+/* -------------------------------- Task Attachments & Proofs -------------------------------- */
+
+export const ALLOWED_TASK_ATTACHMENT_EXTENSIONS = [
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "txt",
+  "zip",
+] as const;
+
+export const ALLOWED_TASK_PROOF_EXTENSIONS = [
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "pdf",
+  "zip",
+  "doc",
+  "docx",
+] as const;
+
+export const MAX_TASK_FILE_SIZE = 10 * 1024 * 1024; // 10 MB (aligned with backend uploadRules.ts)
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  pdf: "application/pdf",
+  zip: "application/zip",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain",
+};
+
+/**
+ * Extracts Cloudinary publicId from a secure URL if present.
+ */
+export function extractCloudinaryPublicId(url?: string): string | undefined {
+  if (!url || typeof url !== "string") return undefined;
+  // Match path after /upload/ optionally skipping version /v12345/
+  const match = url.match(/\/upload\/(?:v\d+\/)?([^\.?#]+(?:\/[^\.?#]+)*)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return undefined;
+}
+
+/**
+ * Validates file format and file size against backend upload rules for task.attachments.
+ */
+export function validateTaskAttachmentFile(file: File): FileValidationResult {
+  if (!file) {
+    return { valid: false, error: "No file selected." };
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (!ext || !(ALLOWED_TASK_ATTACHMENT_EXTENSIONS as readonly string[]).includes(ext)) {
+    return {
+      valid: false,
+      error: `File format '.${ext || "unknown"}' is not supported. Allowed: ${ALLOWED_TASK_ATTACHMENT_EXTENSIONS.join(", ")}.`,
+    };
+  }
+
+  if (file.size > MAX_TASK_FILE_SIZE) {
+    return {
+      valid: false,
+      error: `File size ${(file.size / (1024 * 1024)).toFixed(1)}MB exceeds the limit of ${(MAX_TASK_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB.`,
+    };
+  }
+
+  if (file.size <= 0) {
+    return {
+      valid: false,
+      error: "The selected file is empty.",
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validates file format and file size against backend upload rules for task.proof.
+ */
+export function validateTaskProofFile(file: File): FileValidationResult {
+  if (!file) {
+    return { valid: false, error: "No file selected." };
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (!ext || !(ALLOWED_TASK_PROOF_EXTENSIONS as readonly string[]).includes(ext)) {
+    return {
+      valid: false,
+      error: `File format '.${ext || "unknown"}' is not supported. Allowed: ${ALLOWED_TASK_PROOF_EXTENSIONS.join(", ")}.`,
+    };
+  }
+
+  if (file.size > MAX_TASK_FILE_SIZE) {
+    return {
+      valid: false,
+      error: `File size ${(file.size / (1024 * 1024)).toFixed(1)}MB exceeds the limit of ${(MAX_TASK_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB.`,
+    };
+  }
+
+  if (file.size <= 0) {
+    return {
+      valid: false,
+      error: "The selected file is empty.",
+    };
+  }
+
+  return { valid: true };
+}
+
+export interface TaskAttachmentUploadResult {
+  url: string;
+  publicId: string;
+  name: string;
+  size: string;
+}
+
+/**
+ * Direct-to-CDN upload pipeline for Task Attachments:
+ * 1. Validates format against task.attachments rule (up to 10MB).
+ * 2. Requests signed authorization from backend (model="task", field="attachments").
+ * 3. Directly posts file binary to Cloudinary.
+ * 4. Returns public CDN URL and asset publicId.
+ */
+export async function uploadTaskAttachment(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<TaskAttachmentUploadResult> {
+  const validation = validateTaskAttachmentFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || "Invalid file for task attachment.");
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const safeMime = EXT_TO_MIME[ext] || file.type || "application/octet-stream";
+
+  const signData = await requestUploadSignature({
+    model: "task",
+    field: "attachments",
+    filename: file.name,
+    size: file.size,
+    mime: safeMime,
+  });
+
+  const cdnResult = await uploadFileToCdn(file, signData, onProgress);
+
+  const formattedSize =
+    file.size < 1024 * 1024
+      ? `${(file.size / 1024).toFixed(0)} KB`
+      : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+  return {
+    url: cdnResult.secureUrl,
+    publicId: cdnResult.publicId,
+    name: file.name,
+    size: formattedSize,
+  };
+}
+
+export interface TaskProofUploadResult {
+  url: string;
+  publicId: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+/**
+ * Direct-to-CDN upload pipeline for Task Proof Submissions:
+ * 1. Validates format against task.proof rule (up to 10MB).
+ * 2. Requests signed authorization from backend (model="task", field="proof").
+ * 3. Directly posts file binary to Cloudinary.
+ * 4. Returns public CDN URL and asset publicId.
+ */
+export async function uploadTaskProof(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<TaskProofUploadResult> {
+  const validation = validateTaskProofFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || "Invalid file for task proof.");
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const safeMime = EXT_TO_MIME[ext] || file.type || "application/octet-stream";
+
+  const signData = await requestUploadSignature({
+    model: "task",
+    field: "proof",
+    filename: file.name,
+    size: file.size,
+    mime: safeMime,
+  });
+
+  const cdnResult = await uploadFileToCdn(file, signData, onProgress);
+
+  return {
+    url: cdnResult.secureUrl,
+    publicId: cdnResult.publicId,
+    name: file.name,
+    size: file.size,
+    type: file.type || "application/octet-stream",
+  };
+}
+
