@@ -109,10 +109,6 @@ export const tasksService = {
       res?.totalRecords !== undefined
     ) {
       const total = Number(res?.totalRecords ?? res?.total ?? tasks.length);
-      const limit = Number(res?.limit ?? params.limit ?? 8);
-      const totalPages = Number(
-        res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)),
-      );
       const limit = Number(res?.limit ?? params.limit ?? 10);
       const totalPages = Number(res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)));
       tasks.pagination = {
