@@ -176,9 +176,7 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
 /**
  * Mutation hook for employee to start an assigned task (PATCH /tasks/:id/start).
  */
-export function useStartTaskMutation(
-  options?: UseMutationOptions<Task, ApiError, string>,
-) {
+export function useStartTaskMutation(options?: UseMutationOptions<Task, ApiError, string>) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, string>({
@@ -240,8 +238,9 @@ type SubmitTaskVariables =
       proof?: { url: string; publicId: string };
       proofUrl?: string;
       proofPublicId?: string;
+      files?: File[];
     }
-  | { id: string; payload?: SubmitTaskPayload }
+  | { id: string; payload?: SubmitTaskPayload | FormData }
   | string;
 
 export function useSubmitTaskMutation(
@@ -252,7 +251,7 @@ export function useSubmitTaskMutation(
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
       const id = typeof variables === "string" ? variables : variables.id;
-      let payload: SubmitTaskPayload = { notes: "" };
+      let payload: SubmitTaskPayload | FormData = { notes: "" };
       if (typeof variables === "string") {
         payload = { notes: "" };
       } else if ("payload" in variables && variables.payload) {
@@ -296,7 +295,11 @@ export const useSubmitTaskForReview = useSubmitTaskMutation;
  * Mutation hook for admin to approve or reject a task (PATCH /tasks/:id/review).
  */
 export function useReviewTaskMutation(
-  options?: UseMutationOptions<Task, ApiError, { id: string; isApproved: boolean; feedback?: string }>,
+  options?: UseMutationOptions<
+    Task,
+    ApiError,
+    { id: string; isApproved: boolean; feedback?: string }
+  >,
 ) {
   const queryClient = useQueryClient();
 
@@ -342,7 +345,9 @@ export const useReviewTask = useReviewTaskMutation;
 /**
  * Mutation hook to create a new task.
  */
-export function useCreateTask(options?: UseMutationOptions<Task, ApiError, CreateTaskInput | FormData>) {
+export function useCreateTask(
+  options?: UseMutationOptions<Task, ApiError, CreateTaskInput | FormData>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, CreateTaskInput | FormData>({
@@ -364,7 +369,9 @@ export function useCreateTask(options?: UseMutationOptions<Task, ApiError, Creat
 /**
  * Mutation hook to update an existing task.
  */
-export function useUpdateTask(options?: UseMutationOptions<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>) {
+export function useUpdateTask(
+  options?: UseMutationOptions<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>({
@@ -410,7 +417,9 @@ export function useDeleteTask(options?: UseMutationOptions<void, ApiError, strin
 /**
  * Mutation hook for admin to assign a task to an employee.
  */
-export function useAssignTask(options?: UseMutationOptions<Task, ApiError, { id: string; employeeId: string }>) {
+export function useAssignTask(
+  options?: UseMutationOptions<Task, ApiError, { id: string; employeeId: string }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, { id: string; employeeId: string }>({

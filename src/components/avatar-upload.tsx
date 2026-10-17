@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Upload, Trash2, Camera, Loader2 } from "lucide-react";
+import { Upload, Trash2, Camera, Loader2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { validateAvatarFile, uploadProfileAvatar, MAX_AVATAR_FILE_SIZE } from "@/lib/cdn-upload";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 export interface AvatarUploadProps {
   value?: string | null;
@@ -63,12 +64,12 @@ export function AvatarUpload({
 
   const initials = name
     ? name
-      .trim()
-      .split(/\s+/)
-      .map((p) => p[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+        .trim()
+        .split(/\s+/)
+        .map((p) => p[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "U";
 
   const isImageAvatar =
@@ -174,21 +175,48 @@ export function AvatarUpload({
 
   const isBusy = disabled || isUploading || isRemoving;
 
+  const {
+    isDragging,
+    inputRef: dropInputRef,
+    openFileDialog,
+    dragProps,
+    pasteProps,
+    keyboardProps,
+  } = useFileDropPaste({
+    accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp",
+    maxSize: MAX_AVATAR_FILE_SIZE,
+    multiple: false,
+    disabled: isBusy,
+    label: "profile photo",
+    validateFile: validateAvatarFile,
+    onFiles: (files) => {
+      if (files[0]) void onPickFile(files[0]);
+    },
+  });
+
   return (
-    <div className={`flex flex-col items-center gap-4 ${className}`}>
+    <div {...pasteProps} className={`flex flex-col items-center gap-4 ${className}`}>
       <input
-        ref={fileRef}
+        ref={dropInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-        className="hidden"
+        className="sr-only"
         disabled={isBusy}
         onChange={(e) => onPickFile(e.target.files?.[0])}
       />
 
-      <div className="relative">
+      <div
+        {...dragProps}
+        {...keyboardProps}
+        onClick={openFileDialog}
+        className="relative group cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full transition-transform"
+        title="Click to browse, drag & drop image, or paste with Ctrl+V"
+        aria-label="Upload profile photo. Drag and drop, paste with Ctrl+V, or press Enter to browse"
+      >
         <div
-          className={`grid ${dimensionClasses} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent font-display font-bold shadow-glow ring-4 ring-background transition-opacity ${isBusy ? "opacity-75" : ""
-            }`}
+          className={`grid ${dimensionClasses} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent font-display font-bold shadow-glow ring-4 ring-background transition-all ${
+            isBusy ? "opacity-75" : ""
+          } ${isDragging ? "scale-110 ring-primary ring-8 shadow-xl" : "group-hover:scale-105"}`}
         >
           {isImageAvatar ? (
             <img
@@ -204,8 +232,15 @@ export function AvatarUpload({
             <span>{initials}</span>
           )}
 
+          {/* Dragging overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 grid place-items-center bg-primary/50 text-white backdrop-blur-[1px]">
+              <UploadCloud className="h-8 w-8 animate-bounce text-white" />
+            </div>
+          )}
+
           {/* Loading overlay when uploading directly */}
-          {isBusy && (
+          {isBusy && !isDragging && (
             <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-[1px]">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
@@ -215,7 +250,10 @@ export function AvatarUpload({
         <button
           type="button"
           disabled={isBusy}
-          onClick={() => fileRef.current?.click()}
+          onClick={(e) => {
+            e.stopPropagation();
+            openFileDialog();
+          }}
           className="absolute bottom-0 right-0 grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-110 ring-2 ring-background disabled:pointer-events-none disabled:opacity-50"
           aria-label="Upload photo"
         >
@@ -245,7 +283,7 @@ export function AvatarUpload({
           size="sm"
           className="rounded-md"
           disabled={isBusy}
-          onClick={() => fileRef.current?.click()}
+          onClick={openFileDialog}
         >
           {isUploading ? (
             <>
@@ -280,9 +318,18 @@ export function AvatarUpload({
         )}
       </div>
 
-      <p className="text-center text-[11px] text-muted-foreground">
-        JPG, PNG, or WebP · square · up to {(MAX_AVATAR_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB
-      </p>
+      <div className="text-center space-y-1">
+        <p className="text-xs font-medium text-foreground">
+          Drag and drop image, paste with{" "}
+          <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground border border-border/70">
+            Ctrl+V
+          </kbd>
+          , or browse
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          JPG, PNG, or WebP · square · up to {(MAX_AVATAR_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB
+        </p>
+      </div>
     </div>
   );
 }

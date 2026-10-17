@@ -22,6 +22,7 @@ import {
   type NoticeType,
 } from "@/lib/notice-store";
 import { useCreateNotice } from "@/features/notices/hooks/use-notices-api";
+import { FileDropzone } from "@/components/file-dropzone";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -134,7 +135,9 @@ export function NoticeComposer() {
             onValueChange={(v) => set("type", v as NoticeType)}
             disabled={createNoticeMutation.isPending}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {noticeTypes.map((t) => (
                 <SelectItem key={t} value={t}>
@@ -152,10 +155,14 @@ export function NoticeComposer() {
             onValueChange={(v) => set("audience", v)}
             disabled={createNoticeMutation.isPending}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {noticeAudiences.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -168,10 +175,14 @@ export function NoticeComposer() {
             onValueChange={(v) => set("priority", v as NoticePriority)}
             disabled={createNoticeMutation.isPending}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {noticePriorities.map((p) => (
-                <SelectItem key={p} value={p}>{noticePriorityMeta[p]?.label}</SelectItem>
+                <SelectItem key={p} value={p}>
+                  {noticePriorityMeta[p]?.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -201,41 +212,23 @@ export function NoticeComposer() {
         </div>
 
         <div className="lg:col-span-2 space-y-2">
-          <Label htmlFor="attachment">Attachment (optional)</Label>
-          <div className="flex flex-wrap items-center gap-3">
-            <label
-              htmlFor="attachment"
-              className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border/70 bg-background/40 px-4 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
-            >
-              <Paperclip className="h-4 w-4" />
-              {attachmentFile ? "Replace file" : "PDF, image or document"}
-            </label>
-            <input
-              id="attachment"
-              type="file"
-              className="sr-only"
-              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-              disabled={createNoticeMutation.isPending}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                setAttachmentFile(f);
-              }}
-            />
-            {attachmentFile && (
-              <span className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-3 py-1.5 text-xs">
-                <Paperclip className="h-3.5 w-3.5 text-primary" />
-                <span className="max-w-[220px] truncate">{attachmentFile.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setAttachmentFile(undefined)}
-                  className="text-muted-foreground hover:text-destructive"
-                  disabled={createNoticeMutation.isPending}
-                >
-                  Remove
-                </button>
-              </span>
-            )}
-          </div>
+          <Label htmlFor="notice-attachment">Attachment (optional)</Label>
+          <FileDropzone
+            id="notice-attachment"
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            maxSize={10 * 1024 * 1024}
+            multiple={false}
+            disabled={createNoticeMutation.isPending}
+            selectedFile={attachmentFile || null}
+            onClearFile={() => setAttachmentFile(undefined)}
+            label="Drag and drop file, paste with Ctrl+V, or browse"
+            hint="PDF, image, or document (up to 10 MB)"
+            onFiles={(files) => {
+              if (files[0]) {
+                setAttachmentFile(files[0]);
+              }
+            }}
+          />
         </div>
       </div>
 
