@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Send,
   Trophy,
+  MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -88,7 +89,23 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
         </p>
       )}
 
-      {task.reviewState === "rejected" && task.rejectionReason && (
+      {task.feedback && (
+        <div
+          className={`mt-3 rounded-xl border p-2.5 text-xs ${
+            task.reviewStatus === "approved" || task.status === "completed"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-destructive/30 bg-destructive/10 text-destructive"
+          }`}
+        >
+          <div className="flex items-center gap-1 font-semibold text-[11px] mb-0.5">
+            <MessageSquare className="h-3 w-3" />
+            <span>Feedback from {task.reviewedBy || "Admin"}:</span>
+          </div>
+          <p className="line-clamp-2 italic">"{task.feedback}"</p>
+        </div>
+      )}
+
+      {!task.feedback && task.reviewState === "rejected" && task.rejectionReason && (
         <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
           {task.rejectionReason}
         </p>

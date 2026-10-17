@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { useTaskQuery, useStartTask, type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
+import { useTaskQuery, useStartTask, type Task, getCategoryLabel, formatTaskSubtitle, TaskFeedbackCard } from "@/features/tasks";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/employee/tasks/$id/")({
@@ -201,15 +201,10 @@ function EmployeeTaskDetail() {
               </>
             )}
 
-            {task.reviewState === "rejected" && task.rejectionReason && (
-              <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-                  <MessageSquare className="h-4 w-4" /> Reviewer feedback
-                </div>
-                <p className="mt-1 text-xs text-destructive/90">{task.rejectionReason}</p>
-              </div>
-            )}
           </div>
+
+          {/* Feedback Received Section */}
+          <TaskFeedbackCard task={task} showTaskTitle />
 
           {/* Timeline */}
           <div className="glass rounded-2xl p-6">

@@ -248,6 +248,48 @@ function TaskDetailPage() {
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No attachments.</p>
             )}
+            {/* Submitted Proof Files */}
+            {task.proofFiles && task.proofFiles.length > 0 && (
+              <div className="glass rounded-2xl p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    <h3 className="font-display font-semibold">Submitted Proof Files</h3>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
+                    {task.proofFiles.length} file{task.proofFiles.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {task.submittedBy && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Submitted by {task.submittedBy} {task.submittedAt ? `on ${new Date(task.submittedAt).toLocaleDateString()}` : ""}
+                  </p>
+                )}
+                <ul className="mt-3 space-y-2">
+                  {task.proofFiles.map((proof, i) => (
+                    <li key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 font-medium">
+                        <Paperclip className="h-3.5 w-3.5 text-primary" /> {proof.name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{proof.size || "File"}</span>
+                        {proof.url && (
+                          <a
+                            href={proof.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={proof.name}
+                            className="text-xs text-primary hover:underline font-medium"
+                          >
+                            Download / View
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Employee Requests */}

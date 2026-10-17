@@ -310,8 +310,14 @@ export const tasksService = {
   /**
    * Alias for submitTask matching existing codebase usages.
    */
-  async submitTaskForReview(id: string, notes?: string): Promise<Task> {
-    return this.submitTask(id, { notes: notes || "" });
+  async submitTaskForReview(
+    id: string,
+    notesOrPayload?: string | SubmitTaskPayload | FormData,
+  ): Promise<Task> {
+    if (typeof notesOrPayload === "string" || !notesOrPayload) {
+      return this.submitTask(id, { notes: notesOrPayload || "" });
+    }
+    return this.submitTask(id, notesOrPayload);
   },
 
   /**

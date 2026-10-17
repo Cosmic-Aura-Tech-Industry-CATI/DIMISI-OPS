@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { PageSpinner } from "@/components/loading";
 import { toast } from "sonner";
 import { ScrollText, Search, Download, ChevronLeft, ChevronRight, FileText, FileSpreadsheet, FileType } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -51,8 +53,31 @@ export const Route = createFileRoute("/admin/audit-logs")({
       { property: "og:description", content: "Monitor and review every important administrative action across the organization." },
     ],
   }),
-  component: AuditLogsPage,
+  component: AuditLogsRoute,
 });
+
+function AuditLogsRoute() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      navigate({ to: "/login", replace: true });
+    } else if (!isDirector) {
+      const isEmployee = user.role === "employee" || user.role === "intern";
+      navigate({ to: isEmployee ? "/employee" : "/admin", replace: true });
+    }
+  }, [user, loading, isDirector, navigate]);
+
+  if (loading || !user || !isDirector) {
+    return <PageSpinner />;
+  }
+
+  return <AuditLogsPage />;
+}
 
 type DateRange = "all" | "today" | "7d" | "30d" | "custom";
 
