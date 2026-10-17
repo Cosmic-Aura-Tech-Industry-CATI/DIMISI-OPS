@@ -3,7 +3,7 @@
  * Centralizes all communication with backend task endpoints using standard Axios client.
  */
 
-import { http } from "@/api/client/client";
+import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import {
   buildCreateTaskFormData,
@@ -23,17 +23,13 @@ import {
 
 /**
  * Filter sanitizer for Task API requests.
- * Guarantees that 'page' is always present in query parameters (defaults to 1).
  */
 function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
-  const page =
-    filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))
-      ? Math.max(1, Number(filters.page))
-      : 1;
+  const cleaned: Record<string, unknown> = {};
 
-  const cleaned: Record<string, unknown> = {
-    page,
-  };
+  if (filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))) {
+    cleaned.page = Math.max(1, Number(filters.page));
+  }
 
   if (filters?.limit !== undefined && filters?.limit !== null && !isNaN(Number(filters.limit))) {
     cleaned.limit = Math.max(1, Number(filters.limit));
@@ -73,13 +69,14 @@ function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
 export const tasksService = {
   /**
    * Fetch all tasks (Smart endpoint: returns unmasked tasks for Admin/Director or masked for Employee).
-   * Always includes page parameter in query (e.g. /tasks?page=1 or /tasks?page=N).
+   * Uses apiClient directly to ensure backend pagination envelope is not stripped by unwrap.
    */
   async getTasks(filters?: TaskQueryFilters): Promise<TasksResult> {
     const params = cleanTaskFilters(filters);
-    const res = await http.get<any>(API_ENDPOINTS.tasks.list, {
+    const response = await apiClient.get<any>(API_ENDPOINTS.tasks.list, {
       params,
     });
+    const res = response?.data;
     const rawList = Array.isArray(res)
       ? res
       : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
@@ -100,12 +97,9 @@ export const tasksService = {
         totalPages: Number(
           rawPagination.totalPages ||
             rawPagination.pages ||
-            Math.max(
-              1,
-              Math.ceil((rawPagination.totalRecords || tasks.length) / (Number(params.limit) || 8)),
-            ),
+            Math.max(1, Math.ceil((rawPagination.totalRecords || rawPagination.total || tasks.length) / (Number(params.limit) || 10))),
         ),
-        limit: Number(rawPagination.limit || rawPagination.perPage || params.limit || 8),
+        limit: Number(rawPagination.limit || rawPagination.perPage || params.limit || 10),
         hasNextPage: Boolean(rawPagination.hasNextPage ?? rawPagination.hasNext),
         hasPrevPage: Boolean(rawPagination.hasPrevPage ?? rawPagination.hasPrev),
       };
@@ -119,13 +113,15 @@ export const tasksService = {
       const totalPages = Number(
         res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)),
       );
+      const limit = Number(res?.limit ?? params.limit ?? 10);
+      const totalPages = Number(res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)));
       tasks.pagination = {
         totalRecords: total,
         currentPage: Number(res?.currentPage ?? res?.page ?? params.page ?? 1),
         totalPages,
         limit,
-        hasNextPage: Number(params.page) < totalPages,
-        hasPrevPage: Number(params.page) > 1,
+        hasNextPage: Number(params.page || 1) < totalPages,
+        hasPrevPage: Number(params.page || 1) > 1,
       };
     }
 
@@ -282,22 +278,47 @@ export const tasksService = {
     id: string,
     payload:
       | SubmitTaskPayload
+      | FormData
       | {
           notes?: string;
+          files?: File[];
+          proofFiles?: any[];
           proof?: { url: string; publicId: string };
           proofUrl?: string;
           proofPublicId?: string;
-          files?: File[];
+          formData?: FormData;
         }
-      | FormData
       | string,
   ): Promise<Task> {
-    const body =
-      typeof payload === "string"
-        ? { notes: payload }
-        : payload instanceof FormData
-          ? payload
-          : { ...payload };
+    let body: any;
+    if (payload instanceof FormData) {
+      body = payload;
+    } else if (typeof payload === "string") {
+      body = { notes: payload };
+    } else if (typeof payload === "object" && payload !== null && "formData" in payload && (payload as any).formData) {
+      body = (payload as any).formData;
+    } else if (
+      typeof payload === "object" &&
+      payload !== null &&
+      "files" in payload &&
+      Array.isArray((payload as any).files) &&
+      (payload as any).files.length > 0
+    ) {
+      const fd = new FormData();
+      if ((payload as any).notes) fd.append("notes", (payload as any).notes);
+      for (const file of (payload as any).files) {
+        if (file instanceof File) {
+          fd.append("proofFiles", file);
+        }
+      }
+      if ((payload as any).proofFiles && (payload as any).proofFiles.length > 0) {
+        fd.append("proofFiles", JSON.stringify((payload as any).proofFiles));
+      }
+      body = fd;
+    } else {
+      body = typeof payload === "string" ? { notes: payload } : { ...payload };
+    }
+
     try {
       const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
       const raw = res?.task || res?.data?.task || res;

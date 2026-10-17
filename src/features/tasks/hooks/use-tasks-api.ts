@@ -30,29 +30,21 @@ import type {
 
 /**
  * Hook to fetch all tasks with optional filters.
- * Normalizes filters to guarantee 'page' is always present (defaults to 1).
  */
 export function useTasksQuery(
   filters?: TaskQueryFilters | number,
   options?: Omit<UseQueryOptions<TasksResult, ApiError>, "queryKey" | "queryFn">,
 ) {
-  const pageNum =
+  const filterObj: TaskQueryFilters =
     typeof filters === "number"
-      ? filters
-      : filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))
-        ? Math.max(1, Number(filters.page))
-        : 1;
-
-  const filterObj = typeof filters === "object" && filters !== null ? filters : {};
-
-  const normalizedFilters: TaskQueryFilters = {
-    ...filterObj,
-    page: pageNum,
-  };
+      ? { page: filters }
+      : typeof filters === "object" && filters !== null
+        ? filters
+        : {};
 
   return useQuery<TasksResult, ApiError>({
-    queryKey: queryKeys.tasks.list(normalizedFilters),
-    queryFn: () => tasksService.getTasks(normalizedFilters),
+    queryKey: queryKeys.tasks.list(filterObj),
+    queryFn: () => tasksService.getTasks(filterObj),
     staleTime: 1000 * 60 * 2, // 2 mins
     retry: 1,
     ...options,
@@ -253,24 +245,13 @@ export function useSubmitTaskMutation(
       const id = typeof variables === "string" ? variables : variables.id;
       let payload: SubmitTaskPayload | FormData = { notes: "" };
       if (typeof variables === "string") {
-        payload = { notes: "" };
-      } else if ("payload" in variables && variables.payload) {
-        payload = variables.payload;
-      } else {
-        const v = variables as {
-          notes?: string;
-          proof?: { url: string; publicId: string };
-          proofUrl?: string;
-          proofPublicId?: string;
-        };
-        payload = {
-          notes: v.notes || "",
-          proof: v.proof,
-          proofUrl: v.proofUrl,
-          proofPublicId: v.proofPublicId,
-        };
+        return tasksService.submitTask(id, { notes: "" });
       }
-      return tasksService.submitTask(id, payload);
+      if (variables.payload) {
+        return tasksService.submitTask(id, variables.payload);
+      }
+      const { id: _unusedId, ...rest } = variables;
+      return tasksService.submitTask(id, rest);
     },
     onSuccess: (...args) => {
       const [, variables] = args;
