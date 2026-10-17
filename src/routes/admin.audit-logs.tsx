@@ -47,9 +47,9 @@ import { useOrgActivityQuery, type ActivityLog } from "@/features/activity";
 export const Route = createFileRoute("/admin/audit-logs")({
   head: () => ({
     meta: [
-      { title: "Audit Logs — Poll" },
+      { title: "Audit Logs — Dimisi" },
       { name: "description", content: "Monitor and review every important administrative action across the organization." },
-      { property: "og:title", content: "Audit Logs — Poll" },
+      { property: "og:title", content: "Audit Logs — Dimisi" },
       { property: "og:description", content: "Monitor and review every important administrative action across the organization." },
     ],
   }),

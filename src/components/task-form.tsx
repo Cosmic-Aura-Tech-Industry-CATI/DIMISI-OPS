@@ -36,14 +36,20 @@ import { type Task, type TaskPriority, type TaskType, getCategoryLabel } from "@
 import { useEmployeesQuery } from "@/features/employees";
 import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
-import { ArchiveProjectDialog, CreateProjectDialog, EditProjectDialog } from "@/components/project-dialogs";
+import {
+  ArchiveProjectDialog,
+  CreateProjectDialog,
+  EditProjectDialog,
+} from "@/components/project-dialogs";
 import { cn } from "@/lib/utils";
 import {
   validateTaskAttachmentFile,
   uploadTaskAttachment,
   extractCloudinaryPublicId,
   MAX_TASK_FILE_SIZE,
+  ALLOWED_TASK_ATTACHMENT_EXTENSIONS,
 } from "@/lib/cdn-upload";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 export interface TaskAttachment {
   id?: string;
@@ -73,13 +79,31 @@ export interface TaskFormValues {
   estimatedTime: string;
 }
 
-export const taskCategories = ["Engineering", "Design", "Product", "Marketing", "Sales", "Support", "Operations"];
+export const taskCategories = [
+  "Engineering",
+  "Design",
+  "Product",
+  "Marketing",
+  "Sales",
+  "Support",
+  "Operations",
+];
 
 export function emptyTaskValues(): TaskFormValues {
   return {
-    title: "", description: "", category: "Engineering", priority: "medium",
-    assigneeId: "", points: 50, dueDate: "", notes: "", attachments: [],
-    taskType: "universal", projectId: "", template: "", estimatedTime: "",
+    title: "",
+    description: "",
+    category: "Engineering",
+    priority: "medium",
+    assigneeId: "",
+    points: 50,
+    dueDate: "",
+    notes: "",
+    attachments: [],
+    taskType: "universal",
+    projectId: "",
+    template: "",
+    estimatedTime: "",
   };
 }
 
@@ -100,7 +124,7 @@ export function taskToValues(t: Task): TaskFormValues {
     category:
       getCategoryLabel(t.category) !== "Uncategorized"
         ? getCategoryLabel(t.category)
-        : (taskCategories[0] || "Engineering"),
+        : taskCategories[0] || "Engineering",
     priority: t.priority,
     assigneeId: t.assigneeId,
     points: t.points,
@@ -114,7 +138,13 @@ export function taskToValues(t: Task): TaskFormValues {
   };
 }
 
-const categoryOptions: { value: TaskType; icon: typeof Globe; emoji: string; title: string; hint: string }[] = [
+const categoryOptions: {
+  value: TaskType;
+  icon: typeof Globe;
+  emoji: string;
+  title: string;
+  hint: string;
+}[] = [
   {
     value: "universal",
     icon: Globe,
@@ -138,7 +168,6 @@ const categoryOptions: { value: TaskType; icon: typeof Globe; emoji: string; tit
   },
 ];
 
-
 export function TaskForm({
   initial,
   submitLabel = "Save task",
@@ -156,7 +185,7 @@ export function TaskForm({
 }) {
   const [form, setForm] = useState<TaskFormValues>(initial);
   const [pointsInput, setPointsInput] = useState<string>(
-    initial.points !== undefined && initial.points !== null ? String(initial.points) : "50"
+    initial.points !== undefined && initial.points !== null ? String(initial.points) : "50",
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
@@ -164,9 +193,12 @@ export function TaskForm({
   const { data: employeeData } = useEmployeesQuery();
   const employeeList = employeeData?.employees || [];
   const activeProjects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
-  const selectedProject = allProjectList.find((p) => p.id === form.projectId || p._id === form.projectId);
+  const selectedProject = allProjectList.find(
+    (p) => p.id === form.projectId || p._id === form.projectId,
+  );
 
-  const set = <K extends keyof TaskFormValues>(k: K, v: TaskFormValues[K]) => setForm({ ...form, [k]: v });
+  const set = <K extends keyof TaskFormValues>(k: K, v: TaskFormValues[K]) =>
+    setForm({ ...form, [k]: v });
 
   const handlePointsChange = (raw: string) => {
     // Allow empty string or numbers only
@@ -182,7 +214,9 @@ export function TaskForm({
     setForm((prev) => ({
       ...prev,
       attachments: prev.attachments.map((att) =>
-        att.id === item.id ? { ...att, isUploading: true, uploadProgress: 10, error: undefined } : att
+        att.id === item.id
+          ? { ...att, isUploading: true, uploadProgress: 10, error: undefined }
+          : att,
       ),
     }));
 
@@ -191,7 +225,7 @@ export function TaskForm({
         setForm((prev) => ({
           ...prev,
           attachments: prev.attachments.map((att) =>
-            att.id === item.id ? { ...att, uploadProgress: percent } : att
+            att.id === item.id ? { ...att, uploadProgress: percent } : att,
           ),
         }));
       });
@@ -210,7 +244,7 @@ export function TaskForm({
                 uploadProgress: 100,
                 error: undefined,
               }
-            : att
+            : att,
         ),
       }));
       toast.success(`${item.name} uploaded to storage.`);
@@ -225,20 +259,32 @@ export function TaskForm({
       setForm((prev) => ({
         ...prev,
         attachments: prev.attachments.map((att) =>
-          att.id === item.id ? { ...att, isUploading: false, error: message } : att
+          att.id === item.id ? { ...att, isUploading: false, error: message } : att,
         ),
       }));
       toast.error(`Upload failed for ${item.name}: ${message}`);
     }
   };
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = (files: FileList | File[] | null) => {
+    if (!files) return;
     const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
     const itemsToAdd: TaskAttachment[] = [];
 
     for (const f of fileArray) {
+      // Prevent duplicate attachments
+      const isDuplicate = form.attachments.some(
+        (att) =>
+          att.name === f.name &&
+          (att.file?.size === f.size || att.size?.includes(String(Math.round(f.size / 1024)))),
+      );
+      if (isDuplicate) {
+        toast.info(`"${f.name}" is already attached.`);
+        continue;
+      }
+
       const validation = validateTaskAttachmentFile(f);
       if (!validation.valid) {
         toast.error(`${f.name}: ${validation.error || "Invalid file"}`);
@@ -277,6 +323,31 @@ export function TaskForm({
     });
   };
 
+  const isUploadingAny = form.attachments.some((a) => a.isUploading);
+  const busy = isSubmitting || isUploadingAny;
+
+  const attachmentAccept = ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(",");
+
+  const {
+    isDragging: isAttachmentDragging,
+    inputRef: attachmentInputRef,
+    openFileDialog: openAttachmentDialog,
+    dragProps: attachmentDragProps,
+    pasteProps: attachmentPasteProps,
+    keyboardProps: attachmentKeyboardProps,
+  } = useFileDropPaste({
+    accept: attachmentAccept,
+    maxSize: MAX_TASK_FILE_SIZE,
+    multiple: true,
+    disabled: busy,
+    existingFiles: form.attachments,
+    validateFile: validateTaskAttachmentFile,
+    label: "task attachment",
+    onFiles: (newFiles) => {
+      handleFiles(newFiles);
+    },
+  });
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
@@ -306,9 +377,6 @@ export function TaskForm({
     onSubmit({ ...form, points: numericPoints });
   };
 
-  const isUploadingAny = form.attachments.some((a) => a.isUploading);
-  const busy = isSubmitting || isUploadingAny;
-
   return (
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-3">
       <div className="glass space-y-5 rounded-2xl p-6 lg:col-span-2">
@@ -319,23 +387,43 @@ export function TaskForm({
         )}
 
         <Field label="Title" error={errors.title}>
-          <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Migrate to new analytics SDK" className="h-11" />
+          <Input
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
+            placeholder="e.g. Migrate to new analytics SDK"
+            className="h-11"
+          />
         </Field>
 
         <Field label="Description" error={errors.description}>
-          <Textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="What needs to be done and why…" rows={4} />
+          <Textarea
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="What needs to be done and why…"
+            rows={4}
+          />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Category">
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>{taskCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {taskCategories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </Field>
           <Field label="Priority">
             <Select value={form.priority} onValueChange={(v) => set("priority", v as TaskPriority)}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
@@ -346,7 +434,12 @@ export function TaskForm({
         </div>
 
         <Field label="Notes (optional)">
-          <Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Internal context for reviewers…" rows={3} />
+          <Textarea
+            value={form.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            placeholder="Internal context for reviewers…"
+            rows={3}
+          />
         </Field>
 
         <div>
@@ -359,29 +452,59 @@ export function TaskForm({
             </span>
           </div>
 
-          <label
-            htmlFor="task-attachment"
-            className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/40 p-8 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
+          <div
+            {...attachmentDragProps}
+            {...attachmentPasteProps}
+            {...attachmentKeyboardProps}
+            onClick={openAttachmentDialog}
+            className={`mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              isAttachmentDragging
+                ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
+                : "border-border/70 bg-card/40 hover:border-primary/60 hover:bg-primary/5"
+            } ${busy ? "pointer-events-none opacity-50" : ""}`}
+            aria-label="Upload task attachments. Drag and drop files, paste with Ctrl+V, or press Enter to browse"
           >
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary">
-              <FileUp className="h-5 w-5" />
+            <div
+              className={`grid h-12 w-12 place-items-center rounded-xl transition-all ${
+                isAttachmentDragging
+                  ? "scale-110 bg-primary/20 text-primary shadow-md"
+                  : "bg-primary/15 text-primary group-hover:scale-105"
+              }`}
+            >
+              <FileUp className="h-6 w-6" />
             </div>
-            <p className="text-sm font-medium">Drop files or click to upload</p>
+            <p className="text-sm font-semibold text-foreground">
+              Drag and drop files, paste with Ctrl+V, or browse
+            </p>
             <p className="text-xs text-muted-foreground">
-              PDF, ZIP, DOC, DOCX, XLS, XLSX, PNG, JPG, WebP (Uploaded directly from UI)
+              {ALLOWED_TASK_ATTACHMENT_EXTENSIONS.join(", ").toUpperCase()} (max 10 MB each, direct
+              CDN upload)
+            </p>
+            <p className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+              <span>
+                Press{" "}
+                <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground border border-border/70">
+                  Ctrl+V
+                </kbd>{" "}
+                to paste screenshot or file
+              </span>
+              <span>•</span>
+              <span className="text-primary font-medium hover:underline">Browse files</span>
             </p>
             <input
+              ref={attachmentInputRef}
               id="task-attachment"
               type="file"
               multiple
+              accept={attachmentAccept}
               disabled={busy}
-              className="hidden"
+              className="sr-only"
               onChange={(e) => {
                 handleFiles(e.target.files);
                 e.target.value = "";
               }}
             />
-          </label>
+          </div>
 
           {form.attachments.length > 0 && (
             <ul className="mt-3 space-y-2.5">
@@ -461,7 +584,9 @@ export function TaskForm({
                   {a.isUploading && (
                     <div className="mt-2 space-y-1">
                       <Progress value={a.uploadProgress || 10} className="h-1.5" />
-                      <p className="text-[10px] text-muted-foreground">Uploading directly to CDN…</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Uploading directly to CDN…
+                      </p>
                     </div>
                   )}
 
@@ -499,22 +624,30 @@ export function TaskForm({
                       : "border-border/60 bg-card/40 hover:border-primary/40 hover:bg-secondary/40",
                   )}
                 >
-                  <span className={cn(
-                    "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md text-base",
-                    active ? "bg-primary/20 text-primary" : "bg-secondary/60 text-muted-foreground",
-                  )}>
+                  <span
+                    className={cn(
+                      "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md text-base",
+                      active
+                        ? "bg-primary/20 text-primary"
+                        : "bg-secondary/60 text-muted-foreground",
+                    )}
+                  >
                     <opt.icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-sm font-semibold">
                       <span aria-hidden>{opt.emoji}</span> {opt.title}
                     </span>
-                    <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{opt.hint}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                      {opt.hint}
+                    </span>
                   </span>
-                  <span className={cn(
-                    "mt-1 grid h-4 w-4 shrink-0 place-items-center rounded-full border",
-                    active ? "border-primary" : "border-border",
-                  )}>
+                  <span
+                    className={cn(
+                      "mt-1 grid h-4 w-4 shrink-0 place-items-center rounded-full border",
+                      active ? "border-primary" : "border-border",
+                    )}
+                  >
                     {active && <span className="h-2 w-2 rounded-full bg-primary" />}
                   </span>
                 </button>
@@ -527,30 +660,57 @@ export function TaskForm({
           <>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Project</Label>
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Project
+                </Label>
                 <div className="flex items-center gap-1">
-                  <IconAction label="Add project" onClick={() => setDialog("create")}><FolderPlus className="h-3.5 w-3.5" /></IconAction>
-                  <IconAction label="Rename project" disabled={!selectedProject} onClick={() => setDialog("edit")}><Pencil className="h-3.5 w-3.5" /></IconAction>
-                  <IconAction label="Archive or delete project" disabled={!selectedProject} onClick={() => setDialog("archive")}><Archive className="h-3.5 w-3.5" /></IconAction>
+                  <IconAction label="Add project" onClick={() => setDialog("create")}>
+                    <FolderPlus className="h-3.5 w-3.5" />
+                  </IconAction>
+                  <IconAction
+                    label="Rename project"
+                    disabled={!selectedProject}
+                    onClick={() => setDialog("edit")}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </IconAction>
+                  <IconAction
+                    label="Archive or delete project"
+                    disabled={!selectedProject}
+                    onClick={() => setDialog("archive")}
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </IconAction>
                 </div>
               </div>
               <Select
                 value={form.projectId}
                 onValueChange={(v) => setForm({ ...form, projectId: v, template: "" })}
               >
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select a project" /></SelectTrigger>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
                 <SelectContent>
                   {activeProjects.length === 0 ? (
-                    <div className="px-2 py-3 text-xs text-muted-foreground">No active projects — add one.</div>
+                    <div className="px-2 py-3 text-xs text-muted-foreground">
+                      No active projects — add one.
+                    </div>
                   ) : (
                     activeProjects.map((p) => {
                       const targetId = p._id || p.id;
                       return (
                         <SelectItem key={targetId} value={targetId}>
                           <span className="inline-flex items-center gap-2">
-                            {p.color && <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color }} />}
+                            {p.color && (
+                              <span
+                                className="h-2.5 w-2.5 rounded-sm"
+                                style={{ backgroundColor: p.color }}
+                              />
+                            )}
                             {p.name}
-                            <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{p.code}</span>
+                            <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
+                              {p.code}
+                            </span>
                           </span>
                         </SelectItem>
                       );
@@ -566,7 +726,11 @@ export function TaskForm({
               onOpenChange={(v) => setDialog(v ? "create" : null)}
               onCreated={(p) => setForm((f) => ({ ...f, projectId: p._id || p.id, template: "" }))}
             />
-            <EditProjectDialog open={dialog === "edit"} onOpenChange={(v) => setDialog(v ? "edit" : null)} project={selectedProject} />
+            <EditProjectDialog
+              open={dialog === "edit"}
+              onOpenChange={(v) => setDialog(v ? "edit" : null)}
+              project={selectedProject}
+            />
             <ArchiveProjectDialog
               open={dialog === "archive"}
               onOpenChange={(v) => setDialog(v ? "archive" : null)}
@@ -574,17 +738,22 @@ export function TaskForm({
               onRemoved={() => setForm((f) => ({ ...f, projectId: "", template: "" }))}
             />
 
-
             {form.projectId && (
               <Field label="Task template">
                 <Select
                   value={form.template}
-                  onValueChange={(v) => setForm({ ...form, template: v, title: form.title.trim() ? form.title : v })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, template: v, title: form.title.trim() ? form.title : v })
+                  }
                 >
-                  <SelectTrigger className="h-11"><SelectValue placeholder="Select a task template" /></SelectTrigger>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select a task template" />
+                  </SelectTrigger>
                   <SelectContent>
                     {(selectedProject?.templates ?? []).map((t: string) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -596,7 +765,9 @@ export function TaskForm({
         {form.taskType === "direct" && (
           <Field label="Assign employee" error={errors.assigneeId}>
             <Select value={form.assigneeId} onValueChange={(v) => set("assigneeId", v)}>
-              <SelectTrigger className="h-11"><SelectValue placeholder="Select an employee" /></SelectTrigger>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Select an employee" />
+              </SelectTrigger>
               <SelectContent>
                 {employeeList.map((e) => {
                   const targetId = e._id || e.id || "";
@@ -605,9 +776,15 @@ export function TaskForm({
                   return (
                     <SelectItem key={targetId} value={targetId}>
                       <span className="inline-flex items-center gap-2">
-                        <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">{avatar}</span>
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">
+                          {avatar}
+                        </span>
                         {e.name}
-                        {code && <span className="font-mono text-[10px] tracking-wider text-muted-foreground">{code}</span>}
+                        {code && (
+                          <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
+                            {code}
+                          </span>
+                        )}
                       </span>
                     </SelectItem>
                   );
@@ -620,7 +797,12 @@ export function TaskForm({
         <Field label="Estimated time (optional)">
           <div className="relative">
             <Timer className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={form.estimatedTime} onChange={(e) => set("estimatedTime", e.target.value)} placeholder="e.g. 4h or 2 days" className="h-11 pl-9" />
+            <Input
+              value={form.estimatedTime}
+              onChange={(e) => set("estimatedTime", e.target.value)}
+              placeholder="e.g. 4h or 2 days"
+              className="h-11 pl-9"
+            />
           </div>
         </Field>
 
@@ -643,7 +825,12 @@ export function TaskForm({
         <Field label="Deadline" error={errors.dueDate}>
           <div className="relative">
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input type="date" value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} className="h-11 pl-9" />
+            <Input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => set("dueDate", e.target.value)}
+              className="h-11 pl-9"
+            />
           </div>
         </Field>
 
@@ -656,13 +843,19 @@ export function TaskForm({
               : form.taskType === "project"
                 ? `Open to all · ${selectedProject?.name ?? "No project"}`
                 : "Open to all employees"}
-            {" · "}{form.priority} priority · {form.points} pts
+            {" · "}
+            {form.priority} priority · {form.points} pts
           </p>
         </div>
 
-
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" className="rounded-md" disabled={isSubmitting} onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-md"
+            disabled={isSubmitting}
+            onClick={onCancel}
+          >
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting} className="rounded-md shadow-glow">
@@ -709,10 +902,20 @@ function IconAction({
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

@@ -33,6 +33,7 @@ import {
   type NoticeType,
 } from "@/lib/notice-store";
 import { useDeleteNotice, useUpdateNotice } from "@/features/notices/hooks/use-notices-api";
+import { FileDropzone } from "@/components/file-dropzone";
 
 /** Read-only preview of a notice exactly as employees see it. */
 export function ViewNoticeDialog({
@@ -51,10 +52,10 @@ export function ViewNoticeDialog({
 
   const formattedDate = notice?.createdAt
     ? new Date(notice.createdAt).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
     : "—";
 
   return (
@@ -134,7 +135,8 @@ export function DeleteNoticeDialog({
         <DialogHeader>
           <DialogTitle>Delete notice</DialogTitle>
           <DialogDescription>
-            “{notice?.headline || notice?.title}” will be removed from every notice board. This cannot be undone.
+            “{notice?.headline || notice?.title}” will be removed from every notice board. This
+            cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -191,7 +193,9 @@ export function EditNoticeDialog({
       setPriority(notice.priority || "medium");
       setStatus(notice.status || "published");
       setTargetAll(notice.targetAll ?? true);
-      setExpiryDate(notice.expiryDate ? new Date(notice.expiryDate).toISOString().slice(0, 10) : "");
+      setExpiryDate(
+        notice.expiryDate ? new Date(notice.expiryDate).toISOString().slice(0, 10) : "",
+      );
       setExistingAttachments(notice.attachments || []);
     }
   });
@@ -264,7 +268,9 @@ export function EditNoticeDialog({
                     onValueChange={(v) => setType(v as NoticeType)}
                     disabled={updateNoticeMutation.isPending}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {noticeTypes.map((t) => (
                         <SelectItem key={t} value={t}>
@@ -281,10 +287,14 @@ export function EditNoticeDialog({
                     onValueChange={(v) => setPriority(v as NoticePriority)}
                     disabled={updateNoticeMutation.isPending}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {noticePriorities.map((p) => (
-                        <SelectItem key={p} value={p}>{noticePriorityMeta[p]?.label}</SelectItem>
+                        <SelectItem key={p} value={p}>
+                          {noticePriorityMeta[p]?.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -296,7 +306,9 @@ export function EditNoticeDialog({
                     onValueChange={(v) => setStatus(v as NoticeStatus)}
                     disabled={updateNoticeMutation.isPending}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="published">Published</SelectItem>
                       <SelectItem value="pinned">Pinned</SelectItem>
@@ -345,11 +357,21 @@ export function EditNoticeDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="e-new-file">Add New Attachment (optional)</Label>
-                <Input
+                <FileDropzone
                   id="e-new-file"
-                  type="file"
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                  maxSize={10 * 1024 * 1024}
+                  multiple={false}
                   disabled={updateNoticeMutation.isPending}
-                  onChange={(e) => setNewAttachment(e.target.files?.[0])}
+                  selectedFile={newAttachment || null}
+                  onClearFile={() => setNewAttachment(undefined)}
+                  label="Drag and drop file, paste with Ctrl+V, or browse"
+                  hint="PDF, image, or document (up to 10 MB)"
+                  onFiles={(files) => {
+                    if (files[0]) {
+                      setNewAttachment(files[0]);
+                    }
+                  }}
                 />
               </div>
             </div>

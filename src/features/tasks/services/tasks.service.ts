@@ -93,9 +93,7 @@ export const tasksService = {
             rawPagination.count ||
             tasks.length,
         ),
-        currentPage: Number(
-          rawPagination.currentPage || rawPagination.page || params.page || 1,
-        ),
+        currentPage: Number(rawPagination.currentPage || rawPagination.page || params.page || 1),
         totalPages: Number(
           rawPagination.totalPages ||
             rawPagination.pages ||
@@ -105,8 +103,16 @@ export const tasksService = {
         hasNextPage: Boolean(rawPagination.hasNextPage ?? rawPagination.hasNext),
         hasPrevPage: Boolean(rawPagination.hasPrevPage ?? rawPagination.hasPrev),
       };
-    } else if (res?.totalPages !== undefined || res?.total !== undefined || res?.totalRecords !== undefined) {
+    } else if (
+      res?.totalPages !== undefined ||
+      res?.total !== undefined ||
+      res?.totalRecords !== undefined
+    ) {
       const total = Number(res?.totalRecords ?? res?.total ?? tasks.length);
+      const limit = Number(res?.limit ?? params.limit ?? 8);
+      const totalPages = Number(
+        res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)),
+      );
       const limit = Number(res?.limit ?? params.limit ?? 10);
       const totalPages = Number(res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)));
       tasks.pagination = {
@@ -197,7 +203,8 @@ export const tasksService = {
     if (input.priority !== undefined) jsonBody.priority = toBackendTaskPriority(input.priority);
     if (input.taskType !== undefined) jsonBody.type = toBackendTaskType(input.taskType);
     if (input.points !== undefined) jsonBody.rewardPoints = input.points;
-    if (input.dueDate !== undefined) jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
+    if (input.dueDate !== undefined)
+      jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
     if (input.notes !== undefined) jsonBody.notes = input.notes.trim();
     if (input.estimatedTime !== undefined) jsonBody.estimatedTime = input.estimatedTime.trim();
     if (input.projectId !== undefined) jsonBody.projectId = input.projectId;
@@ -392,15 +399,18 @@ export const tasksService = {
     });
 
     const calculatedPoints = tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0);
-    const backendPoints = typeof res?.kpis?.pointsAtStake === "number" ? res.kpis.pointsAtStake : undefined;
+    const backendPoints =
+      typeof res?.kpis?.pointsAtStake === "number" ? res.kpis.pointsAtStake : undefined;
 
     const kpis = {
-      pendingReview: typeof res?.kpis?.pendingReview === "number" ? res.kpis.pendingReview : tasks.length,
+      pendingReview:
+        typeof res?.kpis?.pendingReview === "number" ? res.kpis.pendingReview : tasks.length,
       highPriority:
         typeof res?.kpis?.highPriority === "number"
           ? res.kpis.highPriority
           : tasks.filter((t) => t.priority === "high").length,
-      pointsAtStake: backendPoints !== undefined && backendPoints > 0 ? backendPoints : calculatedPoints,
+      pointsAtStake:
+        backendPoints !== undefined && backendPoints > 0 ? backendPoints : calculatedPoints,
     };
 
     return { kpis, tasks };

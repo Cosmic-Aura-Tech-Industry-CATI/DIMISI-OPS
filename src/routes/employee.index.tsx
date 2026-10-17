@@ -381,7 +381,13 @@ function EmployeeOverview() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">{t.title}</p>
+                    <Link
+                      to="/employee/tasks/$id"
+                      params={{ id: t.id || (t as any)._id }}
+                      className="truncate text-sm font-medium hover:text-primary transition-colors"
+                    >
+                      {t.title}
+                    </Link>
                     <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${statusTone[t.status] ?? ""}`}>
                       {t.status.replace("_", " ")}
                     </span>
@@ -418,7 +424,13 @@ function EmployeeOverview() {
               return (
                 <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{t.title}</p>
+                    <Link
+                      to="/employee/tasks/$id"
+                      params={{ id: t.id || (t as any)._id }}
+                      className="truncate block text-sm font-medium hover:text-primary transition-colors"
+                    >
+                      {t.title}
+                    </Link>
                     <p className="text-xs text-muted-foreground">{getCategoryLabel(t.category)}</p>
                   </div>
                   <span className={`rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
@@ -553,44 +565,6 @@ function EmployeeOverview() {
         </ol>
       </div>
     </>
-  );
-}
-
-function ProgressPanel({
-  icon: Icon,
-  title,
-  hint,
-  value,
-  suffix,
-  progress,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  hint: string;
-  value: number;
-  suffix: string;
-  progress: number;
-  accent: "success" | "info";
-}) {
-  const bg = accent === "success" ? "bg-success/15 text-success" : "bg-info/15 text-info";
-  return (
-    <div className="glass rounded-2xl p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`grid h-8 w-8 place-items-center rounded-lg ${bg}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-          <h3 className="font-display text-sm font-semibold">{title}</h3>
-        </div>
-        <span className="text-xs text-muted-foreground">{progress}%</span>
-      </div>
-      <p className="mt-4 font-display text-3xl font-semibold">
-        {value} <span className="text-sm font-medium text-muted-foreground">{suffix}</span>
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-      <Progress value={progress} className="mt-3 h-1.5" />
-    </div>
   );
 }
 

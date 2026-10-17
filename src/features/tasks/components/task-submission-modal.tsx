@@ -29,6 +29,7 @@ import { useSubmitTaskMutation } from "../hooks/use-tasks-api";
 import type { Task } from "../types";
 import { useAuth } from "@/lib/auth";
 import { submitForReview } from "@/lib/submission-store";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 interface TaskSubmissionModalProps {
   task: Task | null;
@@ -116,13 +117,23 @@ export function TaskSubmissionModal({
   const isTooLong = trimmed.length > 5000;
   const isNotesEmpty = touched && trimmed.length === 0;
 
-  const handleFilesSelected = (filesList: FileList | null) => {
-    if (!filesList || filesList.length === 0) return;
+  const handleFilesSelected = (filesList: FileList | File[] | null) => {
+    if (!filesList) return;
 
     const incoming = Array.from(filesList);
+    if (incoming.length === 0) return;
     const valid: File[] = [];
 
     for (const f of incoming) {
+      // Prevent duplicate files unless replacing
+      if (
+        replaceIndex === null &&
+        proofFiles.some((existing) => existing.name === f.name && existing.size === f.size)
+      ) {
+        toast.info(`"${f.name}" is already added.`);
+        continue;
+      }
+
       const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
       const isAllowedExt = ALLOWED_EXTENSIONS.includes(ext);
       const isAllowedMime =
@@ -171,20 +182,37 @@ export function TaskSubmissionModal({
     }
   };
 
+  const {
+    isDragging,
+    inputRef: dropInputRef,
+    openFileDialog,
+    dragProps,
+    pasteProps,
+    keyboardProps,
+  } = useFileDropPaste({
+    accept: ACCEPT_FILE_TYPES,
+    maxSize: MAX_FILE_SIZE_BYTES,
+    multiple: true,
+    disabled: submitMutation.isPending,
+    existingFiles: proofFiles,
+    enableWindowPaste: open,
+    label: "proof file",
+    onFiles: (incomingFiles) => {
+      handleFilesSelected(incomingFiles);
+    },
+  });
+
   const handleTriggerReplace = (index: number) => {
     setReplaceIndex(index);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
+    if (dropInputRef.current) {
+      dropInputRef.current.value = "";
+      dropInputRef.current.click();
     }
   };
 
   const handleTriggerAddNew = () => {
     setReplaceIndex(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
+    openFileDialog();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -276,7 +304,8 @@ export function TaskSubmissionModal({
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground">
-              Attach proof of your completed work and summarize deliverables. An admin will review your submission to approve points.
+              Attach proof of your completed work and summarize deliverables. An admin will review
+              your submission to approve points.
             </DialogDescription>
           </DialogHeader>
 
@@ -285,7 +314,9 @@ export function TaskSubmissionModal({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h4 className="font-semibold text-sm line-clamp-1">{task.title}</h4>
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{task.description}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                  {task.description}
+                </p>
               </div>
               <TaskPriorityBadge priority={task.priority} />
             </div>
@@ -316,7 +347,7 @@ export function TaskSubmissionModal({
 
             {/* Hidden file input */}
             <input
-              ref={fileInputRef}
+              ref={dropInputRef}
               type="file"
               accept={ACCEPT_FILE_TYPES}
               multiple
@@ -331,29 +362,23 @@ export function TaskSubmissionModal({
             {/* Drag & Drop Zone when empty */}
             {proofFiles.length === 0 ? (
               <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  handleFilesSelected(e.dataTransfer.files);
-                }}
+                {...dragProps}
+                {...pasteProps}
+                {...keyboardProps}
                 onClick={handleTriggerAddNew}
-                className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
-                  dragging
-                    ? "border-primary bg-primary/10 shadow-glow"
+                className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  isDragging
+                    ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
                     : fileError
                       ? "border-destructive/80 bg-destructive/5 hover:border-destructive"
                       : "border-border/70 bg-card/40 hover:border-primary/60 hover:bg-primary/5"
                 }`}
+                aria-label="Upload task proof files. Drag and drop, paste with Ctrl+V, or press Enter to browse"
               >
                 <div
-                  className={`grid h-12 w-12 place-items-center rounded-xl transition-transform ${
-                    dragging
-                      ? "scale-110 bg-primary/20 text-primary"
+                  className={`grid h-12 w-12 place-items-center rounded-xl transition-all ${
+                    isDragging
+                      ? "scale-110 bg-primary/20 text-primary shadow-md"
                       : fileError
                         ? "bg-destructive/15 text-destructive"
                         : "bg-primary/10 text-primary group-hover:scale-105"
@@ -362,15 +387,28 @@ export function TaskSubmissionModal({
                   <UploadCloud className="h-6 w-6" />
                 </div>
                 <p className="mt-3 font-display text-sm font-semibold">
-                  Click to upload proof file or drag & drop
+                  Drag and drop files, paste with Ctrl+V, or browse
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Allowed: PDF, JPG, JPEG, PNG, DOC, DOCX
+                  Allowed: PDF, JPG, JPEG, PNG, DOC, DOCX (Max 25 MB)
+                </p>
+                <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+                  <span>
+                    Press{" "}
+                    <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground border border-border/70">
+                      Ctrl+V
+                    </kbd>{" "}
+                    to paste screenshot or file
+                  </span>
+                  <span>•</span>
+                  <span className="text-primary font-medium group-hover:underline">
+                    Browse files
+                  </span>
                 </p>
               </div>
             ) : (
               /* Uploaded Files List */
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="space-y-2">
                   {proofFiles.map((file, idx) => {
                     const isImg = isImageFile(file.type, file.name);
@@ -392,7 +430,8 @@ export function TaskSubmissionModal({
                               {file.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {formatFileSize(file.size)} · {file.name.slice(file.name.lastIndexOf(".")).toUpperCase() || "FILE"}
+                              {formatFileSize(file.size)} ·{" "}
+                              {file.name.slice(file.name.lastIndexOf(".")).toUpperCase() || "FILE"}
                             </p>
                           </div>
                         </div>
@@ -424,6 +463,25 @@ export function TaskSubmissionModal({
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Additional drop/paste zone when files already exist */}
+                <div
+                  {...dragProps}
+                  {...pasteProps}
+                  {...keyboardProps}
+                  onClick={handleTriggerAddNew}
+                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed p-3 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    isDragging
+                      ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
+                      : "border-border/60 bg-card/30 hover:border-primary/60 hover:bg-primary/5"
+                  }`}
+                  aria-label="Drag and drop more files, paste with Ctrl+V, or browse"
+                >
+                  <UploadCloud className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium text-foreground">
+                    Drag and drop more files, paste with Ctrl+V, or browse
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between pt-1 text-xs">
@@ -494,7 +552,8 @@ export function TaskSubmissionModal({
             )}
             {isTooShort && (
               <p className="flex items-center gap-1 text-xs text-destructive">
-                <AlertCircle className="h-3 w-3" /> Please enter at least 10 characters describing your completed work.
+                <AlertCircle className="h-3 w-3" /> Please enter at least 10 characters describing
+                your completed work.
               </p>
             )}
             {isTooLong && (
