@@ -230,9 +230,11 @@ type SubmitTaskVariables =
       proof?: { url: string; publicId: string };
       proofUrl?: string;
       proofPublicId?: string;
+      proofFiles?: any[];
       files?: File[];
+      formData?: FormData;
+      payload?: SubmitTaskPayload | FormData;
     }
-  | { id: string; payload?: SubmitTaskPayload | FormData }
   | string;
 
 export function useSubmitTaskMutation(
@@ -242,15 +244,13 @@ export function useSubmitTaskMutation(
 
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
-      const id = typeof variables === "string" ? variables : variables.id;
-      let payload: SubmitTaskPayload | FormData = { notes: "" };
       if (typeof variables === "string") {
-        return tasksService.submitTask(id, { notes: "" });
+        return tasksService.submitTask(variables, { notes: "" });
       }
-      if (variables.payload) {
-        return tasksService.submitTask(id, variables.payload);
+      const { id, payload, ...rest } = variables;
+      if (payload) {
+        return tasksService.submitTask(id, payload);
       }
-      const { id: _unusedId, ...rest } = variables;
       return tasksService.submitTask(id, rest);
     },
     onSuccess: (...args) => {
