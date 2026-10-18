@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -37,8 +37,16 @@ import { useTaskQuery, useDeleteTask, useAssignTask, type Task, getCategoryLabel
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
-  component: TaskDetailPage,
+  component: TaskDetailRoute,
 });
+
+function TaskDetailRoute() {
+  const childMatches = useChildMatches();
+  if (childMatches.length > 0) {
+    return <Outlet />;
+  }
+  return <TaskDetailPage />;
+}
 
 const taskId = (id: string) => id;
 
@@ -189,7 +197,7 @@ function TaskDetailPage() {
         actions={
           <>
             <Button asChild variant="outline" className="rounded-md">
-              <Link to="/admin/tasks/$id/edit" params={{ id: task.id }}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Link>
+              <Link to="/admin/tasks/$id/edit" params={{ id: task.id || (task as any)._id }}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Link>
             </Button>
             <Button variant="destructive" className="rounded-md" onClick={() => setConfirm(true)}>
               <Trash2 className="mr-1.5 h-4 w-4" /> Delete
