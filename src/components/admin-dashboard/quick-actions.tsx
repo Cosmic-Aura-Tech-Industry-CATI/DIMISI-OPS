@@ -34,10 +34,13 @@ function QuickAction({
   );
 }
 
-export function QuickActionsPanel() {
+export function QuickActionsPanel({ weeklyMomentum }: { weeklyMomentum?: number } = {}) {
   const momentum =
-    performanceTrend[performanceTrend.length - 1].points -
-    performanceTrend[performanceTrend.length - 2].points;
+    typeof weeklyMomentum === "number"
+      ? weeklyMomentum
+      : performanceTrend[performanceTrend.length - 1].points -
+        performanceTrend[performanceTrend.length - 2].points;
+  const isPositive = momentum > 0;
 
   return (
     <div className="glass rounded-2xl p-5">
@@ -47,8 +50,8 @@ export function QuickActionsPanel() {
       </div>
       <p className="mt-1 text-xs text-muted-foreground">Jump into common workflows</p>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <QuickAction to="/admin/tasks" icon={Plus} label="Create task" primary />
-        <QuickAction to="/admin/employees" icon={UserPlus} label="Add employee" />
+        <QuickAction to="/admin/tasks/new" icon={Plus} label="Create task" primary />
+        <QuickAction to="/admin/employees/new" icon={UserPlus} label="Add employee" />
         <QuickAction to="/admin/task-reviews" icon={ClipboardList} label="Review tasks" />
         <QuickAction to="/admin/leaderboard" icon={Award} label="Award points" />
         <QuickAction to="/admin/reports" icon={Activity} label="View reports" />
@@ -56,7 +59,9 @@ export function QuickActionsPanel() {
       </div>
       <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
         <p className="text-xs font-medium uppercase tracking-wider text-primary">Weekly momentum</p>
-        <p className="mt-2 font-display text-2xl font-semibold">+{momentum} pts</p>
+        <p className="mt-2 font-display text-2xl font-semibold">
+          {isPositive ? `+${momentum}` : `${momentum}`} pts
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">Compared to last week across all teams.</p>
       </div>
     </div>

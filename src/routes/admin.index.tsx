@@ -23,7 +23,6 @@ import {
 import {
   LatestEmployeesTable,
   LeaderboardPreview,
-  RecentActivities,
   UpcomingDeadlines,
 } from "@/components/admin-dashboard/dashboard-widgets";
 import { QuickActionsPanel } from "@/components/admin-dashboard/quick-actions";
@@ -32,20 +31,21 @@ import { useLeaderboardQuery } from "@/features/leaderboard/hooks/use-leaderboar
 import { useEmployeesQuery } from "@/features/employees/hooks/use-employees-api";
 import { useTasksQuery } from "@/features/tasks/hooks/use-tasks-api";
 import { getCategoryLabel } from "@/features/tasks";
-import { useNoticesQuery } from "@/features/notices/hooks/use-notices-api";
 import { useAdminsQuery } from "@/features/admins/hooks/use-admins-api";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminOverview,
 });
 
 function AdminOverview() {
+  const { user } = useAuth();
+  const isDirector = String(user?.role || "").toLowerCase() === "director";
   const { data: dashboard, isLoading: isDashboardLoading } = useDashboardOverviewQuery();
   const { data: leaderboardData } = useLeaderboardQuery(5);
   const { data: employeesData } = useEmployeesQuery({ page: 1 });
   const { data: adminsData } = useAdminsQuery();
   const { data: allTasks } = useTasksQuery({ page: 1 });
-  const { data: notices } = useNoticesQuery();
 
   const employeesList = useMemo(() => employeesData?.employees || [], [employeesData]);
   const tasksList = useMemo(() => allTasks || [], [allTasks]);
@@ -111,28 +111,6 @@ function AdminOverview() {
       })
       .slice(0, 5);
   }, [tasksList]);
-
-  // Real recent announcements / activity from live Notices collection
-  const recentActivityItems = useMemo(() => {
-    if (!notices || notices.length === 0) return [];
-    return notices.slice(0, 5).map((n) => {
-      const creatorName =
-        typeof n.created_by === "object" && n.created_by !== null
-          ? (n.created_by as any).name || (n.created_by as any).email || "Admin"
-          : typeof n.created_by === "string" && n.created_by.trim()
-            ? n.created_by
-            : "Admin";
-
-      return {
-        id: String(n.id || (n as any)._id || Math.random()),
-        user: creatorName,
-        userAvatar: "AD",
-        action: "posted notice",
-        target: String(n.title || "Announcement"),
-        timestamp: String(n.createdAt || n.published_at || new Date().toISOString()),
-      };
-    });
-  }, [notices]);
 
   // Real latest 5 registered employees
   const latestEmployees = useMemo(() => {
@@ -243,12 +221,14 @@ function AdminOverview() {
   return (
     <>
       <PageHeader
-        title="Admin overview"
+        title={isDirector ? "Director overview" : "Admin overview"}
         subtitle="A pulse on your organization — people, tasks, and momentum."
         actions={
           <>
-            <Button variant="outline" className="rounded-md">
-              <UserPlus className="mr-1.5 h-4 w-4" /> Invite
+            <Button asChild variant="outline" className="rounded-md">
+              <Link to="/admin/employees/new">
+                <UserPlus className="mr-1.5 h-4 w-4" /> Invite
+              </Link>
             </Button>
             <Button asChild className="rounded-md shadow-glow">
               <Link to="/admin/tasks/new">
@@ -315,15 +295,14 @@ function AdminOverview() {
         <DepartmentPerformanceList data={departmentPerformanceData} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <RecentActivities items={recentActivityItems} />
+      <div className="grid gap-4 lg:grid-cols-2">
         <UpcomingDeadlines tasks={upcomingTasks} />
         <LeaderboardPreview entries={topFiveLeaderboard} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <LatestEmployeesTable employees={latestEmployees} />
-        <QuickActionsPanel />
+        <QuickActionsPanel weeklyMomentum={dashboard?.weeklyMomentum?.pointsDifference} />
       </div>
 
       <DepartmentDistributionPanel data={taskDistributionData} />

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { useUploadPdfMutation } from "../hooks/accounts.hooks";
 import type { UploadPdfResponse } from "../types/accounts.types";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 interface UploadEntriesDialogProps {
   open: boolean;
@@ -34,40 +35,45 @@ interface UploadEntriesDialogProps {
 const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-export function UploadEntriesDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: UploadEntriesDialogProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function UploadEntriesDialog({ open, onOpenChange, onSuccess }: UploadEntriesDialogProps) {
   const uploadMutation = useUploadPdfMutation();
 
   const [file, setFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadPdfResponse | null>(null);
 
   const resetDialog = () => {
     setFile(null);
-    setDragOver(false);
     setUploadProgress(0);
     setUploadResult(null);
   };
 
-  const validateAndSetFile = (selectedFile: File) => {
+  const validatePdfFile = (selectedFile: File) => {
     if (
       !selectedFile.name.toLowerCase().endsWith(".pdf") &&
       selectedFile.type !== "application/pdf"
     ) {
-      toast.error("Invalid file format", {
-        description: "Only PDF bank/ledger statements are supported.",
-      });
-      return;
+      return {
+        valid: false,
+        error: "Only PDF bank/ledger statements are supported.",
+      };
     }
 
     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      toast.error("File exceeds size limit", {
-        description: `Max allowed file size is ${MAX_FILE_SIZE_MB}MB.`,
+      return {
+        valid: false,
+        error: `Max allowed file size is ${MAX_FILE_SIZE_MB}MB.`,
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const validateAndSetFile = (selectedFile: File) => {
+    const res = validatePdfFile(selectedFile);
+    if (!res.valid) {
+      toast.error("Invalid file", {
+        description: res.error,
       });
       return;
     }
@@ -77,13 +83,27 @@ export function UploadEntriesDialog({
     setUploadProgress(0);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      validateAndSetFile(e.dataTransfer.files[0]);
-    }
-  };
+  const {
+    isDragging,
+    inputRef: dropInputRef,
+    openFileDialog,
+    dragProps,
+    pasteProps,
+    keyboardProps,
+  } = useFileDropPaste({
+    accept: ".pdf,application/pdf",
+    maxSize: MAX_FILE_SIZE_BYTES,
+    multiple: false,
+    disabled: uploadMutation.isPending,
+    enableWindowPaste: open,
+    label: "statement PDF",
+    validateFile: validatePdfFile,
+    onFiles: (files) => {
+      if (files[0]) {
+        validateAndSetFile(files[0]);
+      }
+    },
+  });
 
   const handleUpload = async () => {
     if (!file) {
@@ -133,7 +153,8 @@ export function UploadEntriesDialog({
             <DialogTitle className="font-display text-xl">Upload PDF Statement</DialogTitle>
           </div>
           <DialogDescription>
-            Upload bank statements or accounting ledgers in PDF format for automated transaction extraction.
+            Upload bank statements or accounting ledgers in PDF format for automated transaction
+            extraction.
           </DialogDescription>
         </DialogHeader>
 
@@ -191,38 +212,53 @@ export function UploadEntriesDialog({
           <div className="space-y-4 py-1">
             {!file ? (
               <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
-                  dragOver
-                    ? "border-primary bg-primary/10"
+                {...dragProps}
+                {...pasteProps}
+                {...keyboardProps}
+                onClick={openFileDialog}
+                className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  isDragging
+                    ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
                     : "border-border/70 hover:border-primary/60 hover:bg-secondary/20"
                 }`}
+                aria-label="Upload PDF statement. Drag and drop, paste with Ctrl+V, or press Enter to browse"
               >
                 <input
-                  ref={fileInputRef}
+                  ref={dropInputRef}
                   type="file"
                   accept=".pdf,application/pdf"
-                  className="hidden"
+                  className="sr-only"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       validateAndSetFile(e.target.files[0]);
                     }
                   }}
                 />
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-primary">
+                <div
+                  className={`mx-auto grid h-12 w-12 place-items-center rounded-xl transition-all ${
+                    isDragging
+                      ? "scale-110 bg-primary/20 text-primary shadow-md"
+                      : "bg-secondary text-primary"
+                  }`}
+                >
                   <Upload className="h-6 w-6" />
                 </div>
                 <h4 className="mt-3 text-sm font-semibold text-foreground">
-                  Click to select PDF or drag and drop
+                  Drag and drop PDF statement, paste with Ctrl+V, or browse
                 </h4>
                 <p className="mt-1 text-xs text-muted-foreground">
                   PDF format only (up to {MAX_FILE_SIZE_MB}MB)
+                </p>
+                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+                  <span>
+                    Press{" "}
+                    <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground border border-border/70">
+                      Ctrl+V
+                    </kbd>{" "}
+                    to paste PDF statement
+                  </span>
+                  <span>•</span>
+                  <span className="text-primary font-medium hover:underline">Browse files</span>
                 </p>
               </div>
             ) : (
@@ -291,7 +327,8 @@ export function UploadEntriesDialog({
               >
                 {uploadMutation.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading ({uploadProgress}%)...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading ({uploadProgress}
+                    %)...
                   </>
                 ) : (
                   <>

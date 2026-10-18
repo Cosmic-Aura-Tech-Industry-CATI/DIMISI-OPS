@@ -30,6 +30,7 @@ import type {
 
 /**
  * Hook to fetch all tasks with optional filters.
+ * Standardizes pagination with limit capped at 10.
  */
 export function useTasksQuery(
   filters?: TaskQueryFilters | number,
@@ -37,10 +38,10 @@ export function useTasksQuery(
 ) {
   const filterObj: TaskQueryFilters =
     typeof filters === "number"
-      ? { page: filters }
+      ? { page: filters, limit: 10 }
       : typeof filters === "object" && filters !== null
-        ? filters
-        : {};
+        ? { ...filters, limit: 10 }
+        : { limit: 10 };
 
   return useQuery<TasksResult, ApiError>({
     queryKey: queryKeys.tasks.list(filterObj),
@@ -77,9 +78,10 @@ export function useAssignedTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "assigned", filters] as const) : taskKeys.assigned,
-    queryFn: () => tasksService.getAssignedTasks(filters),
+    queryKey: filters ? (["tasks", "assigned", filterObj] as const) : taskKeys.assigned,
+    queryFn: () => tasksService.getAssignedTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -95,9 +97,10 @@ export function usePendingTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "pending", filters] as const) : taskKeys.pending,
-    queryFn: () => tasksService.getPendingTasks(filters),
+    queryKey: filters ? (["tasks", "pending", filterObj] as const) : taskKeys.pending,
+    queryFn: () => tasksService.getPendingTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -113,9 +116,10 @@ export function useCompletedTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "completed", filters] as const) : taskKeys.completed,
-    queryFn: () => tasksService.getCompletedTasks(filters),
+    queryKey: filters ? (["tasks", "completed", filterObj] as const) : taskKeys.completed,
+    queryFn: () => tasksService.getCompletedTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -168,9 +172,7 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
 /**
  * Mutation hook for employee to start an assigned task (PATCH /tasks/:id/start).
  */
-export function useStartTaskMutation(
-  options?: UseMutationOptions<Task, ApiError, string>,
-) {
+export function useStartTaskMutation(options?: UseMutationOptions<Task, ApiError, string>) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, string>({
@@ -225,7 +227,7 @@ export const useRequestTask = useRequestTaskMutation;
 /**
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
-type SubmitTaskVariables =
+export type SubmitTaskVariables =
   | {
       id: string;
       notes?: string;
@@ -235,7 +237,7 @@ type SubmitTaskVariables =
       files?: File[];
       proofFiles?: any[];
       formData?: FormData;
-      payload?: SubmitTaskPayload;
+      payload?: SubmitTaskPayload | FormData;
     }
   | string;
 
@@ -253,7 +255,7 @@ export function useSubmitTaskMutation(
       if (variables.payload) {
         return tasksService.submitTask(id, variables.payload);
       }
-      const { id: _unusedId, ...rest } = variables;
+      const { id: _unusedId, payload: _unusedPayload, ...rest } = variables;
       return tasksService.submitTask(id, rest);
     },
     onSuccess: (...args) => {
@@ -279,7 +281,11 @@ export const useSubmitTaskForReview = useSubmitTaskMutation;
  * Mutation hook for admin to approve or reject a task (PATCH /tasks/:id/review).
  */
 export function useReviewTaskMutation(
-  options?: UseMutationOptions<Task, ApiError, { id: string; isApproved: boolean; feedback?: string }>,
+  options?: UseMutationOptions<
+    Task,
+    ApiError,
+    { id: string; isApproved: boolean; feedback?: string }
+  >,
 ) {
   const queryClient = useQueryClient();
 
@@ -325,7 +331,9 @@ export const useReviewTask = useReviewTaskMutation;
 /**
  * Mutation hook to create a new task.
  */
-export function useCreateTask(options?: UseMutationOptions<Task, ApiError, CreateTaskInput | FormData>) {
+export function useCreateTask(
+  options?: UseMutationOptions<Task, ApiError, CreateTaskInput | FormData>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, CreateTaskInput | FormData>({
@@ -347,7 +355,9 @@ export function useCreateTask(options?: UseMutationOptions<Task, ApiError, Creat
 /**
  * Mutation hook to update an existing task.
  */
-export function useUpdateTask(options?: UseMutationOptions<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>) {
+export function useUpdateTask(
+  options?: UseMutationOptions<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, { id: string; input: UpdateTaskInput | FormData }>({
@@ -393,7 +403,9 @@ export function useDeleteTask(options?: UseMutationOptions<void, ApiError, strin
 /**
  * Mutation hook for admin to assign a task to an employee.
  */
-export function useAssignTask(options?: UseMutationOptions<Task, ApiError, { id: string; employeeId: string }>) {
+export function useAssignTask(
+  options?: UseMutationOptions<Task, ApiError, { id: string; employeeId: string }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation<Task, ApiError, { id: string; employeeId: string }>({

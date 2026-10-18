@@ -21,6 +21,7 @@ import {
   MAX_TASK_FILE_SIZE,
   ALLOWED_TASK_PROOF_EXTENSIONS,
 } from "@/lib/cdn-upload";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 export type ProofFile = {
   id: string;
@@ -100,9 +101,7 @@ export function ProofUploader({
 
     try {
       const res = await uploadTaskProof(item.file, (percent) => {
-        onChange(
-          files.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)),
-        );
+        onChange(files.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)));
       });
 
       onChange(
@@ -128,21 +127,29 @@ export function ProofUploader({
             ? String((err as { message: unknown }).message)
             : "Upload failed.";
 
-      onChange(
-        files.map((f) => (f.id === item.id ? { ...f, isUploading: false, error: msg } : f)),
-      );
+      onChange(files.map((f) => (f.id === item.id ? { ...f, isUploading: false, error: msg } : f)));
       toast.error(`Failed to upload ${item.name}: ${msg}`);
     }
   };
 
   const addFiles = useCallback(
-    async (list: FileList | null) => {
-      if (!list || list.length === 0) return;
+    async (list: FileList | File[] | null) => {
+      if (!list) return;
       const incoming = Array.from(list);
+      if (incoming.length === 0) return;
 
       const itemsToAdd: ProofFile[] = [];
 
       for (const f of incoming) {
+        // Prevent duplicate file addition
+        const isDuplicate = files.some(
+          (existing) => existing.name === f.name && existing.size === f.size,
+        );
+        if (isDuplicate) {
+          toast.info(`"${f.name}" is already attached.`);
+          continue;
+        }
+
         const validation = validateTaskProofFile(f);
         if (!validation.valid) {
           toast.error(`${f.name}: ${validation.error || "Invalid file"}`);
@@ -181,9 +188,7 @@ export function ProofUploader({
         try {
           const res = await uploadTaskProof(item.file, (percent) => {
             onChange(
-              updatedList.map((f) =>
-                f.id === item.id ? { ...f, uploadProgress: percent } : f,
-              ),
+              updatedList.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)),
             );
           });
 
@@ -222,6 +227,29 @@ export function ProofUploader({
     [files, onChange],
   );
 
+  const isAnyUploading = files.some((f) => f.isUploading);
+
+  const {
+    isDragging,
+    inputRef: dropInputRef,
+    openFileDialog,
+    dragProps,
+    pasteProps,
+    keyboardProps,
+  } = useFileDropPaste({
+    accept: ACCEPTED,
+    maxSize: MAX_FILE_BYTES,
+    multiple: true,
+    disabled: isAnyUploading,
+    existingFiles: files,
+    validateFile: validateTaskProofFile,
+    onFiles: (newFiles) => {
+      void addFiles(newFiles);
+    },
+    enableWindowPaste: true,
+    label: "proof file",
+  });
+
   const remove = (id: string) => {
     const f = files.find((x) => x.id === id);
     if (f?.previewUrl) {
@@ -233,45 +261,62 @@ export function ProofUploader({
 
   const images = files.filter((f) => f.type.startsWith("image/"));
   const docs = files.filter((f) => !f.type.startsWith("image/"));
-  const isAnyUploading = files.some((f) => f.isUploading);
 
   return (
     <div className="space-y-4">
-      <label
-        htmlFor="proof-input"
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          void addFiles(e.dataTransfer.files);
-        }}
-        className={`group flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-6 text-center transition-all sm:p-8 ${
-          dragging
-            ? "border-primary bg-primary/10 shadow-glow"
+      <div
+        {...dragProps}
+        {...pasteProps}
+        {...keyboardProps}
+        onClick={openFileDialog}
+        className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-8 ${
+          isDragging
+            ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
             : "border-border/70 bg-card/40 hover:border-primary/60 hover:bg-primary/5"
-        }`}
+        } ${isAnyUploading ? "pointer-events-none opacity-60" : ""}`}
+        aria-label="Upload task proof files. Drag and drop, paste with Ctrl+V, or press Enter to browse"
       >
-        <div className={`grid h-14 w-14 place-items-center rounded-md transition-transform ${dragging ? "scale-110 bg-primary/20 text-primary" : "bg-primary/10 text-primary group-hover:scale-105"}`}>
+        <div
+          className={`grid h-14 w-14 place-items-center rounded-xl transition-all ${
+            isDragging
+              ? "scale-110 bg-primary/20 text-primary shadow-md"
+              : "bg-primary/10 text-primary group-hover:scale-105"
+          }`}
+        >
           <UploadCloud className="h-7 w-7" />
         </div>
         <p className="mt-4 font-display text-sm font-semibold">
-          Drag & drop your proof here
+          Drag and drop files, paste with Ctrl+V, or browse
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          or <span className="text-primary font-medium">browse files</span> — {ALLOWED_TASK_PROOF_EXTENSIONS.join(", ").toUpperCase()} (max 10 MB each, direct CDN upload)
+          {ALLOWED_TASK_PROOF_EXTENSIONS.join(", ").toUpperCase()} (max 10 MB each, direct CDN
+          upload)
+        </p>
+        <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+          <span>
+            Press{" "}
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground border border-border/70">
+              Ctrl+V
+            </kbd>{" "}
+            to paste screenshot or file
+          </span>
+          <span>•</span>
+          <span className="text-primary font-medium group-hover:underline">Browse files</span>
         </p>
         <input
-          ref={inputRef}
+          ref={dropInputRef}
           id="proof-input"
           type="file"
           multiple
           accept={ACCEPTED}
           className="sr-only"
           disabled={isAnyUploading}
-          onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }}
+          onChange={(e) => {
+            void addFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
-      </label>
+      </div>
 
       {images.length > 0 && (
         <div>
@@ -280,8 +325,15 @@ export function ProofUploader({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {images.map((f) => (
-              <div key={f.id} className="group relative overflow-hidden rounded-md border border-border/60 bg-card/40">
-                <img src={f.url ?? f.previewUrl ?? f.dataUrl} alt={f.name} className="aspect-square w-full object-cover" />
+              <div
+                key={f.id}
+                className="group relative overflow-hidden rounded-md border border-border/60 bg-card/40"
+              >
+                <img
+                  src={f.url ?? f.previewUrl ?? f.dataUrl}
+                  alt={f.name}
+                  className="aspect-square w-full object-cover"
+                />
 
                 {/* Uploading Overlay */}
                 {f.isUploading && (
@@ -353,7 +405,9 @@ export function ProofUploader({
                   className="rounded-md border border-border/60 bg-card/40 p-3 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${isPdf ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
+                    <div
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${isPdf ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}
+                    >
                       <Icon className="h-4 w-4" />
                     </div>
 
@@ -368,7 +422,8 @@ export function ProofUploader({
                       </div>
 
                       <div className="text-[11px] text-muted-foreground">
-                        {isPdf ? "PDF" : (f.type.split("/")[1] || "file").toUpperCase()} · {formatSize(f.size)}
+                        {isPdf ? "PDF" : (f.type.split("/")[1] || "file").toUpperCase()} ·{" "}
+                        {formatSize(f.size)}
                       </div>
                     </div>
 
@@ -417,7 +472,9 @@ export function ProofUploader({
                   {f.isUploading && (
                     <div className="mt-2 space-y-1">
                       <Progress value={f.uploadProgress || 10} className="h-1.5" />
-                      <p className="text-[10px] text-muted-foreground">Uploading directly to CDN…</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Uploading directly to CDN…
+                      </p>
                     </div>
                   )}
 

@@ -1,19 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { Activity, CalendarClock, Star, Trophy, Users } from "lucide-react";
+import { CalendarClock, Star, Trophy, Users } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
 import type { AuthUser } from "@/auth/types/auth";
 import type { LeaderboardEntry } from "@/features/leaderboard/types";
 import type { Task } from "@/features/tasks/types";
-
-export interface DashboardActivityItem {
-  id: string;
-  user: string;
-  userAvatar?: string;
-  userCode?: string;
-  action: string;
-  target: string;
-  timestamp: string | number | Date;
-}
 
 /** Safely converts string / number / populated object ({ _id, name }) to a displayable string. */
 function getDisplayName(val: any, fallback = "—"): string {
@@ -55,51 +45,6 @@ function WidgetHeader({
   );
 }
 
-export function RecentActivities({ items = [] }: { items?: DashboardActivityItem[] }) {
-  return (
-    <div className="glass rounded-2xl p-5">
-      <WidgetHeader icon={Activity} title="Recent activities" linkTo="/admin/activity" linkLabel="View all" />
-      {items.length === 0 ? (
-        <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
-          <Activity className="mb-2 h-6 w-6 opacity-40" />
-          No recent activity logged
-        </div>
-      ) : (
-        <ul className="mt-4 space-y-4">
-          {items.map((a) => {
-            const user = getDisplayName(a.user, "User");
-            const action = getDisplayName(a.action, "updated");
-            const target = getDisplayName(a.target, "item");
-            const avatar = a.userAvatar || user.slice(0, 2).toUpperCase();
-
-            return (
-              <li key={a.id} className="flex items-start gap-3">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-                  {avatar}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug">
-                    <span className="font-medium">{user}</span>
-                    {a.userCode && <> <IdBadge id={a.userCode} /></>}{" "}
-                    <span className="text-muted-foreground">{action}</span>{" "}
-                    <span className="font-medium">{target}</span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {new Date(a.timestamp).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
   const activeDeadlines = tasks.filter((t) => {
     const s = (t.status || "").toLowerCase();
@@ -137,7 +82,13 @@ export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
               <li key={t.id || (t as any)._id} className="rounded-xl border border-border/60 bg-card/40 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{title}</p>
+                    <Link
+                      to="/admin/tasks/$id"
+                      params={{ id: t.id || (t as any)._id }}
+                      className="truncate block text-sm font-medium hover:text-primary transition-colors"
+                    >
+                      {title}
+                    </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {assigneeName} · {categoryName}
                     </p>
@@ -246,7 +197,13 @@ export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[
                           {avatar}
                         </div>
                         <div>
-                          <p className="font-medium leading-tight">{name}</p>
+                          <Link
+                            to="/admin/employees/$id"
+                            params={{ id: String(e.id || e._id) }}
+                            className="font-medium leading-tight hover:text-primary transition-colors block"
+                          >
+                            {name}
+                          </Link>
                           {e.code && <IdBadge id={e.code} />}
                         </div>
                       </div>

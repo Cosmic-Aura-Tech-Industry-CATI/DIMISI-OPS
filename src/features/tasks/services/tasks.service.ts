@@ -27,13 +27,16 @@ import {
 function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
 
-  if (filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))) {
-    cleaned.page = Math.max(1, Number(filters.page));
-  }
+  cleaned.page =
+    filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))
+      ? Math.max(1, Number(filters.page))
+      : 1;
 
-  if (filters?.limit !== undefined && filters?.limit !== null && !isNaN(Number(filters.limit))) {
-    cleaned.limit = Math.max(1, Number(filters.limit));
-  }
+  // Enforce task limit capped at 10
+  cleaned.limit =
+    filters?.limit !== undefined && filters?.limit !== null && !isNaN(Number(filters.limit))
+      ? Math.min(10, Math.max(1, Number(filters.limit)))
+      : 10;
 
   if (filters?.projectId && typeof filters.projectId === "string") {
     cleaned.projectId = filters.projectId;
@@ -93,9 +96,7 @@ export const tasksService = {
             rawPagination.count ||
             tasks.length,
         ),
-        currentPage: Number(
-          rawPagination.currentPage || rawPagination.page || params.page || 1,
-        ),
+        currentPage: Number(rawPagination.currentPage || rawPagination.page || params.page || 1),
         totalPages: Number(
           rawPagination.totalPages ||
             rawPagination.pages ||
@@ -105,7 +106,11 @@ export const tasksService = {
         hasNextPage: Boolean(rawPagination.hasNextPage ?? rawPagination.hasNext),
         hasPrevPage: Boolean(rawPagination.hasPrevPage ?? rawPagination.hasPrev),
       };
-    } else if (res?.totalPages !== undefined || res?.total !== undefined || res?.totalRecords !== undefined) {
+    } else if (
+      res?.totalPages !== undefined ||
+      res?.total !== undefined ||
+      res?.totalRecords !== undefined
+    ) {
       const total = Number(res?.totalRecords ?? res?.total ?? tasks.length);
       const limit = Number(res?.limit ?? params.limit ?? 10);
       const totalPages = Number(res?.totalPages ?? res?.pages ?? Math.max(1, Math.ceil(total / limit)));
@@ -197,7 +202,8 @@ export const tasksService = {
     if (input.priority !== undefined) jsonBody.priority = toBackendTaskPriority(input.priority);
     if (input.taskType !== undefined) jsonBody.type = toBackendTaskType(input.taskType);
     if (input.points !== undefined) jsonBody.rewardPoints = input.points;
-    if (input.dueDate !== undefined) jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
+    if (input.dueDate !== undefined)
+      jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
     if (input.notes !== undefined) jsonBody.notes = input.notes.trim();
     if (input.estimatedTime !== undefined) jsonBody.estimatedTime = input.estimatedTime.trim();
     if (input.projectId !== undefined) jsonBody.projectId = input.projectId;
@@ -392,15 +398,18 @@ export const tasksService = {
     });
 
     const calculatedPoints = tasks.reduce((sum, t) => sum + (t.points || t.rewardPoints || 0), 0);
-    const backendPoints = typeof res?.kpis?.pointsAtStake === "number" ? res.kpis.pointsAtStake : undefined;
+    const backendPoints =
+      typeof res?.kpis?.pointsAtStake === "number" ? res.kpis.pointsAtStake : undefined;
 
     const kpis = {
-      pendingReview: typeof res?.kpis?.pendingReview === "number" ? res.kpis.pendingReview : tasks.length,
+      pendingReview:
+        typeof res?.kpis?.pendingReview === "number" ? res.kpis.pendingReview : tasks.length,
       highPriority:
         typeof res?.kpis?.highPriority === "number"
           ? res.kpis.highPriority
           : tasks.filter((t) => t.priority === "high").length,
-      pointsAtStake: backendPoints !== undefined && backendPoints > 0 ? backendPoints : calculatedPoints,
+      pointsAtStake:
+        backendPoints !== undefined && backendPoints > 0 ? backendPoints : calculatedPoints,
     };
 
     return { kpis, tasks };
@@ -410,7 +419,7 @@ export const tasksService = {
    * Employee fetches assigned tasks bucket (GET /tasks/assigned).
    */
   async getAssignedTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.assigned, { params });
     const rawList = Array.isArray(res)
       ? res
@@ -426,7 +435,7 @@ export const tasksService = {
    * Employee fetches pending tasks bucket (GET /tasks/pending).
    */
   async getPendingTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.pending, { params });
     const rawList = Array.isArray(res)
       ? res
@@ -442,7 +451,7 @@ export const tasksService = {
    * Employee fetches completed tasks bucket (GET /tasks/completed).
    */
   async getCompletedTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.completed, { params });
     const rawList = Array.isArray(res)
       ? res
