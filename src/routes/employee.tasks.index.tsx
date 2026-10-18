@@ -16,6 +16,8 @@ import {
   UserCheck,
   Layers,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -70,6 +72,19 @@ export const Route = createFileRoute("/employee/tasks/")({
   component: EmployeeTasksPage,
 });
 
+function getVisiblePages(current: number, total: number) {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, 5];
+  }
+  if (current >= total - 2) {
+    return [total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [current - 2, current - 1, current, current + 1, current + 2];
+}
+
 function EmployeeTasksPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
@@ -93,6 +108,14 @@ function EmployeeTasksPage() {
   const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
   const [requestingTaskId, setRequestingTaskId] = useState<string | null>(null);
 
+  const queryFilters = useMemo(
+    () => ({
+      page,
+      limit: 10,
+    }),
+    [page],
+  );
+
   // Endpoint 1: GET /api/v1/tasks/assigned
   const {
     data: assignedTasks = [],
@@ -100,7 +123,7 @@ function EmployeeTasksPage() {
     isError: isErrorAssigned,
     error: errorAssigned,
     refetch: refetchAssigned,
-  } = useAssignedTasks();
+  } = useAssignedTasks(queryFilters);
 
   // Endpoint 2: GET /api/v1/tasks
   const {
@@ -109,7 +132,7 @@ function EmployeeTasksPage() {
     isError: isErrorAll,
     error: errorAll,
     refetch: refetchAll,
-  } = useTasksQuery({ page: 1 });
+  } = useTasksQuery(queryFilters);
 
   // Endpoint 3: GET /api/v1/search/tasks?q=...&priority=...
   const backendPriorityFilter = priorityFilter !== "all" ? priorityFilter : undefined;
@@ -120,7 +143,8 @@ function EmployeeTasksPage() {
     debouncedQuery,
     {
       priority: backendPriorityFilter,
-      limit: 50,
+      page,
+      limit: 10,
     },
     { enabled: isSearchActive },
   );
@@ -209,6 +233,28 @@ function EmployeeTasksPage() {
     });
   }, [activeRawTasks, query, priorityFilter, statusFilter]);
 
+  const activeDataset = activeTab === "assigned" ? assignedTasks : allTasks;
+  const isServerPaginated = isSearchActive
+    ? Boolean(searchResponse?.pagination)
+    : Boolean((activeDataset as any)?.pagination);
+
+  const totalRecords = isSearchActive
+    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filteredTasks.length
+    : (activeDataset as any)?.pagination?.totalRecords ?? filteredTasks.length;
+
+  const totalPages = Math.max(
+    1,
+    isSearchActive
+      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / 10)
+      : (activeDataset as any)?.pagination?.totalPages ?? Math.ceil(totalRecords / 10),
+  );
+
+  const currentPage = Math.min(page, totalPages);
+
+  const slice = isServerPaginated
+    ? filteredTasks
+    : filteredTasks.slice((currentPage - 1) * 10, currentPage * 10);
+
   if (isLoading) {
     return (
       <>
@@ -262,7 +308,14 @@ function EmployeeTasksPage() {
       />
 
       {/* Tabs Bar for switching between Assigned Tasks (/api/v1/tasks/assigned) & All Tasks (/api/v1/tasks) */}
-      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "assigned" | "all")} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          setActiveTab(val as "assigned" | "all");
+          setPage(1);
+        }}
+        className="w-full"
+      >
         <TabsList className="glass h-12 w-full max-w-md justify-start rounded-2xl p-1 bg-card/60 border border-border/60">
           <TabsTrigger
             value="assigned"
@@ -293,7 +346,10 @@ function EmployeeTasksPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
             placeholder={activeTab === "assigned" ? "Search assigned tasks…" : "Search all tasks…"}
             className="h-10 rounded-full pl-9 pr-9"
           />
@@ -303,7 +359,13 @@ function EmployeeTasksPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <Select
+            value={priorityFilter}
+            onValueChange={(val) => {
+              setPriorityFilter(val);
+              setPage(1);
+            }}
+          >
             <SelectTrigger className="h-10 w-full sm:w-36 rounded-full">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
@@ -315,7 +377,13 @@ function EmployeeTasksPage() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter}
+            onValueChange={(val) => {
+              setStatusFilter(val);
+              setPage(1);
+            }}
+          >
             <SelectTrigger className="h-10 w-full sm:w-36 rounded-full">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -368,7 +436,7 @@ function EmployeeTasksPage() {
       ) : viewMode === "cards" ? (
         /* Card Grid View */
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredTasks.map((task, idx) => {
+          {slice.map((task, idx) => {
             const taskId = task._id || task.id;
             const normalizedStatus = (task.status || "").toLowerCase().trim();
             const rawStatus = (task.rawStatus || "").toLowerCase().trim();
@@ -523,7 +591,7 @@ function EmployeeTasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {filteredTasks.map((task, idx) => {
+                {slice.map((task, idx) => {
                   const taskId = task._id || task.id;
                   const normalizedStatus = (task.status || "").toLowerCase().trim();
                   const rawStatus = (task.rawStatus || "").toLowerCase().trim();
@@ -634,6 +702,50 @@ function EmployeeTasksPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="glass flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 p-4 mt-4">
+          <span className="text-xs text-muted-foreground">
+            Showing {slice.length === 0 ? 0 : (currentPage - 1) * 10 + 1}–
+            {Math.min((currentPage - 1) * 10 + slice.length, totalRecords)} of {totalRecords} tasks
+            {` (Page ${currentPage} of ${totalPages})`}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              disabled={currentPage === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              title="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {getVisiblePages(currentPage, totalPages).map((n) => (
+              <Button
+                key={n}
+                variant={n === currentPage ? "default" : "outline"}
+                size="sm"
+                className="h-8 w-8 rounded-md p-0"
+                onClick={() => setPage(n)}
+              >
+                {n}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              title="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}

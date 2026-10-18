@@ -30,6 +30,7 @@ import type {
 
 /**
  * Hook to fetch all tasks with optional filters.
+ * Standardizes pagination with limit capped at 10.
  */
 export function useTasksQuery(
   filters?: TaskQueryFilters | number,
@@ -37,10 +38,10 @@ export function useTasksQuery(
 ) {
   const filterObj: TaskQueryFilters =
     typeof filters === "number"
-      ? { page: filters }
+      ? { page: filters, limit: 10 }
       : typeof filters === "object" && filters !== null
-        ? filters
-        : {};
+        ? { ...filters, limit: 10 }
+        : { limit: 10 };
 
   return useQuery<TasksResult, ApiError>({
     queryKey: queryKeys.tasks.list(filterObj),
@@ -77,9 +78,10 @@ export function useAssignedTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "assigned", filters] as const) : taskKeys.assigned,
-    queryFn: () => tasksService.getAssignedTasks(filters),
+    queryKey: filters ? (["tasks", "assigned", filterObj] as const) : taskKeys.assigned,
+    queryFn: () => tasksService.getAssignedTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -95,9 +97,10 @@ export function usePendingTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "pending", filters] as const) : taskKeys.pending,
-    queryFn: () => tasksService.getPendingTasks(filters),
+    queryKey: filters ? (["tasks", "pending", filterObj] as const) : taskKeys.pending,
+    queryFn: () => tasksService.getPendingTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -113,9 +116,10 @@ export function useCompletedTasks(
   filters?: TaskQueryFilters,
   options?: Omit<UseQueryOptions<Task[], ApiError>, "queryKey" | "queryFn">,
 ) {
+  const filterObj: TaskQueryFilters = { ...filters, limit: 10 };
   return useQuery<Task[], ApiError>({
-    queryKey: filters ? (["tasks", "completed", filters] as const) : taskKeys.completed,
-    queryFn: () => tasksService.getCompletedTasks(filters),
+    queryKey: filters ? (["tasks", "completed", filterObj] as const) : taskKeys.completed,
+    queryFn: () => tasksService.getCompletedTasks(filterObj),
     staleTime: 1000 * 60 * 2,
     retry: 1,
     ...options,
@@ -223,7 +227,7 @@ export const useRequestTask = useRequestTaskMutation;
 /**
  * Mutation hook for employee to submit an in-progress task for review (PATCH /tasks/:id/submit).
  */
-type SubmitTaskVariables =
+export type SubmitTaskVariables =
   | {
       id: string;
       notes?: string;
@@ -232,6 +236,7 @@ type SubmitTaskVariables =
       proofPublicId?: string;
       proofFiles?: any[];
       files?: File[];
+      proofFiles?: any[];
       formData?: FormData;
       payload?: SubmitTaskPayload | FormData;
     }
@@ -244,6 +249,7 @@ export function useSubmitTaskMutation(
 
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
+      const id = typeof variables === "string" ? variables : variables.id;
       if (typeof variables === "string") {
         return tasksService.submitTask(variables, { notes: "" });
       }
@@ -251,7 +257,6 @@ export function useSubmitTaskMutation(
       if (payload) {
         return tasksService.submitTask(id, payload);
       }
-      return tasksService.submitTask(id, rest);
     },
     onSuccess: (...args) => {
       const [, variables] = args;
