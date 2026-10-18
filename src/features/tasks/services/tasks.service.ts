@@ -27,13 +27,16 @@ import {
 function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
 
-  if (filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))) {
-    cleaned.page = Math.max(1, Number(filters.page));
-  }
+  cleaned.page =
+    filters?.page !== undefined && filters?.page !== null && !isNaN(Number(filters.page))
+      ? Math.max(1, Number(filters.page))
+      : 1;
 
-  if (filters?.limit !== undefined && filters?.limit !== null && !isNaN(Number(filters.limit))) {
-    cleaned.limit = Math.max(1, Number(filters.limit));
-  }
+  // Enforce task limit capped at 10
+  cleaned.limit =
+    filters?.limit !== undefined && filters?.limit !== null && !isNaN(Number(filters.limit))
+      ? Math.min(10, Math.max(1, Number(filters.limit)))
+      : 10;
 
   if (filters?.projectId && typeof filters.projectId === "string") {
     cleaned.projectId = filters.projectId;
@@ -416,7 +419,7 @@ export const tasksService = {
    * Employee fetches assigned tasks bucket (GET /tasks/assigned).
    */
   async getAssignedTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.assigned, { params });
     const rawList = Array.isArray(res)
       ? res
@@ -432,7 +435,7 @@ export const tasksService = {
    * Employee fetches pending tasks bucket (GET /tasks/pending).
    */
   async getPendingTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.pending, { params });
     const rawList = Array.isArray(res)
       ? res
@@ -448,7 +451,7 @@ export const tasksService = {
    * Employee fetches completed tasks bucket (GET /tasks/completed).
    */
   async getCompletedTasks(filters?: TaskQueryFilters): Promise<Task[]> {
-    const params = filters?.page !== undefined ? cleanTaskFilters(filters) : filters;
+    const params = cleanTaskFilters(filters);
     const res = await http.get<any>(API_ENDPOINTS.tasks.completed, { params });
     const rawList = Array.isArray(res)
       ? res

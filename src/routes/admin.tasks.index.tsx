@@ -76,13 +76,33 @@ const taskId = (id: string) => id;
 const priorityRank: Record<TaskPriority, number> = { low: 0, medium: 1, high: 2 };
 const createdByFor = (t: Task) => t.createdBy || "Admin";
 
+function getVisiblePages(current: number, total: number) {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, 5];
+  }
+  if (current >= total - 2) {
+    return [total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [current - 2, current - 1, current, current + 1, current + 2];
+}
+
 function TasksPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
-  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery({
-    limit: 100,
-  });
+  const pageSize = DEFAULT_PAGE_SIZE;
+
+  const taskFilters = useMemo(
+    () => ({
+      page,
+      limit: 10,
+    }),
+    [page],
+  );
+
+  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery(taskFilters);
   const deleteTask = useDeleteTask({
     onSuccess: () => {
       toast.success("Task deleted");
@@ -120,7 +140,8 @@ function TasksPage() {
     {
       status: backendStatusFilter,
       priority: backendPriorityFilter,
-      limit: 50,
+      page,
+      limit: 10,
     },
     { enabled: isSearchActive },
   );
@@ -167,10 +188,25 @@ function TasksPage() {
     });
   }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const isServerPaginated = isSearchActive
+    ? Boolean(searchResponse?.pagination)
+    : Boolean((tasks as any)?.pagination);
+
+  const totalRecords = isSearchActive
+    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
+    : (tasks as any)?.pagination?.totalRecords ?? filtered.length;
+
+  const pages = Math.max(
+    1,
+    isSearchActive
+      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / pageSize)
+      : (tasks as any)?.pagination?.totalPages ?? Math.ceil(totalRecords / pageSize),
+  );
   const current = Math.min(page, pages);
 
-  const slice = filtered.slice((current - 1) * pageSize, current * pageSize);
+  const slice = isServerPaginated
+    ? filtered
+    : filtered.slice((current - 1) * pageSize, current * pageSize);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -439,41 +475,44 @@ function TasksPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-5 py-3">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>
-                Showing {slice.length === 0 ? 0 : (current - 1) * pageSize + 1}–{(current - 1) * pageSize + slice.length} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-muted-foreground/80">Rows:</span>
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(val) => {
-                    setPageSize(Number(val));
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-7 w-20 rounded-lg text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <span className="text-xs text-muted-foreground">
+              Showing {slice.length === 0 ? 0 : (current - 1) * pageSize + 1}–
+              {Math.min((current - 1) * pageSize + slice.length, totalRecords)} of {totalRecords} tasks
+              {pages > 1 && ` (Page ${current} of ${pages})`}
+            </span>
             {pages > 1 && (
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                {Array.from({ length: pages }).slice(0, 5).map((_, i) => {
-                  const n = i + 1;
-                  return (
-                    <Button key={n} variant={n === current ? "default" : "outline"} size="sm" className="h-8 w-8 rounded-md p-0" onClick={() => setPage(n)}>{n}</Button>
-                  );
-                })}
-                <Button variant="outline" size="icon" className="h-8 w-8 rounded-md" disabled={current === pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}><ChevronRight className="h-4 w-4" /></Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  disabled={current === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  title="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {getVisiblePages(current, pages).map((n) => (
+                  <Button
+                    key={n}
+                    variant={n === current ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 w-8 rounded-md p-0"
+                    onClick={() => setPage(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-md"
+                  disabled={current === pages}
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                  title="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </div>

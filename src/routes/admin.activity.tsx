@@ -34,6 +34,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -112,6 +113,7 @@ interface ActivityEvent {
     name: string;
     email?: string;
     avatar?: string;
+    initials: string;
   };
   metadata?: Record<string, unknown>;
   timestamp: string; // ISO
@@ -499,15 +501,15 @@ function ActivityPage() {
         actorObj?._id || actorObj?.id || (typeof log.actorId === "string" ? log.actorId : "");
       const empId = actorObj?.empId;
       const email = actorObj?.email;
-      const actorAvatar =
-        actorObj?.avatar ||
+      const actorAvatar = typeof actorObj?.avatar === "string" ? actorObj.avatar.trim() : "";
+      const actorInitials =
         actorName
           .split(" ")
+          .filter(Boolean)
           .map((n) => n[0])
           .slice(0, 2)
           .join("")
-          .toUpperCase() ||
-        "US";
+          .toUpperCase() || "US";
 
       const normalizedAction = log.action || "activity";
       const entityType = log.entityType || "general";
@@ -536,6 +538,7 @@ function ActivityPage() {
           name: actorName,
           email,
           avatar: actorAvatar,
+          initials: actorInitials,
         },
         metadata: log.metadata,
         timestamp: new Date(log.createdAt).toISOString(),
@@ -561,7 +564,14 @@ function ActivityPage() {
         id: log.actorId,
         empId: log.actorId.startsWith("DMS") ? log.actorId : undefined,
         name: log.actorName,
-        avatar: (log.actorName || "US").slice(0, 2).toUpperCase(),
+        avatar: "",
+        initials: (log.actorName || "US")
+          .split(" ")
+          .filter(Boolean)
+          .map((n) => n[0])
+          .slice(0, 2)
+          .join("")
+          .toUpperCase() || "US",
       },
       timestamp: log.timestamp,
     }));
@@ -892,12 +902,14 @@ function ActivityPage() {
                               {m.label}
                             </Badge>
 
-                            <Badge
-                              variant="outline"
-                              className="border-border/60 text-[10px] font-mono uppercase text-muted-foreground"
-                            >
-                              {ev.entityType}
-                            </Badge>
+                            {!m.label.toLowerCase().includes(ev.entityType.toLowerCase()) && (
+                              <Badge
+                                variant="outline"
+                                className="border-border/60 text-[10px] font-mono uppercase text-muted-foreground"
+                              >
+                                {ev.entityType}
+                              </Badge>
+                            )}
 
                             <ScopeBadge scope={ev.scope} />
                             <StatusBadge status={ev.status} />
@@ -909,17 +921,26 @@ function ActivityPage() {
 
                           {/* Actor & Entity Info Row */}
                           <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
-                            <div className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[10px] font-bold text-foreground">
-                              {ev.actor.avatar}
-                            </div>
-                            <span className="font-semibold text-foreground">{ev.actor.name}</span>
+                            <Avatar className="h-6 w-6 shrink-0 ring-1 ring-border/50">
+                              {ev.actor.avatar && ev.actor.avatar.startsWith("http") ? (
+                                <AvatarImage
+                                  src={ev.actor.avatar}
+                                  alt={ev.actor.name}
+                                  className="object-cover"
+                                />
+                              ) : null}
+                              <AvatarFallback className="bg-gradient-to-br from-primary/30 to-accent text-[10px] font-bold text-foreground">
+                                {ev.actor.initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-semibold text-foreground text-xs sm:text-sm">{ev.actor.name}</span>
                             {ev.actor.empId && (
                               <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4.5">
                                 {ev.actor.empId}
                               </Badge>
                             )}
                             {ev.actor.email && (
-                              <span className="hidden text-xs text-muted-foreground sm:inline">
+                              <span className="hidden text-xs text-muted-foreground md:inline">
                                 · {ev.actor.email}
                               </span>
                             )}
