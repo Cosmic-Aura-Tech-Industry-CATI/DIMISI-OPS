@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   CalendarClock,
@@ -32,8 +32,14 @@ import {
 } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/status-badge";
 import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
-import { type Task } from "@/features/tasks";
-import { useTaskQuery, useSubmitTaskForReview, useStartTask, getCategoryLabel } from "@/features/tasks";
+import {
+  type Task,
+  type TaskPriority,
+  useTaskQuery,
+  useSubmitTaskForReview,
+  useStartTask,
+  getCategoryLabel,
+} from "@/features/tasks";
 import { useProjectsQuery } from "@/features/projects";
 import { saveDraft, submitForReview, useSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
@@ -67,8 +73,11 @@ const statusLabel: Record<Task["status"], string> = {
   rejected: "Rejected",
 };
 
-const fmtDate = (v?: string) =>
-  v ? new Date(v).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
+const fmtDate = (v?: string) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+};
 
 function SubmitProofPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submit" });
@@ -88,11 +97,28 @@ function SubmitProofPage() {
   const [issues, setIssues] = useState(existing?.issues ?? "");
   const [additionalRemarks, setAdditionalRemarks] = useState(existing?.additionalRemarks ?? "");
   const [checks, setChecks] = useState({
-    completed: existing?.checklist.completed ?? true,
-    proof: existing?.checklist.proof ?? true,
-    verified: existing?.checklist.verified ?? true,
+    completed: existing?.checklist?.completed ?? true,
+    proof: existing?.checklist?.proof ?? true,
+    verified: existing?.checklist?.verified ?? true,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (existing) {
+      if (existing.files?.length && files.length === 0) setFiles(existing.files);
+      if (existing.workSummary && !workSummary) setWorkSummary(existing.workSummary);
+      if (existing.deliverableLinks && !deliverableLinks) setDeliverableLinks(existing.deliverableLinks);
+      if (existing.issues && !issues) setIssues(existing.issues);
+      if (existing.additionalRemarks && !additionalRemarks) setAdditionalRemarks(existing.additionalRemarks);
+      if (existing.checklist) {
+        setChecks({
+          completed: existing.checklist.completed ?? true,
+          proof: existing.checklist.proof ?? true,
+          verified: existing.checklist.verified ?? true,
+        });
+      }
+    }
+  }, [existing]);
 
   const startTaskMutation = useStartTask();
   const submitMutation = useSubmitTaskForReview({
@@ -146,9 +172,19 @@ function SubmitProofPage() {
     );
   }
 
-  const project = task.projectId ? projects.find((p) => p.id === task.projectId || p._id === task.projectId) : undefined;
-  const assignedBy = task.createdBy || "Admin";
-  const currentStatus = task.reviewState === "in_review" ? "Pending Review" : statusLabel[task.status];
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const project = task.projectId
+    ? safeProjects.find((p) => p.id === task.projectId || p._id === task.projectId)
+    : undefined;
+  const assignedBy = (task as any).assignedByName || task.createdBy || "Admin";
+  const normalizedStatus = (task.status?.toLowerCase() as Task["status"]) || "in_progress";
+  const currentStatus =
+    task.reviewState === "in_review"
+      ? "Pending Review"
+      : statusLabel[normalizedStatus] || task.status || "In Progress";
+  const taskType = (task.taskType?.toLowerCase() || "direct") as string;
+  const typeLabel = taskTypeLabel[taskType] || task.taskType || "Direct";
+  const normalizedPriority = (task.priority?.toLowerCase() as TaskPriority) || "medium";
 
   const packageInput = () => ({
     taskId: task.id || task._id || id,
@@ -266,9 +302,9 @@ function SubmitProofPage() {
   const info: { label: string; value: React.ReactNode; icon?: typeof Trophy }[] = [
     { label: "Task Name", value: task.title },
     { label: "Project Name", value: project?.name ?? (task.taskType === "project" ? "—" : "General"), icon: FolderKanban },
-    { label: "Task Category", value: `${getCategoryLabel(task.category)} · ${taskTypeLabel[task.taskType ?? "direct"]}` },
-    { label: "Priority", value: <PriorityBadge priority={task.priority} /> },
-    { label: "Reward Points", value: `${task.points} pts`, icon: Trophy },
+    { label: "Task Category", value: `${getCategoryLabel(task.category)} · ${typeLabel}` },
+    { label: "Priority", value: <PriorityBadge priority={normalizedPriority} /> },
+    { label: "Reward Points", value: `${task.points ?? task.rewardPoints ?? 0} pts`, icon: Trophy },
     { label: "Assigned Date", value: fmtDate(task.assignedAt ?? task.createdAt) },
     { label: "Deadline", value: fmtDate(task.dueDate), icon: CalendarClock },
     { label: "Current Status", value: currentStatus },
@@ -280,7 +316,7 @@ function SubmitProofPage() {
       <div>
         <Link
           to="/employee/tasks/$id"
-          params={{ id: task.id }}
+          params={{ id: task.id || task._id || id }}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to task
@@ -490,12 +526,19 @@ function SubmitProofPage() {
                 <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Trophy className="h-3.5 w-3.5 text-warning" /> Reward
                 </dt>
-                <dd className="font-medium">{task.points} pts</dd>
+                <dd className="font-medium">{task.points ?? task.rewardPoints ?? 0} pts</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-xs text-muted-foreground">Draft saved</dt>
                 <dd className="font-medium">
-                  {existing ? new Date(existing.updatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                  {existing?.updatedAt && !isNaN(new Date(existing.updatedAt).getTime())
+                    ? new Date(existing.updatedAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : "—"}
                 </dd>
               </div>
             </dl>

@@ -451,7 +451,7 @@ function EmployeeTasksPage() {
         /* Card Grid View */
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {slice.map((task, idx) => {
-            const taskId = task._id || task.id;
+            const taskId = task.id || task._id || "";
             const normalizedStatus = (task.status || "").toLowerCase().trim();
             const rawStatus = (task.rawStatus || "").toLowerCase().trim();
             const isInProgress =
@@ -576,11 +576,13 @@ function EmployeeTasksPage() {
                       )
                     ) : (
                       <Button
-                        onClick={() => setSubmissionTask(task)}
+                        asChild
                         className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white"
                       >
-                        <Send className="mr-1.5 h-4 w-4" />
-                        Submit for review
+                        <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
+                          <Send className="mr-1.5 h-4 w-4" />
+                          Submit for review
+                        </Link>
                       </Button>
                     )}
                   </div>
@@ -606,7 +608,7 @@ function EmployeeTasksPage() {
               </thead>
               <tbody className="divide-y divide-border/40">
                 {slice.map((task, idx) => {
-                  const taskId = task._id || task.id;
+                  const taskId = task.id || task._id || "";
                   const normalizedStatus = (task.status || "").toLowerCase().trim();
                   const rawStatus = (task.rawStatus || "").toLowerCase().trim();
                   const isInProgress =
@@ -702,12 +704,13 @@ function EmployeeTasksPage() {
                         ) : (
                           <Button
                             size="sm"
-                            variant="default"
-                            onClick={() => setSubmissionTask(task)}
+                            asChild
                             className="rounded-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
                           >
-                            <Send className="mr-1.5 h-3.5 w-3.5" />
-                            Submit For Review
+                            <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
+                              <Send className="mr-1.5 h-3.5 w-3.5" />
+                              Submit For Review
+                            </Link>
                           </Button>
                         )}
                       </td>
