@@ -242,6 +242,7 @@ export type SubmitTaskVariables =
     }
   | string;
 
+
 export function useSubmitTaskMutation(
   options?: UseMutationOptions<Task, ApiError, SubmitTaskVariables>,
 ) {
@@ -249,7 +250,6 @@ export function useSubmitTaskMutation(
 
   return useMutation<Task, ApiError, SubmitTaskVariables>({
     mutationFn: (variables: SubmitTaskVariables) => {
-      const id = typeof variables === "string" ? variables : variables.id;
       if (typeof variables === "string") {
         return tasksService.submitTask(variables, { notes: "" });
       }
@@ -257,6 +257,7 @@ export function useSubmitTaskMutation(
       if (payload) {
         return tasksService.submitTask(id, payload);
       }
+      return tasksService.submitTask(id, rest);
     },
     onSuccess: (...args) => {
       const [, variables] = args;
