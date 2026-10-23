@@ -185,7 +185,7 @@ export function TaskDetailDialog({
             </Button>
           ) : (
             <Button asChild className="rounded-md shadow-glow" onClick={() => onOpenChange(false)}>
-              <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
+              <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id || "" }}>
                 <Send className="mr-1.5 h-4 w-4" /> Submit for review
               </Link>
             </Button>
