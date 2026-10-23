@@ -236,7 +236,6 @@ export type SubmitTaskVariables =
       proofPublicId?: string;
       proofFiles?: any[];
       files?: File[];
-      proofFiles?: any[];
       formData?: FormData;
       payload?: SubmitTaskPayload | FormData;
     }
