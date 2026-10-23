@@ -72,7 +72,7 @@ function EmployeeSettingsPage() {
           <PasswordSection />
         </TabsContent>
         <TabsContent value="notifications">
-          <NotificationsSection />
+          <NotificationsSection role="employee" />
         </TabsContent>
         <TabsContent value="theme">
           <ThemeSection />

@@ -12,6 +12,7 @@ import { queryKeys } from "@/api/client/query-keys";
 import { useAuth } from "@/lib/auth";
 import { socketService } from "../services/socket.service";
 import type { NotificationItem, SocketUserEvent } from "../types";
+import type { InAppNotifications, UserPreferences } from "@/features/settings/types";
 
 /** Module-level deduplication set to prevent duplicate notifications/toasts across components */
 const seenNotificationIds = new Set<string>();
@@ -116,6 +117,61 @@ function showNotificationToast(notification: NotificationItem) {
 }
 
 /**
+ * Checks whether an incoming notification should be displayed in the in-app tray
+ * and toast alert based on the user's active in-app notification preferences.
+ */
+export function isNotificationInAppEnabled(
+  notification: NotificationItem,
+  inAppPrefs?: Partial<InAppNotifications>,
+): boolean {
+  if (!inAppPrefs) return true;
+
+  const type = String(notification.type || "").toLowerCase();
+  const title = String(notification.title || "").toLowerCase();
+  const msg = String(notification.message || "").toLowerCase();
+  const text = `${type} ${title} ${msg}`;
+
+  const isUniversal = text.includes("universal");
+
+  // Universal task applications (Admin)
+  if (isUniversal && (text.includes("appli") || text.includes("request"))) {
+    return inAppPrefs.universalTaskApplications !== false;
+  }
+
+  // Universal task assignments (Employee/Admin)
+  if (isUniversal && (text.includes("assign") || text.includes("claim"))) {
+    return inAppPrefs.universalTaskAssignments !== false;
+  }
+
+  // Review request acceptance (Employee)
+  if (text.includes("approved") || text.includes("task_approval") || text.includes("accept")) {
+    return inAppPrefs.reviewAcceptance !== false;
+  }
+
+  // Review request rejection (Employee)
+  if (text.includes("rejected") || text.includes("reject") || text.includes("decline")) {
+    return inAppPrefs.reviewRejection !== false;
+  }
+
+  // Overdue tasks / deadline reminders (Admin/Employee)
+  if (text.includes("deadline") || text.includes("overdue")) {
+    return inAppPrefs.overdueTasks !== false;
+  }
+
+  // Task reviews (Admin)
+  if (text.includes("submission") || text.includes("review_request") || text.includes("review")) {
+    return inAppPrefs.taskReviews !== false;
+  }
+
+  // Task assignments (Employee/Admin)
+  if (text.includes("assignment") || text.includes("assigned")) {
+    return inAppPrefs.taskAssignments !== false;
+  }
+
+  return true;
+}
+
+/**
  * Stable handler function for incoming `notification_created` Socket.IO events.
  * Used identically for both registration (`socket.on`) and cleanup (`socket.off`).
  */
@@ -140,8 +196,17 @@ function handleNotificationCreated(data: unknown) {
     return;
   }
 
-  // 1. Immediately update TanStack Query cache without page refresh
-  if (activeQueryClient) {
+  // Check in-app notification preference from cached settings
+  const cachedPreferences = activeQueryClient?.getQueryData<UserPreferences>(
+    queryKeys.settings.preferences(),
+  );
+  const inAppAllowed = isNotificationInAppEnabled(
+    notification,
+    cachedPreferences?.notifications?.inApp,
+  );
+
+  // 1. Immediately update TanStack Query cache if in-app notification is enabled
+  if (inAppAllowed && activeQueryClient) {
     activeQueryClient.setQueryData<NotificationItem[]>(
       queryKeys.notifications.list(),
       (oldData = []) => {
@@ -156,8 +221,10 @@ function handleNotificationCreated(data: unknown) {
     );
   }
 
-  // 2. Display instant notification toast with tone and deduplication
-  showNotificationToast(notification);
+  // 2. Display instant notification toast with tone and deduplication if enabled
+  if (inAppAllowed) {
+    showNotificationToast(notification);
+  }
 
   // 3. Immediately invalidate related tasks, dashboard, and leaderboard caches
   if (activeQueryClient) {

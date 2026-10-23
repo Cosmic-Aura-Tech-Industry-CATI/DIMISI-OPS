@@ -1,15 +1,27 @@
 /** Types for settings and preferences module. */
 
 export interface EmailNotifications {
+  taskReviews?: boolean;
+  universalTaskApplications?: boolean;
+  universalTaskAssignments?: boolean;
   taskAssignments?: boolean;
   reviewRequests?: boolean;
   weeklyDigest?: boolean;
+  [key: string]: boolean | undefined;
 }
 
 export interface InAppNotifications {
+  taskReviews?: boolean;
+  universalTaskApplications?: boolean;
+  overdueTasks?: boolean;
+  taskAssignments?: boolean;
+  reviewAcceptance?: boolean;
+  reviewRejection?: boolean;
+  universalTaskAssignments?: boolean;
   deadlineReminders?: boolean;
   taskApprovals?: boolean;
   pointsEarned?: boolean;
+  [key: string]: boolean | undefined;
 }
 
 export interface DeliverySchedule {
@@ -23,7 +35,13 @@ export interface UserPreferencesNotifications {
   deliverySchedule?: DeliverySchedule;
 
   // Flattened aliases for legacy/simple binding
+  taskReviews?: boolean;
+  universalTaskApplications?: boolean;
+  overdueTasks?: boolean;
   taskAssignments?: boolean;
+  reviewAcceptance?: boolean;
+  reviewRejection?: boolean;
+  universalTaskAssignments?: boolean;
   reviewRequests?: boolean;
   weeklyDigest?: boolean;
   deadlineReminders?: boolean;
@@ -31,6 +49,7 @@ export interface UserPreferencesNotifications {
   pointsEarned?: boolean;
   quietHoursStart?: string;
   quietHoursEnd?: string;
+  [key: string]: unknown;
 }
 
 export interface TwoFactorSecurity {
