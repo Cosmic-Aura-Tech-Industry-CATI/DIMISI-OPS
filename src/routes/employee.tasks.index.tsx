@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ListTodo,
   Search,
@@ -50,7 +50,17 @@ import { useAuth } from "@/lib/auth";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchTasks } from "@/features/search";
 
+export interface EmployeeTasksSearch {
+  tab?: "assigned" | "all";
+}
+
 export const Route = createFileRoute("/employee/tasks/")({
+  validateSearch: (search: Record<string, unknown>): EmployeeTasksSearch => {
+    const tab = search.tab;
+    return {
+      tab: tab === "all" ? "all" : tab === "assigned" ? "assigned" : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Tasks — Dimisi Operations" },
@@ -77,8 +87,16 @@ function getVisiblePages(current: number, total: number) {
 
 function EmployeeTasksPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"assigned" | "all">("assigned");
-  const [page, setPage] = useState(1);
+  const search = Route.useSearch();
+  const [activeTab, setActiveTab] = useState<"assigned" | "all">(
+    search?.tab === "all" ? "all" : "assigned",
+  );
+
+  useEffect(() => {
+    if (search?.tab === "all" || search?.tab === "assigned") {
+      setActiveTab(search.tab);
+    }
+  }, [search?.tab]);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
   const isSearchActive = debouncedQuery.trim().length > 0;
@@ -528,7 +546,9 @@ function EmployeeTasksPage() {
                           className="w-full rounded-md shadow-glow bg-violet-600 hover:bg-violet-700 text-white"
                         >
                           <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                          {isRequesting ? "Requesting…" : "Request Task"}
+                          {isRequesting
+                            ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
+                            : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
                         </Button>
                       ) : (
                         <Button
@@ -650,7 +670,9 @@ function EmployeeTasksPage() {
                               className="rounded-full bg-violet-600 text-white hover:bg-violet-700 shadow-sm"
                             >
                               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                              {isRequesting ? "Requesting…" : "Request Task"}
+                              {isRequesting
+                                ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
+                                : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
                             </Button>
                           ) : (
                             <Button

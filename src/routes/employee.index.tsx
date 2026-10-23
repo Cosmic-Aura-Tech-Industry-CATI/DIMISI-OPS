@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTasksQuery, useCompletedTasks, useAssignedTasks, getCategoryLabel } from "@/features/tasks";
+import { AvailableTasks } from "@/components/available-tasks";
 import { useAuth } from "@/lib/auth";
 import {
   useEmployeeTasksDeadlinesQuery,
@@ -345,6 +346,9 @@ function EmployeeOverview() {
           </div>
         </div>
       </div>
+
+      <AvailableTasks />
+
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Today's tasks" value={displayToday.length} icon={Target} accent="primary" />
