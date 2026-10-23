@@ -207,7 +207,7 @@ function ActionButton({
     if (isInProgress) {
       return (
         <Button asChild className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white">
-          <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
+          <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id || "" }}>
             <Send className="mr-1.5 h-4 w-4" /> Submit for review
           </Link>
         </Button>
@@ -235,7 +235,7 @@ function ActionButton({
   if (bucket === "rejected") {
     return (
       <Button asChild className="w-full rounded-md shadow-glow">
-        <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id }}>
+        <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id || "" }}>
           <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit
         </Link>
       </Button>

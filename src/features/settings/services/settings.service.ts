@@ -16,47 +16,115 @@ import type {
   WorkspaceSettings,
 } from "../types";
 
+function normalizePreferences(data: Partial<UserPreferences> | null | undefined): UserPreferences {
+  const safeData = data ?? {};
+  const isTotpEnabled = Boolean(
+    safeData.security?.twoFactor?.authenticatorApp ||
+    safeData.security?.twoFactor?.isAuthenticatorVerified ||
+    safeData.twoFactorAuth?.isTotpEnabled,
+  );
+
+  const emailOtpEnabled =
+    safeData.security?.twoFactor?.emailVerification ?? safeData.security?.emailOtpEnabled ?? true;
+
+  const rawNotifications = safeData.notifications || {};
+  const rawEmail = rawNotifications.email || {};
+  const rawInApp = rawNotifications.inApp || {};
+  const rawSchedule = rawNotifications.deliverySchedule || {};
+
+  const resolvedEmail = {
+    taskReviews: rawEmail.taskReviews ?? rawEmail.reviewRequests ?? rawNotifications.reviewRequests ?? true,
+    universalTaskApplications: rawEmail.universalTaskApplications ?? true,
+    universalTaskAssignments: rawEmail.universalTaskAssignments ?? rawEmail.taskAssignments ?? rawNotifications.taskAssignments ?? true,
+    taskAssignments: rawEmail.taskAssignments ?? rawNotifications.taskAssignments ?? true,
+    reviewRequests: rawEmail.reviewRequests ?? rawEmail.taskReviews ?? rawNotifications.reviewRequests ?? true,
+    weeklyDigest: rawEmail.weeklyDigest ?? rawNotifications.weeklyDigest ?? false,
+    ...rawEmail,
+  };
+
+  const resolvedInApp = {
+    taskReviews: rawInApp.taskReviews ?? rawInApp.reviewRequests ?? true,
+    universalTaskApplications: rawInApp.universalTaskApplications ?? true,
+    overdueTasks: rawInApp.overdueTasks ?? rawInApp.deadlineReminders ?? rawNotifications.deadlineReminders ?? true,
+    taskAssignments: rawInApp.taskAssignments ?? rawNotifications.taskAssignments ?? true,
+    reviewAcceptance: rawInApp.reviewAcceptance ?? rawInApp.taskApprovals ?? rawNotifications.taskApprovals ?? true,
+    reviewRejection: rawInApp.reviewRejection ?? true,
+    universalTaskAssignments: rawInApp.universalTaskAssignments ?? rawInApp.taskAssignments ?? true,
+    deadlineReminders: rawInApp.deadlineReminders ?? rawInApp.overdueTasks ?? rawNotifications.deadlineReminders ?? true,
+    taskApprovals: rawInApp.taskApprovals ?? rawInApp.reviewAcceptance ?? rawNotifications.taskApprovals ?? true,
+    pointsEarned: rawInApp.pointsEarned ?? rawNotifications.pointsEarned ?? true,
+    ...rawInApp,
+  };
+
+  const resolvedSchedule = {
+    quietHoursStart: rawSchedule.quietHoursStart || rawNotifications.quietHoursStart || "22:00",
+    quietHoursEnd: rawSchedule.quietHoursEnd || rawNotifications.quietHoursEnd || "07:00",
+    ...rawSchedule,
+  };
+
+  return {
+    _id: safeData._id,
+    userId: safeData.userId || "",
+    theme: safeData.theme || "dark",
+    notifications: {
+      ...rawNotifications,
+      email: resolvedEmail,
+      inApp: resolvedInApp,
+      deliverySchedule: resolvedSchedule,
+    },
+    twoFactorAuth: {
+      isTotpEnabled,
+      totpSecret: safeData.twoFactorAuth?.totpSecret,
+    },
+    security: {
+      ...safeData.security,
+      twoFactorEnabled: isTotpEnabled,
+      emailOtpEnabled,
+    },
+  };
+}
+
+const PREFERENCES_STORAGE_KEY_PREFIX = "dimisi_user_prefs_";
+
+function getLocalPreferences(userId?: string): Partial<UserPreferences> | null {
+  if (typeof window === "undefined" || !userId) return null;
+  try {
+    const raw = localStorage.getItem(`${PREFERENCES_STORAGE_KEY_PREFIX}${userId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalPreferences(userId: string | undefined, prefs: UserPreferences) {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    localStorage.setItem(`${PREFERENCES_STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(prefs));
+  } catch {}
+}
+
 export const settingsService = {
   getPreferences: async (): Promise<UserPreferences> => {
     const res = await http.get<{ preferences?: UserPreferences } | UserPreferences>(
       API_ENDPOINTS.settings.preferences,
     );
-    const data = (res && "preferences" in res ? res.preferences : (res as UserPreferences)) ?? {
-      userId: "",
-      theme: "dark",
-      notifications: {
-        email: { taskAssignments: true, reviewRequests: true, weeklyDigest: false },
-        inApp: { deadlineReminders: true, taskApprovals: true, pointsEarned: true },
-        deliverySchedule: { quietHoursStart: "22:00", quietHoursEnd: "07:00" },
-      },
-      security: {
-        twoFactor: {
-          authenticatorApp: false,
-          emailVerification: true,
-          isAuthenticatorVerified: false,
-        },
-      },
-    };
-
-    const isTotpEnabled = Boolean(
-      data.security?.twoFactor?.authenticatorApp ||
-      data.security?.twoFactor?.isAuthenticatorVerified ||
-      data.twoFactorAuth?.isTotpEnabled,
-    );
-
-    const emailOtpEnabled =
-      data.security?.twoFactor?.emailVerification ?? data.security?.emailOtpEnabled ?? true;
+    const data = res && "preferences" in res ? res.preferences : (res as UserPreferences);
+    const apiNormalized = normalizePreferences(data);
+    const local = getLocalPreferences(apiNormalized.userId);
+    if (!local) return apiNormalized;
 
     return {
-      ...data,
-      twoFactorAuth: {
-        isTotpEnabled,
-        totpSecret: data.twoFactorAuth?.totpSecret,
-      },
-      security: {
-        ...data.security,
-        twoFactorEnabled: isTotpEnabled,
-        emailOtpEnabled,
+      ...apiNormalized,
+      notifications: {
+        ...apiNormalized.notifications,
+        email: {
+          ...local.notifications?.email,
+          ...apiNormalized.notifications.email,
+        },
+        inApp: {
+          ...local.notifications?.inApp,
+          ...apiNormalized.notifications.inApp,
+        },
       },
     };
   },
@@ -70,7 +138,32 @@ export const settingsService = {
     }
 
     if (payload.notifications) {
-      formattedPayload.notifications = payload.notifications;
+      const email = payload.notifications.email || {};
+      const inApp = payload.notifications.inApp || {};
+
+      // Mirror aliases so existing backend schema fields and extended fields are both sent
+      const mirroredEmail = {
+        ...email,
+        reviewRequests: email.taskReviews !== undefined ? email.taskReviews : email.reviewRequests,
+        taskAssignments:
+          email.universalTaskAssignments !== undefined
+            ? email.universalTaskAssignments
+            : email.taskAssignments,
+      };
+
+      const mirroredInApp = {
+        ...inApp,
+        taskApprovals:
+          inApp.reviewAcceptance !== undefined ? inApp.reviewAcceptance : inApp.taskApprovals,
+        deadlineReminders:
+          inApp.overdueTasks !== undefined ? inApp.overdueTasks : inApp.deadlineReminders,
+      };
+
+      formattedPayload.notifications = {
+        ...payload.notifications,
+        email: mirroredEmail,
+        inApp: mirroredInApp,
+      };
     }
 
     if (payload.security) {
@@ -92,14 +185,24 @@ export const settingsService = {
       formattedPayload,
     );
     const data = res && "preferences" in res ? res.preferences : (res as UserPreferences);
-    return (
-      data ?? {
-        userId: "",
-        theme: "dark",
-        notifications: {},
-        security: {},
-      }
-    );
+    const result = normalizePreferences(data);
+
+    // Ensure client updates are preserved in returned object
+    if (payload.notifications?.email) {
+      result.notifications.email = {
+        ...result.notifications.email,
+        ...payload.notifications.email,
+      };
+    }
+    if (payload.notifications?.inApp) {
+      result.notifications.inApp = {
+        ...result.notifications.inApp,
+        ...payload.notifications.inApp,
+      };
+    }
+
+    saveLocalPreferences(result.userId, result);
+    return result;
   },
 
   getWorkspace: async (): Promise<WorkspaceSettings> => {
