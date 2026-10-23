@@ -1,24 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useAuth } from "@/lib/auth";
-import { PageSpinner } from "@/components/loading";
+import { createFileRoute, redirect, Navigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  beforeLoad: () => {
+    throw redirect({ to: "/admin" });
+  },
+  component: () => <Navigate to="/admin" replace />,
 });
 
-function Index() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) navigate({ to: "/login" });
-    else {
-      const isAdminOrDirector = user.role === "admin" || user.role === "director";
-      navigate({ to: isAdminOrDirector ? "/admin" : "/employee" });
-    }
-  }, [user, loading, navigate]);
-
-  return <PageSpinner />;
-}

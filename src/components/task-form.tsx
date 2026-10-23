@@ -118,17 +118,39 @@ export function taskToValues(t: Task): TaskFormValues {
     uploadProgress: 100,
   }));
 
+  const formattedDueDate = t.dueDate
+    ? (() => {
+        try {
+          const d = new Date(t.dueDate);
+          return !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : t.dueDate.slice(0, 10);
+        } catch {
+          return t.dueDate.slice(0, 10);
+        }
+      })()
+    : "";
+
   return {
-    title: t.title,
-    description: t.description,
+    title: t.title || "",
+    description: t.description || "",
     category:
       getCategoryLabel(t.category) !== "Uncategorized"
         ? getCategoryLabel(t.category)
         : taskCategories[0] || "Engineering",
-    priority: t.priority,
-    assigneeId: t.assigneeId,
-    points: t.points,
-    dueDate: t.dueDate,
+    priority: t.priority || "medium",
+    assigneeId:
+      t.assigneeId ||
+      (typeof t.assignedTo === "object" && t.assignedTo
+        ? (t.assignedTo as any)._id
+        : typeof t.assignedTo === "string"
+          ? t.assignedTo
+          : ""),
+    points:
+      typeof t.points === "number"
+        ? t.points
+        : typeof t.rewardPoints === "number"
+          ? t.rewardPoints
+          : 50,
+    dueDate: formattedDueDate,
     notes: t.notes ?? "",
     attachments: existingAttachments,
     taskType: t.taskType ?? "direct",
@@ -411,7 +433,7 @@ export function TaskForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {taskCategories.map((c) => (
+                {Array.from(new Set([form.category, ...taskCategories].filter(Boolean))).map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>

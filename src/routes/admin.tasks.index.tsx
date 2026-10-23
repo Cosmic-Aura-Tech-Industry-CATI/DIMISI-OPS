@@ -357,10 +357,10 @@ function TasksPage() {
                       <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id || (t as any)._id } })}>
                         <Eye className="mr-2 h-4 w-4" /> View
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id || (t as any)._id } })}>
                         <Pencil className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -455,10 +455,10 @@ function TasksPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id } })}>
+                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id", params: { id: t.id || (t as any)._id } })}>
                             <Eye className="mr-2 h-4 w-4" /> View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id } })}>
+                          <DropdownMenuItem onClick={() => navigate({ to: "/admin/tasks/$id/edit", params: { id: t.id || (t as any)._id } })}>
                             <Pencil className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
