@@ -97,6 +97,7 @@ function EmployeeTasksPage() {
       setActiveTab(search.tab);
     }
   }, [search?.tab]);
+  const [page, setPage] = useState<number>(1);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
   const isSearchActive = debouncedQuery.trim().length > 0;
@@ -189,9 +190,18 @@ function EmployeeTasksPage() {
     requestTaskMutation.mutate(id);
   };
 
+  // Safe dataset extractions to handle any API response shape
+  const safeAssignedTasks = Array.isArray(assignedTasks)
+    ? assignedTasks
+    : ((assignedTasks as any)?.tasks || []);
+  const safeAllTasks = Array.isArray(allTasks)
+    ? allTasks
+    : ((allTasks as any)?.tasks || []);
+
   // Switch active dataset strictly based on tab selected or search results
-  const baseTasks = activeTab === "assigned" ? assignedTasks : allTasks;
+  const baseTasks = activeTab === "assigned" ? safeAssignedTasks : safeAllTasks;
   const activeRawTasks = isSearchActive ? searchTasksList : baseTasks;
+  const safeActiveRawTasks = Array.isArray(activeRawTasks) ? activeRawTasks : [];
   const isLoading = isSearchActive
     ? isSearching && !searchResponse
     : (activeTab === "assigned" ? isLoadingAssigned : isLoadingAll);
@@ -200,18 +210,22 @@ function EmployeeTasksPage() {
   const refetch = activeTab === "assigned" ? refetchAssigned : refetchAll;
 
   const filteredTasks = useMemo(() => {
-    return activeRawTasks.filter((t) => {
+    return safeActiveRawTasks.filter((t) => {
+      if (!t) return false;
       const q = query.trim().toLowerCase();
+      const title = (t.title || "").toLowerCase();
+      const desc = (t.description || "").toLowerCase();
+      const cat = getCategoryLabel(t.category).toLowerCase();
       const matchesQuery =
         !q ||
         isSearchActive ||
-        t.title.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        getCategoryLabel(t.category).toLowerCase().includes(q);
+        title.includes(q) ||
+        desc.includes(q) ||
+        cat.includes(q);
 
       const matchesPriority =
         priorityFilter === "all" ||
-        t.priority.toLowerCase() === priorityFilter.toLowerCase();
+        (t.priority || "").toLowerCase() === priorityFilter.toLowerCase();
 
       const normalizedStatus = (t.status || "").toLowerCase().trim();
       const rawStatus = (t.rawStatus || "").toLowerCase().trim();
@@ -231,7 +245,7 @@ function EmployeeTasksPage() {
 
       return matchesQuery && matchesPriority && matchesStatus;
     });
-  }, [activeRawTasks, query, priorityFilter, statusFilter]);
+  }, [safeActiveRawTasks, query, isSearchActive, priorityFilter, statusFilter]);
 
   const activeDataset = activeTab === "assigned" ? assignedTasks : allTasks;
   const isServerPaginated = isSearchActive
@@ -324,7 +338,7 @@ function EmployeeTasksPage() {
             <UserCheck className="h-4 w-4" />
             <span>Assigned Tasks</span>
             <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
-              {assignedTasks.length}
+              {safeAssignedTasks.length}
             </span>
           </TabsTrigger>
           <TabsTrigger
@@ -334,7 +348,7 @@ function EmployeeTasksPage() {
             <Layers className="h-4 w-4" />
             <span>All Tasks</span>
             <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
-              {allTasks.length}
+              {safeAllTasks.length}
             </span>
           </TabsTrigger>
         </TabsList>
