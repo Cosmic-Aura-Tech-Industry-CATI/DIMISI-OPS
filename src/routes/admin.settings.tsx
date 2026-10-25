@@ -722,18 +722,41 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
     const origEmail = (preferences.notifications.email || {}) as Record<string, boolean | undefined>;
     const origSched = preferences.notifications.deliverySchedule || {};
 
-    const inAppChanged = Object.keys(localInApp).some(
-      (k) => localInApp[k] !== origInApp[k],
+    const inAppKeys = isAdm
+      ? [
+          "taskReviews",
+          "universalTaskApplications",
+          "overdueTasks",
+          "reviewAcceptance",
+          "reviewRejection",
+          "universalTaskAssignments",
+        ]
+      : [
+          "taskReviews",
+          "universalTaskApplications",
+          "overdueTasks",
+          "taskAssignments",
+          "reviewAcceptance",
+          "reviewRejection",
+          "universalTaskAssignments",
+        ];
+
+    const emailKeys = isAdm
+      ? ["taskReviews", "universalTaskApplications"]
+      : ["universalTaskAssignments"];
+
+    const inAppChanged = inAppKeys.some(
+      (k) => localInApp[k] !== undefined && origInApp[k] !== undefined && localInApp[k] !== origInApp[k],
     );
-    const emailChanged = Object.keys(localEmail).some(
-      (k) => localEmail[k] !== origEmail[k],
+    const emailChanged = emailKeys.some(
+      (k) => localEmail[k] !== undefined && origEmail[k] !== undefined && localEmail[k] !== origEmail[k],
     );
     const schedChanged =
       quietStart !== (origSched.quietHoursStart || "22:00") ||
       quietEnd !== (origSched.quietHoursEnd || "07:00");
 
     return inAppChanged || emailChanged || schedChanged;
-  }, [preferences, localInApp, localEmail, quietStart, quietEnd]);
+  }, [preferences, localInApp, localEmail, quietStart, quietEnd, isAdm]);
 
   const handleSave = () => {
     const origNotifs = preferences?.notifications || {};
@@ -741,29 +764,28 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
     const origEmail = origNotifs.email || {};
     const origSched = origNotifs.deliverySchedule || {};
 
-    const payloadInApp = {
+    const payloadInApp: Record<string, boolean | undefined> = {
       ...origInApp,
       ...localInApp,
-      ...(isAdm
-        ? {
-            reviewRequests: localInApp.taskReviews ?? origInApp.reviewRequests,
-            deadlineReminders: localInApp.overdueTasks ?? origInApp.deadlineReminders,
-          }
-        : {
-            taskApprovals: localInApp.reviewAcceptance ?? origInApp.taskApprovals,
-            deadlineReminders: localInApp.overdueTasks ?? origInApp.deadlineReminders,
-          }),
+      deadlineReminders:
+        localInApp.overdueTasks !== undefined ? localInApp.overdueTasks : origInApp.deadlineReminders,
+      taskApprovals:
+        localInApp.reviewAcceptance !== undefined ? localInApp.reviewAcceptance : origInApp.taskApprovals,
     };
 
-    const payloadEmail = {
+    const payloadEmail: Record<string, boolean | undefined> = {
       ...origEmail,
       ...localEmail,
       ...(isAdm
         ? {
-            reviewRequests: localEmail.taskReviews ?? origEmail.reviewRequests,
+            reviewRequests:
+              localEmail.taskReviews !== undefined ? localEmail.taskReviews : origEmail.reviewRequests,
           }
         : {
-            taskAssignments: localEmail.universalTaskAssignments ?? origEmail.taskAssignments,
+            taskAssignments:
+              localEmail.universalTaskAssignments !== undefined
+                ? localEmail.universalTaskAssignments
+                : origEmail.taskAssignments,
           }),
     };
 
@@ -925,16 +947,56 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   onChange={(c) => handleInAppChange("overdueTasks", c)}
                 />
                 <ToggleRow
-                  title="Task assignments"
-                  description="When tasks are assigned or reassigned across team members."
-                  icon={ListTodo}
-                  checked={localInApp.taskAssignments ?? true}
+                  title="Review request acceptance"
+                  description="When task review requests are approved across operations."
+                  icon={CheckCircle2}
+                  checked={localInApp.reviewAcceptance ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("taskAssignments", c)}
+                  onChange={(c) => handleInAppChange("reviewAcceptance", c)}
+                />
+                <ToggleRow
+                  title="Review request rejection"
+                  description="When task submissions require revision, feedback, or are rejected."
+                  icon={AlertCircle}
+                  checked={localInApp.reviewRejection ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => handleInAppChange("reviewRejection", c)}
+                />
+                <ToggleRow
+                  title="Universal task assignments"
+                  description="When universal tasks are assigned or claimed by team members."
+                  icon={Layers}
+                  checked={localInApp.universalTaskAssignments ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => handleInAppChange("universalTaskAssignments", c)}
                 />
               </>
             ) : (
               <>
+                <ToggleRow
+                  title="Task reviews"
+                  description="When your submitted tasks enter review or undergo evaluation."
+                  icon={CheckCircle2}
+                  checked={localInApp.taskReviews ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => handleInAppChange("taskReviews", c)}
+                />
+                <ToggleRow
+                  title="Universal task applications"
+                  description="Updates and status on your applications for open universal tasks."
+                  icon={Layers}
+                  checked={localInApp.universalTaskApplications ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => handleInAppChange("universalTaskApplications", c)}
+                />
+                <ToggleRow
+                  title="Overdue tasks"
+                  description="Reminders when your active assigned tasks are approaching deadline or overdue."
+                  icon={Clock}
+                  checked={localInApp.overdueTasks ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => handleInAppChange("overdueTasks", c)}
+                />
                 <ToggleRow
                   title="Task assignments"
                   description="When a new direct or project task is assigned directly to you."
@@ -942,14 +1004,6 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   checked={localInApp.taskAssignments ?? true}
                   disabled={updatePreferences.isPending}
                   onChange={(c) => handleInAppChange("taskAssignments", c)}
-                />
-                <ToggleRow
-                  title="Universal task assignments"
-                  description="When an open universal task you applied for is approved and assigned to you."
-                  icon={Layers}
-                  checked={localInApp.universalTaskAssignments ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("universalTaskAssignments", c)}
                 />
                 <ToggleRow
                   title="Review request acceptance"
@@ -968,12 +1022,12 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   onChange={(c) => handleInAppChange("reviewRejection", c)}
                 />
                 <ToggleRow
-                  title="Overdue tasks"
-                  description="Reminders when your active assigned tasks are approaching deadline or overdue."
-                  icon={Clock}
-                  checked={localInApp.overdueTasks ?? true}
+                  title="Universal task assignments"
+                  description="When an open universal task you applied for is approved and assigned to you."
+                  icon={Layers}
+                  checked={localInApp.universalTaskAssignments ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("overdueTasks", c)}
+                  onChange={(c) => handleInAppChange("universalTaskAssignments", c)}
                 />
               </>
             )}
