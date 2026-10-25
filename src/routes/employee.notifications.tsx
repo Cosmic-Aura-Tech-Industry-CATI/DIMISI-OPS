@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
-  useNotificationsQuery,
+  useFilteredNotificationsQuery,
   type NotificationItem,
 } from "@/features/notifications";
 
@@ -58,6 +58,73 @@ const defaultMeta = {
   ring: "ring-primary/30",
 };
 
+const filterCategories = [
+  { id: "all", label: "All" },
+  { id: "assignments", label: "Task Assignments", Icon: ClipboardList },
+  { id: "reviews", label: "Review Decisions", Icon: CheckCircle2 },
+  { id: "deadlines", label: "Deadlines", Icon: AlarmClock },
+  { id: "rewards", label: "Points & Rewards", Icon: Sparkles },
+];
+
+function matchesFilter(n: NotificationItem, catId: string): boolean {
+  if (catId === "all") return true;
+
+  const type = String(n.type || "").toLowerCase();
+  const text = `${type} ${n.title} ${n.message}`.toLowerCase();
+
+  switch (catId) {
+    case "assignments":
+      return type.includes("assignment") || type.includes("new_task") || text.includes("assign");
+    case "reviews":
+      return (
+        type.includes("approved") ||
+        type.includes("task_approval") ||
+        type.includes("rejected") ||
+        text.includes("approved") ||
+        text.includes("rejected") ||
+        text.includes("review")
+      );
+    case "deadlines":
+      return (
+        type.includes("deadline") ||
+        text.includes("deadline") ||
+        text.includes("overdue")
+      );
+    case "rewards":
+      return type.includes("points") || text.includes("points");
+    default:
+      return true;
+  }
+}
+
+function getActionLink(n: NotificationItem): {
+  to: string;
+  params?: Record<string, string>;
+  label: string;
+} {
+  if (n.taskId) {
+    return {
+      to: "/employee/tasks/$id",
+      params: { id: n.taskId },
+      label: "View task",
+    };
+  }
+
+  const type = String(n.type || "").toLowerCase();
+  const text = `${type} ${n.title} ${n.message}`.toLowerCase();
+
+  if (type.includes("points") || text.includes("points")) {
+    return {
+      to: "/employee/leaderboard",
+      label: "View leaderboard",
+    };
+  }
+  return {
+    to: "/employee/tasks",
+    label: "View my tasks",
+  };
+}
+
 function formatWhen(ts: string | Date) {
   const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
   if (diffM < 60) return `${diffM}m ago`;
@@ -67,7 +134,7 @@ function formatWhen(ts: string | Date) {
 }
 
 function NotificationsPage() {
-  const { data: notifications = [], isLoading } = useNotificationsQuery();
+  const { data: notifications = [], isLoading } = useFilteredNotificationsQuery();
   const markReadMutation = useMarkNotificationReadMutation();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
@@ -90,7 +157,7 @@ function NotificationsPage() {
         if (tab === "read") return n.isRead;
         return true;
       })
-      .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
+      .filter((n) => matchesFilter(n, typeFilter))
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }, [notifications, tab, typeFilter]);
 
@@ -130,29 +197,20 @@ function NotificationsPage() {
 
       {/* Type filter chips */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <button
-          onClick={() => setTypeFilter("all")}
-          className={cn(
-            "shrink-0 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors",
-            typeFilter === "all" ? "bg-primary/15 text-primary border-primary/40" : "hover:bg-muted",
-          )}
-        >
-          All
-        </button>
-        {Object.keys(meta).map((k) => {
-          const M = meta[k];
-          const active = typeFilter === k;
+        {filterCategories.map((cat) => {
+          const active = typeFilter === cat.id;
+          const Icon = cat.Icon;
           return (
             <button
-              key={k}
-              onClick={() => setTypeFilter(k)}
+              key={cat.id}
+              onClick={() => setTypeFilter(cat.id)}
               className={cn(
                 "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors",
                 active ? "bg-primary/15 text-primary border-primary/40" : "hover:bg-muted",
               )}
             >
-              <M.Icon className="h-3.5 w-3.5" />
-              {M.label}
+              {Icon && <Icon className="h-3.5 w-3.5" />}
+              {cat.label}
             </button>
           );
         })}
@@ -209,6 +267,8 @@ function NotificationsPage() {
             const M = meta[n.type] || defaultMeta;
             const isUnread = !n.isRead;
             const notifId = n._id || n.id || "";
+            const actionLink = getActionLink(n);
+
             return (
               <div
                 key={notifId}
@@ -239,10 +299,16 @@ function NotificationsPage() {
                   <p className="mt-0.5 break-words text-sm text-muted-foreground">{n.message}</p>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {n.taskId && (
+                    {actionLink.params ? (
                       <Button asChild size="sm" variant="outline" className="rounded-md">
-                        <Link to="/employee/tasks/$id" params={{ id: n.taskId }}>
-                          View task
+                        <Link to={actionLink.to} params={actionLink.params as any}>
+                          {actionLink.label}
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="outline" className="rounded-md">
+                        <Link to={actionLink.to}>
+                          {actionLink.label}
                         </Link>
                       </Button>
                     )}
