@@ -272,7 +272,8 @@ function SubmitProofPage() {
       if (
         normStatus === "assigned" ||
         normStatus === "pending" ||
-        normStatus === "open"
+        normStatus === "open" ||
+        normStatus === "overdue"
       ) {
         try {
           await startTaskMutation.mutateAsync(targetId);

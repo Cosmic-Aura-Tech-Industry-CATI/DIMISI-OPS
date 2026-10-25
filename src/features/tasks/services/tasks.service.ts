@@ -43,15 +43,23 @@ function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
   }
 
   if (filters?.status && typeof filters.status === "string" && filters.status !== "all") {
-    cleaned.status = filters.status;
+    let mappedStatus: string | undefined = filters.status;
+    if (filters.status === "available") mappedStatus = "open";
+    else if (filters.status === "submitted") mappedStatus = "in_review";
+    else if (filters.status === "pending") mappedStatus = "requested";
+    else if (filters.status === "rejected") mappedStatus = undefined;
+
+    if (mappedStatus) {
+      cleaned.status = mappedStatus;
+    }
   }
 
   if (filters?.priority && typeof filters.priority === "string" && filters.priority !== "all") {
-    cleaned.priority = filters.priority;
+    cleaned.priority = filters.priority.toLowerCase();
   }
 
   if (filters?.type && typeof filters.type === "string" && filters.type !== "all") {
-    cleaned.type = filters.type;
+    cleaned.type = filters.type.toLowerCase();
   }
 
   if (filters?.assignedTo && typeof filters.assignedTo === "string") {

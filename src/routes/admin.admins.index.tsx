@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
 import { useAdminsQuery, useAdminStatsQuery, useRevokeAdminAccess, EditAdminDialog } from "@/features/admins";
+import { useDepartmentsQuery } from "@/features/departments";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/search";
 
@@ -86,7 +87,31 @@ function AdminsPage() {
   const debouncedQuery = useDebounce(query, 300);
   const isSearchActive = debouncedQuery.trim().length > 0;
 
-  const { data: responseData, isLoading: isBaseLoading, isError, error, refetch, isRefetching } = useAdminsQuery();
+  const [dept, setDept] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AuthUser | null>(null);
+
+  const { data: departmentsData = [] } = useDepartmentsQuery();
+  const selectedDeptObj = useMemo(
+    () => departmentsData.find((d: any) => d.name === dept || d._id === dept || d.id === dept),
+    [departmentsData, dept],
+  );
+  const departmentId = dept !== "all" ? selectedDeptObj?._id : undefined;
+
+  const queryFilters = useMemo(
+    () => ({
+      page,
+      status: status === "active" || status === "inactive" ? status : undefined,
+      department: departmentId,
+      sortOrder: sortKey === "joinedAt" ? sortDir : undefined,
+    }),
+    [page, status, departmentId, sortKey, sortDir],
+  );
+
+  const { data: responseData, isLoading: isBaseLoading, isError, error, refetch, isRefetching } = useAdminsQuery(queryFilters);
   const { data: statsData } = useAdminStatsQuery();
   const revokeMutation = useRevokeAdminAccess();
 
@@ -160,17 +185,12 @@ function AdminsPage() {
     });
   }, [rawAdmins]);
 
-  const departments = useMemo(
-    () => Array.from(new Set(admins.map((a) => a.department))).sort(),
-    [admins],
-  );
-
-  const [dept, setDept] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("joinedAt");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
-  const [editingAdmin, setEditingAdmin] = useState<AuthUser | null>(null);
+  const departments = useMemo(() => {
+    if (departmentsData.length > 0) {
+      return Array.from(new Set(departmentsData.map((d: any) => d.name))).filter(Boolean).sort();
+    }
+    return Array.from(new Set(admins.map((a) => a.department))).sort();
+  }, [departmentsData, admins]);
 
   const requestDelete = (a: { id: string; name: string; permanent?: boolean; code?: string }) => {
     if (a.permanent) {
@@ -198,8 +218,9 @@ function AdminsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = admins.filter((a) => {
-      if (dept !== "all" && a.department !== dept) return false;
-      if (status !== "all" && a.status !== status) return false;
+      if (dept !== "all" && !departmentId && a.department !== dept) return false;
+      if (isSearchActive && dept !== "all" && a.department !== dept) return false;
+      if (isSearchActive && status !== "all" && a.status !== status) return false;
       if (!q || isSearchActive) return true;
       return (
         a.name.toLowerCase().includes(q) ||
@@ -214,22 +235,30 @@ function AdminsPage() {
       let cmp = 0;
       if (sortKey === "name") cmp = a.name.localeCompare(b.name);
       else if (sortKey === "department") cmp = a.department.localeCompare(b.department);
-      else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
+      else if (isSearchActive) {
+        cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
+      } else {
+        return 0; // Already sorted on server by joinDate via sortOrder
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [admins, query, isSearchActive, dept, status, sortKey, sortDir]);
+  }, [admins, query, isSearchActive, dept, departmentId, status, sortKey, sortDir]);
+
+  const isServerPaginated = isSearchActive
+    ? Boolean(searchResponse?.pagination)
+    : Boolean(responseData?.pagination);
 
   const totalRecords = isSearchActive
     ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
-    : filtered.length;
+    : responseData?.pagination?.totalRecords ?? filtered.length;
   const pages = Math.max(
     1,
     isSearchActive
       ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
-      : Math.ceil(filtered.length / PAGE_SIZE),
+      : responseData?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE),
   );
   const current = Math.min(page, pages);
-  const slice = isSearchActive && searchResponse?.pagination
+  const slice = isServerPaginated
     ? filtered
     : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
