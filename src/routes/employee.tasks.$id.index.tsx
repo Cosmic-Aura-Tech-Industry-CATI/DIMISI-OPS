@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { useTaskQuery, useStartTask, type Task, getCategoryLabel, formatTaskSubtitle, TaskFeedbackCard } from "@/features/tasks";
+import { useTaskQuery, useStartTask, type Task, getCategoryLabel, formatTaskSubtitle, TaskFeedbackCard, isTaskOverdue, isTaskEligibleForSubmission } from "@/features/tasks";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/employee/tasks/$id/")({
@@ -111,6 +111,9 @@ function EmployeeTaskDetail() {
     task.reviewState === "approved";
 
   const targetTaskId = task.id || task._id || id;
+  const overdue = isTaskOverdue(task);
+  const eligible = isTaskEligibleForSubmission(task);
+  const isOverdueAndEligible = overdue && eligible;
 
   return (
     <>
@@ -124,7 +127,23 @@ function EmployeeTaskDetail() {
         title={task.title}
         subtitle={formatTaskSubtitle(task.category, task.id || task._id || id)}
         actions={
-          isAssigned ? (
+          isCompleted ? (
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
+              <CheckCircle2 className="h-4 w-4" /> Completed & Points Awarded
+            </div>
+          ) : isInReview ? (
+            <Button asChild variant="outline" className="rounded-md border-primary/40 text-primary">
+              <Link to="/employee/pending-review">
+                <Eye className="mr-1.5 h-4 w-4" /> Waiting for Review
+              </Link>
+            </Button>
+          ) : (isOverdueAndEligible || isInProgress) ? (
+            <Button asChild className="rounded-md shadow-glow bg-indigo-600 text-white hover:bg-indigo-700">
+              <Link to="/employee/tasks/$id/submit" params={{ id: targetTaskId }}>
+                <Send className="mr-1.5 h-4 w-4" /> Submit for Review
+              </Link>
+            </Button>
+          ) : isAssigned ? (
             <Button
               className="rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={startTask.isPending}
@@ -133,22 +152,6 @@ function EmployeeTaskDetail() {
               <PlayCircle className="mr-1.5 h-4 w-4" />
               {startTask.isPending ? "Starting…" : "Start Task"}
             </Button>
-          ) : isInProgress ? (
-            <Button asChild className="rounded-md shadow-glow bg-indigo-600 text-white hover:bg-indigo-700">
-              <Link to="/employee/tasks/$id/submit" params={{ id: targetTaskId }}>
-                <Send className="mr-1.5 h-4 w-4" /> Submit for Review
-              </Link>
-            </Button>
-          ) : isInReview ? (
-            <Button asChild variant="outline" className="rounded-md border-primary/40 text-primary">
-              <Link to="/employee/pending-review">
-                <Eye className="mr-1.5 h-4 w-4" /> Waiting for Review
-              </Link>
-            </Button>
-          ) : isCompleted ? (
-            <div className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
-              <CheckCircle2 className="h-4 w-4" /> Completed & Points Awarded
-            </div>
           ) : (
             <Button asChild className="rounded-md shadow-glow">
               <Link to="/employee/tasks/$id/submit" params={{ id: targetTaskId }}>

@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
 import { useEmployeesQuery, useRevokeEmployeeAccess, EditEmployeeDialog } from "@/features/employees";
+import { useDepartmentsQuery } from "@/features/departments";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/search";
 
@@ -95,13 +96,22 @@ function EmployeesPage() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<AuthUser | null>(null);
 
+  const { data: departmentsData = [] } = useDepartmentsQuery();
+  const selectedDeptObj = useMemo(
+    () => departmentsData.find((d: any) => d.name === dept || d._id === dept || d.id === dept),
+    [departmentsData, dept],
+  );
+  const departmentId = dept !== "all" ? selectedDeptObj?._id : undefined;
+
   const queryFilters = useMemo(
     () => ({
       page,
       limit: PAGE_SIZE,
       status: status === "active" || status === "inactive" ? status : undefined,
+      department: departmentId,
+      sortOrder: sortKey === "joinedAt" ? sortDir : undefined,
     }),
-    [page, status],
+    [page, status, departmentId, sortKey, sortDir],
   );
 
   const {
@@ -180,10 +190,12 @@ function EmployeesPage() {
     });
   }, [rawEmployees]);
 
-  const departments = useMemo(
-    () => Array.from(new Set(all.map((e) => e.department))).sort(),
-    [all],
-  );
+  const departments = useMemo(() => {
+    if (departmentsData.length > 0) {
+      return Array.from(new Set(departmentsData.map((d: any) => d.name))).filter(Boolean).sort();
+    }
+    return Array.from(new Set(all.map((e) => e.department))).sort();
+  }, [departmentsData, all]);
 
   const jobTitles = useMemo(
     () => Array.from(new Set(all.map((e) => e.jobTitle))).sort(),
@@ -193,9 +205,11 @@ function EmployeesPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = all.filter((e) => {
-      if (dept !== "all" && e.department !== dept) return false;
+      // If search is active or department ID could not be resolved, fallback client-side
+      if (dept !== "all" && !departmentId && e.department !== dept) return false;
+      if (isSearchActive && dept !== "all" && e.department !== dept) return false;
       if (role !== "all" && e.jobTitle !== role) return false;
-      if (status !== "all" && e.status !== status) return false;
+      if (isSearchActive && status !== "all" && e.status !== status) return false;
       if (!q || isSearchActive) return true;
       return (
         e.name.toLowerCase().includes(q) ||
@@ -210,10 +224,14 @@ function EmployeesPage() {
       if (sortKey === "name") cmp = a.name.localeCompare(b.name);
       else if (sortKey === "department") cmp = a.department.localeCompare(b.department);
       else if (sortKey === "points") cmp = a.points - b.points;
-      else cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
+      else if (isSearchActive) {
+        cmp = +new Date(a.joinedAt) - +new Date(b.joinedAt);
+      } else {
+        return 0; // Already sorted on server by joinDate via sortOrder
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [all, query, isSearchActive, dept, role, status, sortKey, sortDir]);
+  }, [all, query, isSearchActive, dept, departmentId, role, status, sortKey, sortDir]);
 
   const isServerPaginated = isSearchActive
     ? Boolean(searchResponse?.pagination)

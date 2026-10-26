@@ -61,28 +61,34 @@ type SortKey = "code" | "name" | "createdAt" | "status" | "manager";
 const PAGE_SIZE = 8;
 
 function ProjectManagementPage() {
+  const [status, setStatus] = useState<"all" | "active" | "inactive" | "archived">("all");
+  const [sortKey, setSortKey] = useState<SortKey>("code");
+  const [asc, setAsc] = useState(true);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
+  const isSearchActive = debouncedQuery.trim().length > 0;
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Project | undefined>();
+  const [removing, setRemoving] = useState<Project | undefined>();
+
+  const projectFilters = useMemo(
+    () => (status !== "all" ? { status } : undefined),
+    [status],
+  );
+
   const {
     data: projects = [],
     isLoading,
     isError,
     error,
     refetch,
-  } = useProjectsQuery();
+  } = useProjectsQuery(projectFilters);
+
+  const { data: allUnfilteredProjects = [] } = useProjectsQuery();
 
   const { data: tasks = [] } = useTasksQuery();
-
-  const [query, setQuery] = useState("");
-  const debouncedQuery = useDebounce(query, 300);
-  const isSearchActive = debouncedQuery.trim().length > 0;
-
-  const [status, setStatus] = useState<"all" | "active" | "inactive" | "archived">("all");
-  const [sortKey, setSortKey] = useState<SortKey>("code");
-  const [asc, setAsc] = useState(true);
-  const [page, setPage] = useState(1);
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Project | undefined>();
-  const [removing, setRemoving] = useState<Project | undefined>();
 
   // Integrate backend search API: GET /api/v1/search/projects?q=...&status=...
   const {
@@ -108,8 +114,10 @@ function ProjectManagementPage() {
     const q = query.trim().toLowerCase();
     return activeProjectPool
       .filter((p) => {
-        const pStatus = (p.status || "active").toLowerCase();
-        if (status !== "all" && pStatus !== status.toLowerCase()) return false;
+        if (isSearchActive && status !== "all") {
+          const pStatus = (p.status || "active").toLowerCase();
+          if (pStatus !== status.toLowerCase()) return false;
+        }
         if (!q || isSearchActive) return true;
         return (
           p.name.toLowerCase().includes(q) ||
@@ -138,6 +146,7 @@ function ProjectManagementPage() {
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) setAsc(!asc);
     else { setSortKey(key); setAsc(true); }
+    setPage(1);
   };
 
   return (
@@ -157,8 +166,8 @@ function ProjectManagementPage() {
         {(["all", "active", "inactive", "archived"] as const).map((s) => {
           const count =
             s === "all"
-              ? projects.length
-              : projects.filter((p) => (p.status || "").toLowerCase() === s).length;
+              ? allUnfilteredProjects.length
+              : allUnfilteredProjects.filter((p) => (p.status || "").toLowerCase() === s).length;
 
           return (
             <button

@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bell, BellOff, ClipboardCheck, CheckCircle2, UserPlus, ShieldPlus, Check, Sparkles, AlarmClock, XCircle } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  ClipboardCheck,
+  CheckCircle2,
+  UserPlus,
+  ShieldPlus,
+  Check,
+  AlarmClock,
+  Layers,
+  ListTodo,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
-  useNotificationsQuery,
+  useFilteredNotificationsQuery,
   type NotificationItem,
 } from "@/features/notifications";
 
@@ -30,19 +41,103 @@ export const Route = createFileRoute("/admin/notifications")({
 });
 
 const meta: Record<string, { label: string; Icon: typeof Bell }> = {
-  approved:           { label: "Task Approved",       Icon: CheckCircle2 },
-  task_approval:      { label: "Task Approved",       Icon: CheckCircle2 },
-  submission:         { label: "New Submission",      Icon: ClipboardCheck },
-  new_submission:     { label: "New Submission",      Icon: ClipboardCheck },
-  review_request:     { label: "Review Request",      Icon: ClipboardCheck },
-  new_employee:       { label: "New Employee",        Icon: UserPlus },
-  new_admin:          { label: "New Admin",           Icon: ShieldPlus },
-  deadline_reminder:  { label: "Deadline Reminder",   Icon: AlarmClock },
-  points_earned:      { label: "Points Earned",       Icon: Sparkles },
-  rejected:           { label: "Task Rejected",       Icon: XCircle },
+  submission: { label: "New Submission", Icon: ClipboardCheck },
+  new_submission: { label: "New Submission", Icon: ClipboardCheck },
+  review_request: { label: "Review Request", Icon: ClipboardCheck },
+  task_assignment: { label: "Task Assignment", Icon: ListTodo },
+  universal_task: { label: "Universal Task", Icon: Layers },
+  new_employee: { label: "New Employee", Icon: UserPlus },
+  new_admin: { label: "New Admin", Icon: ShieldPlus },
+  deadline_reminder: { label: "Deadline Reminder", Icon: AlarmClock },
+  approved: { label: "Task Approved", Icon: CheckCircle2 },
+  task_approval: { label: "Task Approved", Icon: CheckCircle2 },
 };
 
 const defaultMeta = { label: "Notification", Icon: Bell };
+
+const filterCategories = [
+  { id: "all", label: "All" },
+  { id: "submissions", label: "Submissions", Icon: ClipboardCheck },
+  { id: "universal", label: "Universal Tasks", Icon: Layers },
+  { id: "assignments", label: "Task Assignments", Icon: ListTodo },
+  { id: "team", label: "Team Updates", Icon: UserPlus },
+  { id: "deadlines", label: "Deadlines", Icon: AlarmClock },
+];
+
+function matchesFilter(n: NotificationItem, catId: string): boolean {
+  if (catId === "all") return true;
+
+  const type = String(n.type || "").toLowerCase();
+  const text = `${type} ${n.title} ${n.message}`.toLowerCase();
+
+  switch (catId) {
+    case "submissions":
+      return (
+        type.includes("submission") ||
+        type.includes("review_request") ||
+        text.includes("submission") ||
+        text.includes("review")
+      );
+    case "universal":
+      return text.includes("universal");
+    case "assignments":
+      return type.includes("assignment") || text.includes("assign");
+    case "team":
+      return (
+        type === "new_employee" ||
+        type === "new_admin" ||
+        text.includes("employee") ||
+        text.includes("admin")
+      );
+    case "deadlines":
+      return (
+        type.includes("deadline") ||
+        text.includes("deadline") ||
+        text.includes("overdue")
+      );
+    default:
+      return true;
+  }
+}
+
+function getActionLink(n: NotificationItem): {
+  to: string;
+  params?: Record<string, string>;
+  label: string;
+} {
+  if (n.taskId) {
+    return {
+      to: "/admin/tasks/$id",
+      params: { id: n.taskId },
+      label: "View task",
+    };
+  }
+
+  const text = `${n.type} ${n.title} ${n.message}`.toLowerCase();
+
+  if (text.includes("submission") || text.includes("review")) {
+    return {
+      to: "/admin/tasks",
+      label: "Review tasks",
+    };
+  }
+  if (text.includes("employee")) {
+    return {
+      to: "/admin/employees",
+      label: "View employees",
+    };
+  }
+  if (text.includes("admin")) {
+    return {
+      to: "/admin/admins",
+      label: "View admins",
+    };
+  }
+  return {
+    to: "/admin/tasks",
+    label: "View tasks",
+  };
+}
 
 function formatWhen(ts: string | Date) {
   const diffM = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
@@ -52,7 +147,7 @@ function formatWhen(ts: string | Date) {
 }
 
 function AdminNotificationsPage() {
-  const { data: notifications = [], isLoading } = useNotificationsQuery();
+  const { data: notifications = [], isLoading } = useFilteredNotificationsQuery();
   const markReadMutation = useMarkNotificationReadMutation();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
@@ -76,7 +171,7 @@ function AdminNotificationsPage() {
           if (tab === "read") return n.isRead;
           return true;
         })
-        .filter((n) => (typeFilter === "all" ? true : n.type === typeFilter))
+        .filter((n) => matchesFilter(n, typeFilter))
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
     [notifications, tab, typeFilter],
   );
@@ -116,29 +211,20 @@ function AdminNotificationsPage() {
       />
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <button
-          onClick={() => setTypeFilter("all")}
-          className={cn(
-            "shrink-0 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors",
-            typeFilter === "all" ? "border-primary/40 bg-primary/15 text-primary" : "hover:bg-muted",
-          )}
-        >
-          All
-        </button>
-        {Object.keys(meta).map((k) => {
-          const M = meta[k];
-          const active = typeFilter === k;
+        {filterCategories.map((cat) => {
+          const active = typeFilter === cat.id;
+          const Icon = cat.Icon;
           return (
             <button
-              key={k}
-              onClick={() => setTypeFilter(k)}
+              key={cat.id}
+              onClick={() => setTypeFilter(cat.id)}
               className={cn(
                 "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors",
                 active ? "border-primary/40 bg-primary/15 text-primary" : "hover:bg-muted",
               )}
             >
-              <M.Icon className="h-3.5 w-3.5" />
-              {M.label}
+              {Icon && <Icon className="h-3.5 w-3.5" />}
+              {cat.label}
             </button>
           );
         })}
@@ -192,6 +278,8 @@ function AdminNotificationsPage() {
           {filtered.map((n: NotificationItem, i) => {
             const M = meta[n.type] || defaultMeta;
             const notifId = n._id || n.id || "";
+            const actionLink = getActionLink(n);
+
             return (
               <div
                 key={notifId}
@@ -215,10 +303,16 @@ function AdminNotificationsPage() {
                   <div className="mt-1.5 break-words font-medium">{n.title}</div>
                   <p className="mt-0.5 break-words text-sm text-muted-foreground">{n.message}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {n.taskId && (
+                    {actionLink.params ? (
                       <Button asChild size="sm" variant="outline" className="rounded-md">
-                        <Link to="/admin/tasks/$id" params={{ id: n.taskId }}>
-                          View task
+                        <Link to={actionLink.to} params={actionLink.params as any}>
+                          {actionLink.label}
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="outline" className="rounded-md">
+                        <Link to={actionLink.to}>
+                          {actionLink.label}
                         </Link>
                       </Button>
                     )}

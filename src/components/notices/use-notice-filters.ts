@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { noticeStatus, noticeTypeMeta, useNotices, type Notice } from "@/lib/notice-store";
+import { useNoticesQuery } from "@/features/notices/hooks/use-notices-api";
+import type { NoticeFilters, NoticeStatus } from "@/features/notices/types";
 
 export type NoticeFilterKey = "all" | "published" | "draft" | "expired" | "pinned";
 
@@ -9,14 +11,23 @@ export function useNoticeFilters() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<NoticeFilterKey>("all");
 
+  const apiFilters = useMemo<NoticeFilters | undefined>(() => {
+    if (filter === "all" || filter === "expired") return undefined;
+    return { status: filter as NoticeStatus };
+  }, [filter]);
+
+  const { data: filteredNoticesData } = useNoticesQuery(apiFilters);
+  const activePool = (apiFilters ? filteredNoticesData : notices) ?? [];
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return notices.filter((n: Notice) => {
+    return activePool.filter((n: Notice) => {
       const isPinned = n.status === "pinned" || Boolean(n.pinned);
       const status = noticeStatus(n);
 
       if (filter === "pinned" && !isPinned) return false;
-      if (filter !== "all" && filter !== "pinned" && status !== filter) return false;
+      if (filter === "expired" && status !== "expired") return false;
+      if (!apiFilters && filter !== "all" && status !== filter) return false;
       if (!q) return true;
 
       const headlineMatch = (n.headline || n.title || "").toLowerCase().includes(q);
@@ -26,7 +37,7 @@ export function useNoticeFilters() {
 
       return headlineMatch || contentMatch || typeMatch;
     });
-  }, [notices, query, filter]);
+  }, [activePool, apiFilters, query, filter]);
 
   const counts = useMemo(
     () => ({

@@ -10,8 +10,8 @@ import { useAuth } from "@/lib/auth";
 import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
-  useNotificationsQuery,
-  IncomingCallDialog,
+  useFilteredNotificationsQuery,
+  type NotificationItem,
 } from "@/features/notifications";
 
 type ToneType = "info" | "success" | "warning";
@@ -35,13 +35,13 @@ export function NotificationsMenu() {
   const isAdmin = user?.role === "admin" || user?.role === "director";
   const [open, setOpen] = useState(false);
 
-  const { data: rawNotifications = [] } = useNotificationsQuery();
+  const { data: notifications = [] } = useFilteredNotificationsQuery();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
   const markReadMutation = useMarkNotificationReadMutation();
 
-  const notifications = rawNotifications.map((n) => {
+  const formattedItems = notifications.map((n) => {
     let tone: ToneType = "info";
-    const typeStr = String(n.type || "");
+    const typeStr = String(n.type || "").toLowerCase();
     if (typeStr.includes("approved") || typeStr.includes("points")) {
       tone = "success";
     } else if (typeStr.includes("rejected") || typeStr.includes("deadline")) {
@@ -49,36 +49,46 @@ export function NotificationsMenu() {
     }
 
     return {
+      raw: n,
       id: n._id || n.id || "",
       title: n.title,
       body: n.message,
       time: shortTime(n.createdAt),
       tone,
       unread: !n.isRead,
+      taskId: n.taskId,
     };
   });
 
-  const unread = notifications.filter((i) => i.unread).length;
+  const unread = formattedItems.filter((i) => i.unread).length;
 
   const handleMarkAllRead = async () => {
     try {
       await markAllReadMutation.mutateAsync();
     } catch {
-      // Ignore background errors
+      // Handled silently
     }
   };
 
-  const handleNotificationClick = (id: string, isUnread: boolean) => {
-    if (isUnread) {
-      markReadMutation.mutate(id);
+  const handleNotificationClick = (item: NotificationItem) => {
+    const notifId = item._id || item.id || "";
+    if (!item.isRead && notifId) {
+      markReadMutation.mutate(notifId);
     }
     setOpen(false);
-    navigate({ to: isAdmin ? "/admin/notifications" : "/employee/notifications" });
+
+    if (item.taskId) {
+      navigate({
+        to: isAdmin ? "/admin/tasks/$id" : "/employee/tasks/$id",
+        params: { id: item.taskId },
+      });
+    } else {
+      navigate({ to: isAdmin ? "/admin/notifications" : "/employee/notifications" });
+    }
   };
 
   return (
-    <>
-      <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -118,16 +128,16 @@ export function NotificationsMenu() {
           </button>
         </div>
         <ScrollArea className="max-h-[55vh] sm:max-h-80">
-          {notifications.length === 0 ? (
+          {formattedItems.length === 0 ? (
             <p className="px-4 py-8 text-center text-xs text-muted-foreground">
               You're all caught up.
             </p>
           ) : (
             <ul className="divide-y divide-border/60">
-              {notifications.map((n) => (
+              {formattedItems.map((n) => (
                 <li
                   key={n.id}
-                  onClick={() => handleNotificationClick(n.id, n.unread)}
+                  onClick={() => handleNotificationClick(n.raw)}
                   className={cn(
                     "flex cursor-pointer gap-2.5 px-3 py-3 transition-colors hover:bg-accent/40 sm:gap-3 sm:px-4",
                     n.unread && "bg-primary/3",
@@ -169,7 +179,5 @@ export function NotificationsMenu() {
         </div>
       </PopoverContent>
     </Popover>
-    <IncomingCallDialog />
-    </>
   );
 }

@@ -108,11 +108,16 @@ export const settingsService = {
       // Mirror aliases so existing backend schema fields and extended fields are both sent
       const mirroredEmail = {
         ...email,
-        reviewRequests: email.taskReviews !== undefined ? email.taskReviews : email.reviewRequests,
+        reviewRequests:
+          email.taskReviews !== undefined
+            ? email.taskReviews
+            : email.reviewRequests,
         taskAssignments:
-          email.universalTaskAssignments !== undefined
-            ? email.universalTaskAssignments
-            : email.taskAssignments,
+          email.taskAssignments !== undefined
+            ? email.taskAssignments
+            : email.universalTaskAssignments !== undefined
+              ? email.universalTaskAssignments
+              : undefined,
       };
 
       const mirroredInApp = {

@@ -2,7 +2,7 @@
  * Type-safe service functions for the Admin Management module.
  * Communicates with the backend /api/v1/admins endpoints directly from database.
  */
-import { http } from "@/api/client/client";
+import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import type { AuthUser } from "@/auth/types/auth";
 import type { MessageResponse } from "@/types/api";
@@ -55,16 +55,19 @@ export async function getAdminStats(): Promise<AdminStats> {
 /** GET /api/v1/admins — retrieves filtered list of administrators directly from backend database. */
 export async function getAdmins(filters?: AdminFilters): Promise<AdminListResponse> {
   const params = cleanFilters(filters);
-  const res = await http.get<AdminListResponse | { admins: AuthUser[] }>(adminEndpoints.list, {
+  const response = await apiClient.get<any>(adminEndpoints.list, {
     params,
   });
-  if (res && typeof res === "object" && "admins" in res) {
+  const res = response?.data;
+  if (res && typeof res === "object") {
+    const rawList = res.data?.admins || res.admins || (Array.isArray(res.data) ? res.data : []);
+    const pagination = res.pagination || res.data?.pagination;
     return {
-      admins: res.admins,
-      pagination: (res as AdminListResponse).pagination,
+      admins: Array.isArray(rawList) ? rawList : [],
+      pagination,
     };
   }
-  return { admins: Array.isArray(res) ? res : [] };
+  return { admins: [] };
 }
 
 /** GET /api/v1/admins/:id — retrieves details for a single administrator directly from backend database. */
