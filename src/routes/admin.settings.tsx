@@ -909,14 +909,6 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   disabled={updatePreferences.isPending}
                   onChange={(c) => handleEmailToggle("universalTask", c)}
                 />
-                <ToggleRow
-                  title="Overdue tasks"
-                  description="Receive email notifications when tasks exceed their deadline."
-                  icon={Mail}
-                  checked={localEmail.taskOverdue ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailToggle("taskOverdue", c)}
-                />
               </>
             ) : (
               <>
@@ -927,22 +919,6 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   checked={localEmail.taskAssignments ?? true}
                   disabled={updatePreferences.isPending}
                   onChange={(c) => handleEmailToggle("taskAssignments", c)}
-                />
-                <ToggleRow
-                  title="Review actions"
-                  description="Receive email notifications when your submission is approved or rejected."
-                  icon={Mail}
-                  checked={localEmail.reviewRequests ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailToggle("reviewRequests", c)}
-                />
-                <ToggleRow
-                  title="Overdue tasks"
-                  description="Receive email reminders when your tasks are overdue."
-                  icon={Mail}
-                  checked={localEmail.taskOverdue ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailToggle("taskOverdue", c)}
                 />
               </>
             )}

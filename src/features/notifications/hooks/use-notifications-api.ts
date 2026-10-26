@@ -1,47 +1,25 @@
-import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/client/query-keys";
-import { useAuth } from "@/lib/auth";
-import { useUserPreferencesQuery } from "@/features/settings/hooks/use-settings-api";
 import { notificationsService } from "../services/notifications.service";
-import { filterNotificationsByPreferences, useRealtimeNotifications } from "./use-realtime-notifications";
+import { useRealtimeNotifications, filterNotificationsByPreferences } from "./use-realtime-notifications";
 import type { NotificationItem } from "../types";
+import type { UserPreferences } from "@/features/settings/types";
+import { useAuth } from "@/lib/auth";
 
-export function useNotificationsQuery() {
+/**
+ * Fetch notifications from the API.
+ * Pass `type` to filter by NotificationType on the backend.
+ */
+export function useNotificationsQuery(type?: string) {
   // Automatically attaches real-time websocket listener for live DB updates
   useRealtimeNotifications();
 
   return useQuery({
-    queryKey: queryKeys.notifications.list(),
-    queryFn: () => notificationsService.getNotifications(),
+    queryKey: queryKeys.notifications.list(type),
+    queryFn: () => notificationsService.getNotifications(type),
     staleTime: 60 * 1000,
     refetchInterval: false, // Long polling replaced by real-time Socket.IO events
   });
-}
-
-/**
- * Hook providing notifications filtered by the user's role and their active in-app preferences.
- */
-export function useFilteredNotificationsQuery() {
-  const { user } = useAuth();
-  const { data: preferences, isLoading: isPrefsLoading } = useUserPreferencesQuery();
-  const notifsQuery = useNotificationsQuery();
-
-  const rawNotifications = notifsQuery.data || [];
-  const filteredNotifications = useMemo(() => {
-    return filterNotificationsByPreferences(
-      rawNotifications,
-      preferences?.notifications?.inApp,
-      user?.role,
-    );
-  }, [rawNotifications, preferences?.notifications?.inApp, user?.role]);
-
-  return {
-    ...notifsQuery,
-    rawNotifications,
-    data: filteredNotifications,
-    isPreferencesLoading: isPrefsLoading,
-  };
 }
 
 export function useMarkNotificationReadMutation() {
@@ -98,6 +76,35 @@ export function useMarkAllNotificationsReadMutation() {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    },
+  });
+}
+
+/**
+ * Fetches notifications and filters them client-side based on the user's
+ * active in-app notification preferences and role.
+ * Drop-in replacement for useNotificationsQuery in the bell-menu component.
+ */
+export function useFilteredNotificationsQuery() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  useRealtimeNotifications();
+
+  return useQuery({
+    queryKey: queryKeys.notifications.list(),
+    queryFn: () => notificationsService.getNotifications(),
+    staleTime: 60 * 1000,
+    refetchInterval: false,
+    select: (data: NotificationItem[]) => {
+      const prefs = queryClient.getQueryData<UserPreferences>(
+        queryKeys.settings.preferences(),
+      );
+      return filterNotificationsByPreferences(
+        data,
+        prefs?.notifications?.inApp,
+        user?.role,
+      );
     },
   });
 }
