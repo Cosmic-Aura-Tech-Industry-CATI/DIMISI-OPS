@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   Bell,
@@ -11,7 +11,6 @@ import {
   Check,
   AlarmClock,
   Layers,
-  ListTodo,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,7 @@ import { cn } from "@/lib/utils";
 import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
-  useFilteredNotificationsQuery,
+  useNotificationsQuery,
   type NotificationItem,
 } from "@/features/notifications";
 
@@ -40,65 +39,30 @@ export const Route = createFileRoute("/admin/notifications")({
   component: AdminNotificationsPage,
 });
 
-const meta: Record<string, { label: string; Icon: typeof Bell }> = {
-  submission: { label: "New Submission", Icon: ClipboardCheck },
+const notifMeta: Record<string, { label: string; Icon: typeof Bell }> = {
   new_submission: { label: "New Submission", Icon: ClipboardCheck },
-  review_request: { label: "Review Request", Icon: ClipboardCheck },
-  task_assignment: { label: "Task Assignment", Icon: ListTodo },
-  universal_task: { label: "Universal Task", Icon: Layers },
+  task_requested: { label: "Universal Task", Icon: Layers },
+  task_overdue: { label: "Overdue", Icon: AlarmClock },
+  deadline_reminder: { label: "Overdue", Icon: AlarmClock },
   new_employee: { label: "New Employee", Icon: UserPlus },
   new_admin: { label: "New Admin", Icon: ShieldPlus },
-  deadline_reminder: { label: "Deadline Reminder", Icon: AlarmClock },
-  approved: { label: "Task Approved", Icon: CheckCircle2 },
-  task_approval: { label: "Task Approved", Icon: CheckCircle2 },
+  review_action: { label: "Review Action", Icon: CheckCircle2 },
+  task_assignment: { label: "Task Assignment", Icon: CheckCircle2 },
 };
 
 const defaultMeta = { label: "Notification", Icon: Bell };
 
-const filterCategories = [
-  { id: "all", label: "All" },
-  { id: "submissions", label: "Submissions", Icon: ClipboardCheck },
-  { id: "universal", label: "Universal Tasks", Icon: Layers },
-  { id: "assignments", label: "Task Assignments", Icon: ListTodo },
-  { id: "team", label: "Team Updates", Icon: UserPlus },
-  { id: "deadlines", label: "Deadlines", Icon: AlarmClock },
+/**
+ * Filter chips for admin notifications.
+ * `apiType` maps to the NotificationType enum value sent as `?type=` query param.
+ * `null` means "All" (no type filter).
+ */
+const filterCategories: Array<{ id: string; label: string; apiType: string | null; Icon?: typeof Bell }> = [
+  { id: "all", label: "All", apiType: null },
+  { id: "submissions", label: "Submissions", apiType: "new_submission", Icon: ClipboardCheck },
+  { id: "universal", label: "Universal Tasks", apiType: "task_requested", Icon: Layers },
+  { id: "overdue", label: "Overdue", apiType: "task_overdue", Icon: AlarmClock },
 ];
-
-function matchesFilter(n: NotificationItem, catId: string): boolean {
-  if (catId === "all") return true;
-
-  const type = String(n.type || "").toLowerCase();
-  const text = `${type} ${n.title} ${n.message}`.toLowerCase();
-
-  switch (catId) {
-    case "submissions":
-      return (
-        type.includes("submission") ||
-        type.includes("review_request") ||
-        text.includes("submission") ||
-        text.includes("review")
-      );
-    case "universal":
-      return text.includes("universal");
-    case "assignments":
-      return type.includes("assignment") || text.includes("assign");
-    case "team":
-      return (
-        type === "new_employee" ||
-        type === "new_admin" ||
-        text.includes("employee") ||
-        text.includes("admin")
-      );
-    case "deadlines":
-      return (
-        type.includes("deadline") ||
-        text.includes("deadline") ||
-        text.includes("overdue")
-      );
-    default:
-      return true;
-  }
-}
 
 function getActionLink(n: NotificationItem): {
   to: string;
@@ -106,37 +70,19 @@ function getActionLink(n: NotificationItem): {
   label: string;
 } {
   if (n.taskId) {
-    return {
-      to: "/admin/tasks/$id",
-      params: { id: n.taskId },
-      label: "View task",
-    };
+    return { to: "/admin/tasks/$id", params: { id: n.taskId }, label: "View task" };
   }
-
   const text = `${n.type} ${n.title} ${n.message}`.toLowerCase();
-
-  if (text.includes("submission") || text.includes("review")) {
-    return {
-      to: "/admin/tasks",
-      label: "Review tasks",
-    };
+  if (text.includes("submission") || text.includes("review") || text.includes("request")) {
+    return { to: "/admin/tasks", label: "Review tasks" };
   }
   if (text.includes("employee")) {
-    return {
-      to: "/admin/employees",
-      label: "View employees",
-    };
+    return { to: "/admin/employees", label: "View employees" };
   }
   if (text.includes("admin")) {
-    return {
-      to: "/admin/admins",
-      label: "View admins",
-    };
+    return { to: "/admin/admins", label: "View admins" };
   }
-  return {
-    to: "/admin/tasks",
-    label: "View tasks",
-  };
+  return { to: "/admin/tasks", label: "View tasks" };
 }
 
 function formatWhen(ts: string | Date) {
@@ -147,34 +93,24 @@ function formatWhen(ts: string | Date) {
 }
 
 function AdminNotificationsPage() {
-  const { data: notifications = [], isLoading } = useFilteredNotificationsQuery();
+  const [tab, setTab] = useState<"all" | "unread" | "read">("all");
+  const [typeFilter, setTypeFilter] = useState<(typeof filterCategories)[number]>(filterCategories[0]);
+
+  // API-side filtering — pass the enum type value as ?type= query param
+  const { data: notifications = [], isLoading } = useNotificationsQuery(typeFilter.apiType ?? undefined);
   const markReadMutation = useMarkNotificationReadMutation();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
 
-  const [tab, setTab] = useState<"all" | "unread" | "read">("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const unread = notifications.filter((n) => !n.isRead).length;
+  const read = notifications.filter((n) => n.isRead).length;
 
-  const counts = useMemo(
-    () => ({
-      all: notifications.length,
-      unread: notifications.filter((n) => !n.isRead).length,
-      read: notifications.filter((n) => n.isRead).length,
-    }),
-    [notifications],
-  );
-
-  const filtered = useMemo(
-    () =>
-      notifications
-        .filter((n) => {
-          if (tab === "unread") return !n.isRead;
-          if (tab === "read") return n.isRead;
-          return true;
-        })
-        .filter((n) => matchesFilter(n, typeFilter))
-        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
-    [notifications, tab, typeFilter],
-  );
+  const filtered = notifications
+    .filter((n) => {
+      if (tab === "unread") return !n.isRead;
+      if (tab === "read") return n.isRead;
+      return true;
+    })
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
   const handleMarkAllRead = async () => {
     try {
@@ -197,27 +133,28 @@ function AdminNotificationsPage() {
     <>
       <PageHeader
         title="Notifications"
-        subtitle="Approvals, submissions and new team members across your workspace."
+        subtitle="Approvals, submissions and updates across your workspace."
         actions={
           <Button
             variant="outline"
             className="min-h-11 w-full rounded-md sm:w-auto"
             onClick={handleMarkAllRead}
-            disabled={counts.unread === 0 || markAllReadMutation.isPending}
+            disabled={unread === 0 || markAllReadMutation.isPending}
           >
             <Check className="mr-1.5 h-4 w-4" /> Mark all read
           </Button>
         }
       />
 
+      {/* Type filter chips — trigger API re-fetch on click */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filterCategories.map((cat) => {
-          const active = typeFilter === cat.id;
+          const active = typeFilter.id === cat.id;
           const Icon = cat.Icon;
           return (
             <button
               key={cat.id}
-              onClick={() => setTypeFilter(cat.id)}
+              onClick={() => setTypeFilter(cat)}
               className={cn(
                 "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors",
                 active ? "border-primary/40 bg-primary/15 text-primary" : "hover:bg-muted",
@@ -234,19 +171,19 @@ function AdminNotificationsPage() {
         <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
           <TabsTrigger value="all" className="gap-1.5 sm:gap-2">
             All
-            <span className="text-xs text-muted-foreground">{counts.all}</span>
+            <span className="text-xs text-muted-foreground">{notifications.length}</span>
           </TabsTrigger>
           <TabsTrigger value="unread" className="gap-1.5 sm:gap-2">
             Unread
-            {counts.unread > 0 && (
+            {unread > 0 && (
               <Badge className="ml-0.5 h-5 bg-primary px-1.5 text-primary-foreground hover:bg-primary">
-                {counts.unread}
+                {unread}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="read" className="gap-1.5 sm:gap-2">
             Read
-            <span className="text-xs text-muted-foreground">{counts.read}</span>
+            <span className="text-xs text-muted-foreground">{read}</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -276,7 +213,7 @@ function AdminNotificationsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((n: NotificationItem, i) => {
-            const M = meta[n.type] || defaultMeta;
+            const M = notifMeta[n.type] || defaultMeta;
             const notifId = n._id || n.id || "";
             const actionLink = getActionLink(n);
 

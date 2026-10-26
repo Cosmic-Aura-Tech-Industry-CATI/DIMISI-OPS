@@ -1,26 +1,21 @@
 /** Types for settings and preferences module. */
 
+/** Exact backend IUserSettings.notifications.email field names */
 export interface EmailNotifications {
-  taskReviews?: boolean;
-  universalTaskApplications?: boolean;
-  universalTaskAssignments?: boolean;
   taskAssignments?: boolean;
+  universalTask?: boolean;
   reviewRequests?: boolean;
-  weeklyDigest?: boolean;
+  taskOverdue?: boolean;
   [key: string]: boolean | undefined;
 }
 
+/** Exact backend IUserSettings.notifications.inApp field names */
 export interface InAppNotifications {
-  taskReviews?: boolean;
-  universalTaskApplications?: boolean;
-  overdueTasks?: boolean;
   taskAssignments?: boolean;
-  reviewAcceptance?: boolean;
-  reviewRejection?: boolean;
-  universalTaskAssignments?: boolean;
-  deadlineReminders?: boolean;
-  taskApprovals?: boolean;
-  pointsEarned?: boolean;
+  reviewRequests?: boolean;
+  taskOverdue?: boolean;
+  universalTask?: boolean;
+  reviewActions?: boolean;
   [key: string]: boolean | undefined;
 }
 
@@ -33,22 +28,6 @@ export interface UserPreferencesNotifications {
   email?: EmailNotifications;
   inApp?: InAppNotifications;
   deliverySchedule?: DeliverySchedule;
-
-  // Flattened aliases for legacy/simple binding
-  taskReviews?: boolean;
-  universalTaskApplications?: boolean;
-  overdueTasks?: boolean;
-  taskAssignments?: boolean;
-  reviewAcceptance?: boolean;
-  reviewRejection?: boolean;
-  universalTaskAssignments?: boolean;
-  reviewRequests?: boolean;
-  weeklyDigest?: boolean;
-  deadlineReminders?: boolean;
-  taskApprovals?: boolean;
-  pointsEarned?: boolean;
-  quietHoursStart?: string;
-  quietHoursEnd?: string;
   [key: string]: unknown;
 }
 
@@ -85,7 +64,6 @@ export interface UpdatePreferencesPayload {
     email?: Partial<EmailNotifications>;
     inApp?: Partial<InAppNotifications>;
     deliverySchedule?: Partial<DeliverySchedule>;
-    [key: string]: unknown;
   };
   security?: {
     twoFactor?: Partial<TwoFactorSecurity>;
