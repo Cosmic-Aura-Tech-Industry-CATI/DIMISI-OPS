@@ -963,17 +963,6 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   onChange={(c) => handleInAppChange("universalTaskApplications", c)}
                 />
                 <ToggleRow
-                  title="Employee task assignments"
-                  description="When tasks are assigned to employees or claimed across operations."
-                  icon={ListTodo}
-                  checked={localInApp.universalTaskAssignments ?? localInApp.taskAssignments ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => {
-                    handleInAppChange("universalTaskAssignments", c);
-                    handleInAppChange("taskAssignments", c);
-                  }}
-                />
-                <ToggleRow
                   title="Overdue tasks"
                   description="When tasks exceed their deadline or require immediate escalation."
                   icon={Clock}
