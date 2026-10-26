@@ -46,7 +46,7 @@ function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
     let mappedStatus: string | undefined = filters.status;
     if (filters.status === "available") mappedStatus = "open";
     else if (filters.status === "submitted") mappedStatus = "in_review";
-    else if (filters.status === "pending") mappedStatus = "requested";
+    else if (filters.status === "pending") mappedStatus = "in_review";
     else if (filters.status === "rejected") mappedStatus = undefined;
 
     if (mappedStatus) {

@@ -112,6 +112,7 @@ function TasksPage() {
     if (status === "all" || status === "rejected") return undefined;
     if (status === "available") return "open";
     if (status === "submitted") return "in_review";
+    if (status === "pending") return "in_review";
     return status;
   }, [status]);
 
@@ -172,11 +173,11 @@ function TasksPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = activeTaskPool.filter((t) => {
+    return activeTaskPool.filter((t) => {
       if (status === "rejected") {
         if (t.reviewState !== "rejected") return false;
       } else if (isSearchActive) {
-        if (status === "submitted") {
+        if (status === "submitted" || status === "pending") {
           if (t.reviewState !== "in_review") return false;
         } else if (status !== "all" && t.status !== status) {
           return false;
@@ -193,15 +194,7 @@ function TasksPage() {
         getCategoryLabel(t.category).toLowerCase().includes(q)
       );
     });
-    return list.sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "title") cmp = a.title.localeCompare(b.title);
-      else if (sortKey === "priority") cmp = priorityRank[a.priority] - priorityRank[b.priority];
-      else if (sortKey === "points") cmp = a.points - b.points;
-      else cmp = +new Date(a.dueDate) - +new Date(b.dueDate);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
+  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType]);
 
   const isServerPaginated = isSearchActive
     ? Boolean(searchResponse?.pagination)
