@@ -43,13 +43,13 @@ function normalizePreferences(data: Partial<UserPreferences> | null | undefined)
   };
 
   const resolvedInApp = {
-    taskReviews: rawInApp.taskReviews ?? rawInApp.reviewRequests ?? true,
+    taskReviews: rawInApp.taskReviews ?? true,
     universalTaskApplications: rawInApp.universalTaskApplications ?? true,
     overdueTasks: rawInApp.overdueTasks ?? rawInApp.deadlineReminders ?? rawNotifications.deadlineReminders ?? true,
     taskAssignments: rawInApp.taskAssignments ?? rawNotifications.taskAssignments ?? true,
     reviewAcceptance: rawInApp.reviewAcceptance ?? rawInApp.taskApprovals ?? rawNotifications.taskApprovals ?? true,
     reviewRejection: rawInApp.reviewRejection ?? true,
-    universalTaskAssignments: rawInApp.universalTaskAssignments ?? rawInApp.taskAssignments ?? true,
+    universalTaskAssignments: rawInApp.universalTaskAssignments ?? true,
     deadlineReminders: rawInApp.deadlineReminders ?? rawInApp.overdueTasks ?? rawNotifications.deadlineReminders ?? true,
     taskApprovals: rawInApp.taskApprovals ?? rawInApp.reviewAcceptance ?? rawNotifications.taskApprovals ?? true,
     pointsEarned: rawInApp.pointsEarned ?? rawNotifications.pointsEarned ?? true,
@@ -84,49 +84,13 @@ function normalizePreferences(data: Partial<UserPreferences> | null | undefined)
   };
 }
 
-const PREFERENCES_STORAGE_KEY_PREFIX = "dimisi_user_prefs_";
-
-function getLocalPreferences(userId?: string): Partial<UserPreferences> | null {
-  if (typeof window === "undefined" || !userId) return null;
-  try {
-    const raw = localStorage.getItem(`${PREFERENCES_STORAGE_KEY_PREFIX}${userId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLocalPreferences(userId: string | undefined, prefs: UserPreferences) {
-  if (typeof window === "undefined" || !userId) return;
-  try {
-    localStorage.setItem(`${PREFERENCES_STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(prefs));
-  } catch {}
-}
-
 export const settingsService = {
   getPreferences: async (): Promise<UserPreferences> => {
     const res = await http.get<{ preferences?: UserPreferences } | UserPreferences>(
       API_ENDPOINTS.settings.preferences,
     );
     const data = res && "preferences" in res ? res.preferences : (res as UserPreferences);
-    const apiNormalized = normalizePreferences(data);
-    const local = getLocalPreferences(apiNormalized.userId);
-    if (!local) return apiNormalized;
-
-    return {
-      ...apiNormalized,
-      notifications: {
-        ...apiNormalized.notifications,
-        email: {
-          ...local.notifications?.email,
-          ...apiNormalized.notifications.email,
-        },
-        inApp: {
-          ...local.notifications?.inApp,
-          ...apiNormalized.notifications.inApp,
-        },
-      },
-    };
+    return normalizePreferences(data);
   },
 
   updatePreferences: async (payload: UpdatePreferencesPayload): Promise<UserPreferences> => {
@@ -144,11 +108,16 @@ export const settingsService = {
       // Mirror aliases so existing backend schema fields and extended fields are both sent
       const mirroredEmail = {
         ...email,
-        reviewRequests: email.taskReviews !== undefined ? email.taskReviews : email.reviewRequests,
+        reviewRequests:
+          email.taskReviews !== undefined
+            ? email.taskReviews
+            : email.reviewRequests,
         taskAssignments:
-          email.universalTaskAssignments !== undefined
-            ? email.universalTaskAssignments
-            : email.taskAssignments,
+          email.taskAssignments !== undefined
+            ? email.taskAssignments
+            : email.universalTaskAssignments !== undefined
+              ? email.universalTaskAssignments
+              : undefined,
       };
 
       const mirroredInApp = {
@@ -187,7 +156,7 @@ export const settingsService = {
     const data = res && "preferences" in res ? res.preferences : (res as UserPreferences);
     const result = normalizePreferences(data);
 
-    // Ensure client updates are preserved in returned object
+    // Ensure client updates are preserved in returned object for cache consistency
     if (payload.notifications?.email) {
       result.notifications.email = {
         ...result.notifications.email,
@@ -201,7 +170,6 @@ export const settingsService = {
       };
     }
 
-    saveLocalPreferences(result.userId, result);
     return result;
   },
 

@@ -45,6 +45,8 @@ import {
   type Task,
   type TaskPriority,
   getCategoryLabel,
+  isTaskOverdue,
+  isTaskEligibleForSubmission,
 } from "@/features/tasks";
 import { useAuth } from "@/lib/auth";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -463,6 +465,33 @@ function EmployeeTasksPage() {
               rawStatus !== "in_review" &&
               task.reviewState !== "in_review";
 
+            const isCompleted =
+              normalizedStatus === "completed" ||
+              rawStatus === "completed" ||
+              task.reviewState === "approved" ||
+              task.reviewStatus === "approved";
+
+            const isInReview =
+              normalizedStatus === "in_review" ||
+              normalizedStatus === "in review" ||
+              normalizedStatus === "pending_review" ||
+              rawStatus === "in_review" ||
+              rawStatus === "in review" ||
+              task.reviewState === "in_review" ||
+              task.reviewState === "pending_review" ||
+              task.reviewStatus === "in_review";
+
+            const myId = user?.id || (user as any)?._id;
+            const myEmpId = user?.empId || user?.code;
+            const isAssignedToMe = Boolean(
+              (myId && (task.assigneeId === myId || task.assignedTo === myId)) ||
+              (myEmpId && task.assigneeCode === myEmpId)
+            );
+
+            const overdue = isTaskOverdue(task);
+            const eligible = isTaskEligibleForSubmission(task);
+            const isOverdueAndEligible = overdue && eligible;
+
             const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
             const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
 
@@ -552,37 +581,65 @@ function EmployeeTasksPage() {
                   </Button>
 
                   <div className="w-full min-w-0 lg:flex-1">
-                    {!isInProgress ? (
-                      activeTab === "all" ? (
-                        <Button
-                          disabled={isRequesting}
-                          onClick={() => handleRequestTask(task)}
-                          className="w-full rounded-md shadow-glow bg-violet-600 hover:bg-violet-700 text-white"
-                        >
-                          <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                          {isRequesting
-                            ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
-                            : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
-                        </Button>
-                      ) : (
-                        <Button
-                          disabled={isStarting}
-                          onClick={() => handleStartTask(task)}
-                          className="w-full rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                          <PlayCircle className="mr-1.5 h-4 w-4" />
-                          {isStarting ? "Starting…" : "Start Task"}
-                        </Button>
-                      )
-                    ) : (
+                    {isCompleted ? (
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full min-w-0 rounded-md border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                      >
+                        <Link to="/employee/tasks/$id" params={{ id: taskId }}>
+                          <CheckCircle2 className="mr-1.5 h-4 w-4" /> Completed
+                        </Link>
+                      </Button>
+                    ) : isInReview ? (
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full min-w-0 rounded-md border-primary/40 text-primary hover:bg-primary/10"
+                      >
+                        <Link to="/employee/pending-review">
+                          <Eye className="mr-1.5 h-4 w-4" /> In Review
+                        </Link>
+                      </Button>
+                    ) : isOverdueAndEligible ? (
                       <Button
                         asChild
                         className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white"
                       >
                         <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
                           <Send className="mr-1.5 h-4 w-4" />
-                          Submit for review
+                          Submit for Review
                         </Link>
+                      </Button>
+                    ) : isInProgress ? (
+                      <Button
+                        asChild
+                        className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
+                          <Send className="mr-1.5 h-4 w-4" />
+                          Submit for Review
+                        </Link>
+                      </Button>
+                    ) : activeTab === "all" && !isAssignedToMe ? (
+                      <Button
+                        disabled={isRequesting}
+                        onClick={() => handleRequestTask(task)}
+                        className="w-full rounded-md shadow-glow bg-violet-600 hover:bg-violet-700 text-white"
+                      >
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                        {isRequesting
+                          ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
+                          : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled={isStarting}
+                        onClick={() => handleStartTask(task)}
+                        className="w-full rounded-md shadow-glow bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        <PlayCircle className="mr-1.5 h-4 w-4" />
+                        {isStarting ? "Starting…" : "Start Task"}
                       </Button>
                     )}
                   </div>
@@ -619,6 +676,33 @@ function EmployeeTasksPage() {
                     normalizedStatus !== "in_review" &&
                     rawStatus !== "in_review" &&
                     task.reviewState !== "in_review";
+
+                  const isCompleted =
+                    normalizedStatus === "completed" ||
+                    rawStatus === "completed" ||
+                    task.reviewState === "approved" ||
+                    task.reviewStatus === "approved";
+
+                  const isInReview =
+                    normalizedStatus === "in_review" ||
+                    normalizedStatus === "in review" ||
+                    normalizedStatus === "pending_review" ||
+                    rawStatus === "in_review" ||
+                    rawStatus === "in review" ||
+                    task.reviewState === "in_review" ||
+                    task.reviewState === "pending_review" ||
+                    task.reviewStatus === "in_review";
+
+                  const myId = user?.id || (user as any)?._id;
+                  const myEmpId = user?.empId || user?.code;
+                  const isAssignedToMe = Boolean(
+                    (myId && (task.assigneeId === myId || task.assignedTo === myId)) ||
+                    (myEmpId && task.assigneeCode === myEmpId)
+                  );
+
+                  const overdue = isTaskOverdue(task);
+                  const eligible = isTaskEligibleForSubmission(task);
+                  const isOverdueAndEligible = overdue && eligible;
 
                   const isStarting = startTaskMutation.isPending && startingTaskId === taskId;
                   const isRequesting = requestTaskMutation.isPending && requestingTaskId === taskId;
@@ -677,31 +761,29 @@ function EmployeeTasksPage() {
 
                       {/* Actions */}
                       <td className="px-5 py-4 text-right whitespace-nowrap">
-                        {!isInProgress ? (
-                          activeTab === "all" ? (
-                            <Button
-                              size="sm"
-                              disabled={isRequesting}
-                              onClick={() => handleRequestTask(task)}
-                              className="rounded-full bg-violet-600 text-white hover:bg-violet-700 shadow-sm"
-                            >
-                              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                              {isRequesting
-                                ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
-                                : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              disabled={isStarting}
-                              onClick={() => handleStartTask(task)}
-                              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                            >
-                              <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-                              {isStarting ? "Starting…" : "Start Task"}
-                            </Button>
-                          )
-                        ) : (
+                        {isCompleted ? (
+                          <Button
+                            size="sm"
+                            asChild
+                            variant="outline"
+                            className="rounded-full border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                          >
+                            <Link to="/employee/tasks/$id" params={{ id: taskId }}>
+                              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Completed
+                            </Link>
+                          </Button>
+                        ) : isInReview ? (
+                          <Button
+                            size="sm"
+                            asChild
+                            variant="outline"
+                            className="rounded-full border-primary/40 text-primary hover:bg-primary/10"
+                          >
+                            <Link to="/employee/pending-review">
+                              <Eye className="mr-1.5 h-3.5 w-3.5" /> In Review
+                            </Link>
+                          </Button>
+                        ) : isOverdueAndEligible ? (
                           <Button
                             size="sm"
                             asChild
@@ -709,8 +791,41 @@ function EmployeeTasksPage() {
                           >
                             <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
                               <Send className="mr-1.5 h-3.5 w-3.5" />
-                              Submit For Review
+                              Submit for Review
                             </Link>
+                          </Button>
+                        ) : isInProgress ? (
+                          <Button
+                            size="sm"
+                            asChild
+                            className="rounded-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                          >
+                            <Link to="/employee/tasks/$id/submit" params={{ id: taskId }}>
+                              <Send className="mr-1.5 h-3.5 w-3.5" />
+                              Submit for Review
+                            </Link>
+                          </Button>
+                        ) : activeTab === "all" && !isAssignedToMe ? (
+                          <Button
+                            size="sm"
+                            disabled={isRequesting}
+                            onClick={() => handleRequestTask(task)}
+                            className="rounded-full bg-violet-600 text-white hover:bg-violet-700 shadow-sm"
+                          >
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                            {isRequesting
+                              ? (task.taskType === "universal" ? "Acquiring…" : "Requesting…")
+                              : (task.taskType === "universal" ? "Acquire Task" : "Request Task")}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={isStarting}
+                            onClick={() => handleStartTask(task)}
+                            className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                          >
+                            <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                            {isStarting ? "Starting…" : "Start Task"}
                           </Button>
                         )}
                       </td>

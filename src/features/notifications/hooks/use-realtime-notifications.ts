@@ -22,6 +22,7 @@ let subscriberCount = 0;
 let activeSocket: Socket | null = null;
 let activeQueryClient: QueryClient | null = null;
 let activeUserId: string | null = null;
+let activeUserRole: string | null = null;
 
 /**
  * Extracts and normalizes the notification payload from various backend socket event shapes.
@@ -118,11 +119,12 @@ function showNotificationToast(notification: NotificationItem) {
 
 /**
  * Checks whether an incoming notification should be displayed in the in-app tray
- * and toast alert based on the user's active in-app notification preferences.
+ * and toast alert based on the user's active in-app notification preferences and role.
  */
 export function isNotificationInAppEnabled(
   notification: NotificationItem,
   inAppPrefs?: Partial<InAppNotifications>,
+  userRole?: string,
 ): boolean {
   if (!inAppPrefs) return true;
 
@@ -131,44 +133,116 @@ export function isNotificationInAppEnabled(
   const msg = String(notification.message || "").toLowerCase();
   const text = `${type} ${title} ${msg}`;
 
-  const isUniversal = text.includes("universal");
+  const role = String(userRole || activeUserRole || "").toLowerCase();
+  const isAdmin = role === "admin" || role === "director";
 
-  // Universal task applications (Admin)
-  if (isUniversal && (text.includes("appli") || text.includes("request"))) {
-    return inAppPrefs.universalTaskApplications !== false;
+  if (isAdmin) {
+    // Suppress employee-only reward signals for admins
+    if (type.includes("points") || text.includes("points earned") || text.includes("points")) {
+      return false;
+    }
+
+    // Universal task applications (Admin)
+    if (text.includes("universal") && (text.includes("appli") || text.includes("request"))) {
+      return inAppPrefs.universalTaskApplications !== false;
+    }
+
+    // Task reviews / submissions awaiting approval (Admin)
+    if (
+      text.includes("submission") ||
+      text.includes("review_request") ||
+      text.includes("ready for review") ||
+      text.includes("waiting for your approval") ||
+      type === "new_submission" ||
+      type === "submission" ||
+      type === "review_request"
+    ) {
+      return inAppPrefs.taskReviews !== false;
+    }
+
+    // Overdue tasks / deadline reminders (Admin)
+    if (text.includes("deadline") || text.includes("overdue")) {
+      return inAppPrefs.overdueTasks !== false && inAppPrefs.deadlineReminders !== false;
+    }
+
+    // Employee task assignments / universal task assignments across operations (Admin)
+    if (text.includes("assignment") || text.includes("assigned")) {
+      return inAppPrefs.universalTaskAssignments !== false && inAppPrefs.taskAssignments !== false;
+    }
+
+    return true;
   }
 
-  // Universal task assignments (Employee/Admin)
-  if (isUniversal && (text.includes("assign") || text.includes("claim"))) {
+  // Employee role:
+  // Suppress admin-only staff management events for employees
+  if (
+    type === "new_employee" ||
+    type === "new_admin" ||
+    text.includes("new employee added") ||
+    text.includes("new admin added")
+  ) {
+    return false;
+  }
+
+  // Universal task assignments (Employee)
+  if (text.includes("universal") && (text.includes("assign") || text.includes("claim"))) {
     return inAppPrefs.universalTaskAssignments !== false;
   }
 
-  // Review request acceptance (Employee)
-  if (text.includes("approved") || text.includes("task_approval") || text.includes("accept")) {
-    return inAppPrefs.reviewAcceptance !== false;
-  }
-
-  // Review request rejection (Employee)
-  if (text.includes("rejected") || text.includes("reject") || text.includes("decline")) {
-    return inAppPrefs.reviewRejection !== false;
-  }
-
-  // Overdue tasks / deadline reminders (Admin/Employee)
-  if (text.includes("deadline") || text.includes("overdue")) {
-    return inAppPrefs.overdueTasks !== false;
-  }
-
-  // Task reviews (Admin)
-  if (text.includes("submission") || text.includes("review_request") || text.includes("review")) {
-    return inAppPrefs.taskReviews !== false;
-  }
-
-  // Task assignments (Employee/Admin)
-  if (text.includes("assignment") || text.includes("assigned")) {
+  // Direct task assignments (Employee)
+  if (
+    text.includes("assignment") ||
+    text.includes("assigned") ||
+    type === "task_assignment" ||
+    type === "new_task"
+  ) {
     return inAppPrefs.taskAssignments !== false;
   }
 
+  // Review request acceptance / task approval (Employee)
+  if (
+    text.includes("approved") ||
+    text.includes("task_approval") ||
+    text.includes("has been approved") ||
+    type === "approved" ||
+    type === "task_approval"
+  ) {
+    return inAppPrefs.reviewAcceptance !== false && inAppPrefs.taskApprovals !== false;
+  }
+
+  // Review request rejection (Employee)
+  if (
+    text.includes("rejected") ||
+    text.includes("reject") ||
+    text.includes("decline") ||
+    type === "rejected"
+  ) {
+    return inAppPrefs.reviewRejection !== false;
+  }
+
+  // Overdue tasks / deadline reminders (Employee)
+  if (text.includes("deadline") || text.includes("overdue") || type === "deadline_reminder") {
+    return inAppPrefs.overdueTasks !== false && inAppPrefs.deadlineReminders !== false;
+  }
+
+  // Points earned / rewards (Employee)
+  if (type.includes("points") || text.includes("points earned")) {
+    return inAppPrefs.pointsEarned !== false;
+  }
+
   return true;
+}
+
+/**
+ * Filters a list of notifications based on active in-app preferences and user role.
+ */
+export function filterNotificationsByPreferences(
+  notifications: NotificationItem[],
+  inAppPrefs?: Partial<InAppNotifications>,
+  userRole?: string,
+): NotificationItem[] {
+  if (!Array.isArray(notifications)) return [];
+  return notifications.filter((n) => isNotificationInAppEnabled(n, inAppPrefs, userRole));
 }
 
 /**
@@ -203,6 +277,7 @@ function handleNotificationCreated(data: unknown) {
   const inAppAllowed = isNotificationInAppEnabled(
     notification,
     cachedPreferences?.notifications?.inApp,
+    activeUserRole || undefined,
   );
 
   // 1. Immediately update TanStack Query cache if in-app notification is enabled
@@ -245,10 +320,12 @@ function handleNotificationCreated(data: unknown) {
 
 /**
  * Stable handler for Redis Pub/Sub `user_event` stream forwarding.
+ * Skips `notification_created` to prevent double-handling since it has a dedicated listener.
  */
 function handleUserEvent(payload: SocketUserEvent) {
-  if (payload?.event === "notification_created" && payload?.notification) {
-    handleNotificationCreated(payload.notification);
+  if (payload?.event === "notification_created") {
+    // Already handled by socket.on("notification_created")
+    return;
   }
 }
 
@@ -283,9 +360,10 @@ export function useRealtimeNotifications() {
       return;
     }
 
-    // Keep active query client and user ID updated
+    // Keep active query client, user ID, and role updated
     activeQueryClient = queryClient;
     activeUserId = user.id;
+    activeUserRole = user.role;
 
     // Connect and obtain shared Socket.IO instance
     const socket = socketService.connect(user.id);
@@ -312,10 +390,12 @@ export function useRealtimeNotifications() {
         activeSocket.off("reconnect", handleReconnect);
         socketService.off("reconnected", handleReconnect);
         activeSocket = null;
+        activeUserId = null;
+        activeUserRole = null;
         // Do NOT disconnect shared socket on unmount — preserved for background use
       }
     };
-  }, [user?.id, queryClient]);
+  }, [user?.id, user?.role, queryClient]);
 
   return {
     socket: socketService.getSocket(),

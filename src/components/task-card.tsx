@@ -17,7 +17,7 @@ import { PriorityBadge } from "@/components/status-badge";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { SubmissionDetailDialog } from "@/components/submission-detail-dialog";
 import type { TaskReviewState } from "@/lib/mock-data";
-import { type Task, useStartTask, getCategoryLabel } from "@/features/tasks";
+import { type Task, useStartTask, getCategoryLabel, isTaskOverdue, isTaskEligibleForSubmission } from "@/features/tasks";
 
 type Bucket = "assigned" | "review" | "completed" | "rejected";
 
@@ -191,6 +191,21 @@ function ActionButton({
         task.status === "pending" ||
         rawSt === "pending");
 
+    const overdue = isTaskOverdue(task);
+    const eligible = isTaskEligibleForSubmission(task);
+    const isOverdueAndEligible = overdue && eligible;
+
+    // Overdue tasks: Hide "Start Task" and display "Submit for Review" instead
+    if (isOverdueAndEligible || isInProgress) {
+      return (
+        <Button asChild className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id || "" }}>
+            <Send className="mr-1.5 h-4 w-4" /> Submit for Review
+          </Link>
+        </Button>
+      );
+    }
+
     if (isAssignedNotStarted) {
       return (
         <Button
@@ -199,17 +214,7 @@ function ActionButton({
           onClick={() => startTask.mutate(task.id || task._id || "")}
         >
           <PlayCircle className="mr-1.5 h-4 w-4" />
-          {startTask.isPending ? "Starting…" : "Start task"}
-        </Button>
-      );
-    }
-
-    if (isInProgress) {
-      return (
-        <Button asChild className="w-full rounded-md shadow-glow bg-indigo-600 hover:bg-indigo-700 text-white">
-          <Link to="/employee/tasks/$id/submit" params={{ id: task.id || task._id || "" }}>
-            <Send className="mr-1.5 h-4 w-4" /> Submit for review
-          </Link>
+          {startTask.isPending ? "Starting…" : "Start Task"}
         </Button>
       );
     }
@@ -221,7 +226,7 @@ function ActionButton({
         onClick={() => startTask.mutate(task.id || task._id || "")}
       >
         <PlayCircle className="mr-1.5 h-4 w-4" />
-        {startTask.isPending ? "Starting…" : "Start task"}
+        {startTask.isPending ? "Starting…" : "Start Task"}
       </Button>
     );
   }

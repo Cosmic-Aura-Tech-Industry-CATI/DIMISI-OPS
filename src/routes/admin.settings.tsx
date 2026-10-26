@@ -697,12 +697,15 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
 
   useEffect(() => {
     if (preferences?.notifications) {
-      setLocalInApp(
-        ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {},
-      );
-      setLocalEmail(
-        ((preferences.notifications.email || {}) as Record<string, boolean>) || {},
-      );
+      const inApp = ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {};
+      const email = ((preferences.notifications.email || {}) as Record<string, boolean>) || {};
+      setLocalInApp(inApp);
+      setLocalEmail({
+        ...email,
+        taskReviews: email.taskReviews ?? email.reviewRequests ?? true,
+        taskAssignments: email.taskAssignments ?? email.universalTaskAssignments ?? true,
+        universalTaskAssignments: email.universalTaskAssignments ?? email.taskAssignments ?? true,
+      });
       setQuietStart(preferences.notifications.deliverySchedule?.quietHoursStart || "22:00");
       setQuietEnd(preferences.notifications.deliverySchedule?.quietHoursEnd || "07:00");
     }
@@ -713,7 +716,14 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
   };
 
   const handleEmailChange = (key: string, checked: boolean) => {
-    setLocalEmail((prev) => ({ ...prev, [key]: checked }));
+    setLocalEmail((prev) => {
+      const next = { ...prev, [key]: checked };
+      if (!isAdm && (key === "taskAssignments" || key === "universalTaskAssignments")) {
+        next.taskAssignments = checked;
+        next.universalTaskAssignments = checked;
+      }
+      return next;
+    });
   };
 
   const hasChanges = useMemo(() => {
@@ -722,18 +732,38 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
     const origEmail = (preferences.notifications.email || {}) as Record<string, boolean | undefined>;
     const origSched = preferences.notifications.deliverySchedule || {};
 
-    const inAppChanged = Object.keys(localInApp).some(
-      (k) => localInApp[k] !== origInApp[k],
+    const inAppKeys = isAdm
+      ? [
+          "taskReviews",
+          "universalTaskApplications",
+          "overdueTasks",
+          "universalTaskAssignments",
+          "taskAssignments",
+        ]
+      : [
+          "taskAssignments",
+          "universalTaskAssignments",
+          "reviewAcceptance",
+          "reviewRejection",
+          "overdueTasks",
+        ];
+
+    const emailKeys = isAdm
+      ? ["taskReviews", "universalTaskApplications"]
+      : ["taskAssignments", "universalTaskAssignments"];
+
+    const inAppChanged = inAppKeys.some(
+      (k) => localInApp[k] !== undefined && origInApp[k] !== undefined && localInApp[k] !== origInApp[k],
     );
-    const emailChanged = Object.keys(localEmail).some(
-      (k) => localEmail[k] !== origEmail[k],
+    const emailChanged = emailKeys.some(
+      (k) => localEmail[k] !== undefined && origEmail[k] !== undefined && localEmail[k] !== origEmail[k],
     );
     const schedChanged =
       quietStart !== (origSched.quietHoursStart || "22:00") ||
       quietEnd !== (origSched.quietHoursEnd || "07:00");
 
     return inAppChanged || emailChanged || schedChanged;
-  }, [preferences, localInApp, localEmail, quietStart, quietEnd]);
+  }, [preferences, localInApp, localEmail, quietStart, quietEnd, isAdm]);
 
   const handleSave = () => {
     const origNotifs = preferences?.notifications || {};
@@ -741,29 +771,42 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
     const origEmail = origNotifs.email || {};
     const origSched = origNotifs.deliverySchedule || {};
 
-    const payloadInApp = {
+    const payloadInApp: Record<string, boolean | undefined> = {
       ...origInApp,
       ...localInApp,
-      ...(isAdm
-        ? {
-            reviewRequests: localInApp.taskReviews ?? origInApp.reviewRequests,
-            deadlineReminders: localInApp.overdueTasks ?? origInApp.deadlineReminders,
-          }
-        : {
-            taskApprovals: localInApp.reviewAcceptance ?? origInApp.taskApprovals,
-            deadlineReminders: localInApp.overdueTasks ?? origInApp.deadlineReminders,
-          }),
+      deadlineReminders:
+        localInApp.overdueTasks !== undefined ? localInApp.overdueTasks : origInApp.deadlineReminders,
+      taskApprovals:
+        localInApp.reviewAcceptance !== undefined ? localInApp.reviewAcceptance : origInApp.taskApprovals,
     };
 
-    const payloadEmail = {
+    if (isAdm) {
+      if (localInApp.universalTaskAssignments !== undefined) {
+        payloadInApp.taskAssignments = localInApp.universalTaskAssignments;
+      }
+    }
+
+    const payloadEmail: Record<string, boolean | undefined> = {
       ...origEmail,
       ...localEmail,
       ...(isAdm
         ? {
-            reviewRequests: localEmail.taskReviews ?? origEmail.reviewRequests,
+            reviewRequests:
+              localEmail.taskReviews !== undefined ? localEmail.taskReviews : origEmail.reviewRequests,
           }
         : {
-            taskAssignments: localEmail.universalTaskAssignments ?? origEmail.taskAssignments,
+            taskAssignments:
+              localEmail.taskAssignments !== undefined
+                ? localEmail.taskAssignments
+                : localEmail.universalTaskAssignments !== undefined
+                  ? localEmail.universalTaskAssignments
+                  : origEmail.taskAssignments,
+            universalTaskAssignments:
+              localEmail.taskAssignments !== undefined
+                ? localEmail.taskAssignments
+                : localEmail.universalTaskAssignments !== undefined
+                  ? localEmail.universalTaskAssignments
+                  : origEmail.universalTaskAssignments,
           }),
     };
 
@@ -795,12 +838,15 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
 
   const handleReset = () => {
     if (preferences?.notifications) {
-      setLocalInApp(
-        ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {},
-      );
-      setLocalEmail(
-        ((preferences.notifications.email || {}) as Record<string, boolean>) || {},
-      );
+      const inApp = ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {};
+      const email = ((preferences.notifications.email || {}) as Record<string, boolean>) || {};
+      setLocalInApp(inApp);
+      setLocalEmail({
+        ...email,
+        taskReviews: email.taskReviews ?? email.reviewRequests ?? true,
+        taskAssignments: email.taskAssignments ?? email.universalTaskAssignments ?? true,
+        universalTaskAssignments: email.universalTaskAssignments ?? email.taskAssignments ?? true,
+      });
       setQuietStart(preferences.notifications.deliverySchedule?.quietHoursStart || "22:00");
       setQuietEnd(preferences.notifications.deliverySchedule?.quietHoursEnd || "07:00");
       toast.info("Preferences reverted to last saved state.");
@@ -917,20 +963,26 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   onChange={(c) => handleInAppChange("universalTaskApplications", c)}
                 />
                 <ToggleRow
+                  title="Employee task assignments"
+                  description="When tasks are assigned to employees or claimed across operations."
+                  icon={ListTodo}
+                  checked={localInApp.universalTaskAssignments ?? localInApp.taskAssignments ?? true}
+                  disabled={updatePreferences.isPending}
+                  onChange={(c) => {
+                    handleInAppChange("universalTaskAssignments", c);
+                    handleInAppChange("taskAssignments", c);
+                  }}
+                />
+                <ToggleRow
                   title="Overdue tasks"
                   description="When tasks exceed their deadline or require immediate escalation."
                   icon={Clock}
-                  checked={localInApp.overdueTasks ?? true}
+                  checked={localInApp.overdueTasks ?? localInApp.deadlineReminders ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("overdueTasks", c)}
-                />
-                <ToggleRow
-                  title="Task assignments"
-                  description="When tasks are assigned or reassigned across team members."
-                  icon={ListTodo}
-                  checked={localInApp.taskAssignments ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("taskAssignments", c)}
+                  onChange={(c) => {
+                    handleInAppChange("overdueTasks", c);
+                    handleInAppChange("deadlineReminders", c);
+                  }}
                 />
               </>
             ) : (
@@ -955,9 +1007,12 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   title="Review request acceptance"
                   description="When an admin reviews and approves your task submission."
                   icon={CheckCircle2}
-                  checked={localInApp.reviewAcceptance ?? true}
+                  checked={localInApp.reviewAcceptance ?? localInApp.taskApprovals ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("reviewAcceptance", c)}
+                  onChange={(c) => {
+                    handleInAppChange("reviewAcceptance", c);
+                    handleInAppChange("taskApprovals", c);
+                  }}
                 />
                 <ToggleRow
                   title="Review request rejection"
@@ -971,9 +1026,12 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                   title="Overdue tasks"
                   description="Reminders when your active assigned tasks are approaching deadline or overdue."
                   icon={Clock}
-                  checked={localInApp.overdueTasks ?? true}
+                  checked={localInApp.overdueTasks ?? localInApp.deadlineReminders ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("overdueTasks", c)}
+                  onChange={(c) => {
+                    handleInAppChange("overdueTasks", c);
+                    handleInAppChange("deadlineReminders", c);
+                  }}
                 />
               </>
             )}
@@ -1009,12 +1067,12 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
             ) : (
               <>
                 <ToggleRow
-                  title="Universal task assignments"
-                  description="Receive email notifications when you are approved and assigned a universal task."
+                  title="Task assignments"
+                  description="Receive email notifications when a task or universal task is assigned to you."
                   icon={Mail}
-                  checked={localEmail.universalTaskAssignments ?? true}
+                  checked={localEmail.taskAssignments ?? localEmail.universalTaskAssignments ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailChange("universalTaskAssignments", c)}
+                  onChange={(c) => handleEmailChange("taskAssignments", c)}
                 />
               </>
             )}

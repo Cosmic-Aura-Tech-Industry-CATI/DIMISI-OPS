@@ -1,8 +1,10 @@
-/** React Query hooks for the notifications module with real-time websocket sync. */
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/client/query-keys";
+import { useAuth } from "@/lib/auth";
+import { useUserPreferencesQuery } from "@/features/settings/hooks/use-settings-api";
 import { notificationsService } from "../services/notifications.service";
-import { useRealtimeNotifications } from "./use-realtime-notifications";
+import { filterNotificationsByPreferences, useRealtimeNotifications } from "./use-realtime-notifications";
 import type { NotificationItem } from "../types";
 
 export function useNotificationsQuery() {
@@ -15,6 +17,31 @@ export function useNotificationsQuery() {
     staleTime: 60 * 1000,
     refetchInterval: false, // Long polling replaced by real-time Socket.IO events
   });
+}
+
+/**
+ * Hook providing notifications filtered by the user's role and their active in-app preferences.
+ */
+export function useFilteredNotificationsQuery() {
+  const { user } = useAuth();
+  const { data: preferences, isLoading: isPrefsLoading } = useUserPreferencesQuery();
+  const notifsQuery = useNotificationsQuery();
+
+  const rawNotifications = notifsQuery.data || [];
+  const filteredNotifications = useMemo(() => {
+    return filterNotificationsByPreferences(
+      rawNotifications,
+      preferences?.notifications?.inApp,
+      user?.role,
+    );
+  }, [rawNotifications, preferences?.notifications?.inApp, user?.role]);
+
+  return {
+    ...notifsQuery,
+    rawNotifications,
+    data: filteredNotifications,
+    isPreferencesLoading: isPrefsLoading,
+  };
 }
 
 export function useMarkNotificationReadMutation() {

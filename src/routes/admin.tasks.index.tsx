@@ -94,27 +94,6 @@ function TasksPage() {
   const [page, setPage] = useState(1);
   const pageSize = DEFAULT_PAGE_SIZE;
 
-  const taskFilters = useMemo(
-    () => ({
-      page,
-      limit: 10,
-    }),
-    [page],
-  );
-
-  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery(taskFilters);
-  const deleteTask = useDeleteTask({
-    onSuccess: () => {
-      toast.success("Task deleted");
-      setPendingDelete(null);
-    },
-    onError: (err) => {
-      toast.error("Failed to delete task", {
-        description: err.message || "An error occurred while deleting the task.",
-      });
-    },
-  });
-
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
   const isSearchActive = debouncedQuery.trim().length > 0;
@@ -127,10 +106,43 @@ function TasksPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
 
-  // Integrate backend search API: GET /api/v1/search/tasks?q=...&status=...&priority=...
-  const backendStatusFilter =
-    status !== "all" && status !== "submitted" && status !== "rejected" ? status : undefined;
+  // Derive backend-compatible filter values:
+  // "available" -> "open", "submitted" -> "in_review", "rejected" -> handled client-side
+  const backendStatusFilter = useMemo(() => {
+    if (status === "all" || status === "rejected") return undefined;
+    if (status === "available") return "open";
+    if (status === "submitted") return "in_review";
+    if (status === "pending") return "in_review";
+    return status;
+  }, [status]);
+
   const backendPriorityFilter = priority !== "all" ? priority : undefined;
+  const backendTypeFilter = taskType !== "all" ? taskType : undefined;
+
+  const taskFilters = useMemo(
+    () => ({
+      page,
+      limit: 10,
+      status: backendStatusFilter,
+      priority: backendPriorityFilter,
+      type: backendTypeFilter,
+    }),
+    [page, backendStatusFilter, backendPriorityFilter, backendTypeFilter],
+  );
+
+  const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery(taskFilters);
+  const { data: allUnfilteredTasks = [] } = useTasksQuery();
+  const deleteTask = useDeleteTask({
+    onSuccess: () => {
+      toast.success("Task deleted");
+      setPendingDelete(null);
+    },
+    onError: (err) => {
+      toast.error("Failed to delete task", {
+        description: err.message || "An error occurred while deleting the task.",
+      });
+    },
+  });
 
   const {
     data: searchResponse,
@@ -155,21 +167,25 @@ function TasksPage() {
   const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
 
   const categories = useMemo(
-    () => Array.from(new Set(activeTaskPool.map((t) => getCategoryLabel(t.category)))).sort(),
-    [activeTaskPool],
+    () => Array.from(new Set(allUnfilteredTasks.map((t) => getCategoryLabel(t.category)))).sort(),
+    [allUnfilteredTasks],
   );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = activeTaskPool.filter((t) => {
-      if (status === "submitted") {
-        if (t.reviewState !== "in_review") return false;
-      } else if (status === "rejected") {
+    return activeTaskPool.filter((t) => {
+      if (status === "rejected") {
         if (t.reviewState !== "rejected") return false;
-      } else if (status !== "all" && t.status !== status) return false;
-      if (priority !== "all" && t.priority !== priority) return false;
+      } else if (isSearchActive) {
+        if (status === "submitted" || status === "pending") {
+          if (t.reviewState !== "in_review") return false;
+        } else if (status !== "all" && t.status !== status) {
+          return false;
+        }
+      }
+      if (isSearchActive && priority !== "all" && t.priority !== priority) return false;
       if (category !== "all" && getCategoryLabel(t.category) !== category) return false;
-      if (taskType !== "all" && (t.taskType ?? "direct") !== taskType) return false;
+      if (isSearchActive && taskType !== "all" && (t.taskType ?? "direct") !== taskType) return false;
       if (!q || isSearchActive) return true;
       return (
         t.title.toLowerCase().includes(q) ||
@@ -178,15 +194,7 @@ function TasksPage() {
         getCategoryLabel(t.category).toLowerCase().includes(q)
       );
     });
-    return list.sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "title") cmp = a.title.localeCompare(b.title);
-      else if (sortKey === "priority") cmp = priorityRank[a.priority] - priorityRank[b.priority];
-      else if (sortKey === "points") cmp = a.points - b.points;
-      else cmp = +new Date(a.dueDate) - +new Date(b.dueDate);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType, sortKey, sortDir]);
+  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType]);
 
   const isServerPaginated = isSearchActive
     ? Boolean(searchResponse?.pagination)
@@ -231,11 +239,11 @@ function TasksPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard label="Total" value={tasks.length} tone="text-foreground" />
-        <SummaryCard label="Available" value={tasks.filter((t) => t.status === "available").length} tone="text-primary" />
-        <SummaryCard label="Assigned" value={tasks.filter((t) => t.status === "assigned" || t.status === "pending").length} tone="text-info" />
-        <SummaryCard label="In progress" value={tasks.filter((t) => t.status === "in_progress").length} tone="text-primary" />
-        <SummaryCard label="Overdue" value={tasks.filter((t) => t.status === "overdue").length} tone="text-destructive" />
+        <SummaryCard label="Total" value={allUnfilteredTasks.length} tone="text-foreground" />
+        <SummaryCard label="Available" value={allUnfilteredTasks.filter((t) => t.status === "available").length} tone="text-primary" />
+        <SummaryCard label="Assigned" value={allUnfilteredTasks.filter((t) => t.status === "assigned" || t.status === "pending").length} tone="text-info" />
+        <SummaryCard label="In progress" value={allUnfilteredTasks.filter((t) => t.status === "in_progress").length} tone="text-primary" />
+        <SummaryCard label="Overdue" value={allUnfilteredTasks.filter((t) => t.status === "overdue").length} tone="text-destructive" />
       </div>
 
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center">

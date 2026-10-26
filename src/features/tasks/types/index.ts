@@ -378,6 +378,91 @@ export function toFrontendTaskStatus(status?: string): { status: MockTaskStatus;
   }
 }
 
+/**
+ * Determines whether a task is overdue based on status and deadline/dueDate.
+ */
+export function isTaskOverdue(task?: {
+  dueDate?: string;
+  deadline?: string;
+  status?: string;
+  rawStatus?: string;
+} | null): boolean {
+  if (!task) return false;
+
+  const normStatus = (task.status || "").toLowerCase().trim();
+  const rawStatus = (task.rawStatus || "").toLowerCase().trim();
+
+  if (normStatus === "overdue" || rawStatus === "overdue") {
+    return true;
+  }
+
+  if (task.dueDate) {
+    const days = Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000);
+    if (!isNaN(days) && days < 0) {
+      return true;
+    }
+  }
+
+  if (task.deadline) {
+    const deadlineTime = new Date(task.deadline).getTime();
+    if (!isNaN(deadlineTime) && deadlineTime < Date.now()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether a task is eligible for submission.
+ * Rule: Do not treat completed, already-submitted, or currently-in-review tasks
+ * as eligible for submission unless existing business rules allow it.
+ */
+export function isTaskEligibleForSubmission(task?: {
+  status?: string;
+  rawStatus?: string;
+  reviewState?: string;
+  reviewStatus?: string;
+} | null): boolean {
+  if (!task) return false;
+
+  const normStatus = (task.status || "").toLowerCase().trim();
+  const rawStatus = (task.rawStatus || "").toLowerCase().trim();
+  const revState = (task.reviewState || "").toLowerCase().trim();
+  const revStatus = (task.reviewStatus || "").toLowerCase().trim();
+
+  // Completed tasks are NOT eligible for submission
+  if (
+    normStatus === "completed" ||
+    rawStatus === "completed" ||
+    revState === "approved" ||
+    revStatus === "approved"
+  ) {
+    return false;
+  }
+
+  // Already submitted / currently in review tasks are NOT eligible
+  if (
+    normStatus === "in_review" ||
+    normStatus === "in review" ||
+    normStatus === "pending_review" ||
+    rawStatus === "in_review" ||
+    rawStatus === "in review" ||
+    revState === "in_review" ||
+    revState === "pending_review" ||
+    revStatus === "in_review"
+  ) {
+    return false;
+  }
+
+  // Cancelled tasks are NOT eligible
+  if (normStatus === "cancelled" || rawStatus === "cancelled") {
+    return false;
+  }
+
+  return true;
+}
+
 export function isMongoObjectId(val: unknown): boolean {
   return typeof val === "string" && /^[a-f\d]{24}$/i.test(val.trim());
 }
