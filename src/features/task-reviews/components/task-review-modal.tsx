@@ -15,9 +15,8 @@ import {
   Download,
   Clock,
   ExternalLink,
-  X,
   MessageSquare,
-  CheckCheck,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskPriorityBadge, TaskStatusBadge } from "@/components/task-status-badge";
-import { useReviewTaskMutation, type Task, type TaskProofFile } from "@/features/tasks";
+import { useReviewTaskMutation, type Task } from "@/features/tasks";
 import { getSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
 
@@ -54,6 +53,45 @@ function isPdfProof(type?: string, name?: string): boolean {
   if (type === "application/pdf") return true;
   if (!name) return false;
   return name.toLowerCase().endsWith(".pdf");
+}
+
+function parseSubmissionNotes(notes?: string) {
+  if (!notes) return {};
+  const sections: {
+    workSummary?: string;
+    deliverableLinks?: string;
+    issues?: string;
+    additionalRemarks?: string;
+    generalNotes?: string;
+  } = {};
+
+  const hasHeaders = /Work Summary:|Deliverables & Links:|Issues & Blockers:|Additional Remarks:/i.test(notes);
+  if (!hasHeaders) {
+    sections.generalNotes = notes;
+    return sections;
+  }
+
+  const workSummaryMatch = notes.match(/Work Summary:\s*([\s\S]*?)(?=(?:Deliverables & Links:|Proof files attached|Issues & Blockers:|Additional Remarks:|$))/i);
+  if (workSummaryMatch && workSummaryMatch[1].trim()) {
+    sections.workSummary = workSummaryMatch[1].trim();
+  }
+
+  const linksMatch = notes.match(/Deliverables & Links:\s*([\s\S]*?)(?=(?:Proof files attached|Issues & Blockers:|Additional Remarks:|$))/i);
+  if (linksMatch && linksMatch[1].trim()) {
+    sections.deliverableLinks = linksMatch[1].trim();
+  }
+
+  const issuesMatch = notes.match(/Issues & Blockers:\s*([\s\S]*?)(?=(?:Additional Remarks:|$))/i);
+  if (issuesMatch && issuesMatch[1].trim()) {
+    sections.issues = issuesMatch[1].trim();
+  }
+
+  const remarksMatch = notes.match(/Additional Remarks:\s*([\s\S]*?)$/i);
+  if (remarksMatch && remarksMatch[1].trim()) {
+    sections.additionalRemarks = remarksMatch[1].trim();
+  }
+
+  return sections;
 }
 
 export function TaskReviewModal({
@@ -130,6 +168,31 @@ export function TaskReviewModal({
   const submitterCode = task.assigneeCode || localSub?.employeeCode;
   const submitterEmail = task.assigneeEmail;
   const submittedAt = task.submittedAt || localSub?.submittedAt;
+
+  // Structured fields: workSummary, deliverableLinks, issues/submissionNotes, additionalRemarks
+  const parsedNotes = parseSubmissionNotes(task.notes);
+
+  const workSummary =
+    (task as any).workSummary ||
+    localSub?.workSummary ||
+    parsedNotes.workSummary;
+
+  const deliverableLinks =
+    (task as any).deliverableLinks ||
+    localSub?.deliverableLinks ||
+    parsedNotes.deliverableLinks;
+
+  const submissionNotes =
+    (task as any).issues ||
+    localSub?.issues ||
+    parsedNotes.issues ||
+    parsedNotes.generalNotes ||
+    (!workSummary && !deliverableLinks ? task.notes : undefined);
+
+  const additionalRemarks =
+    (task as any).additionalRemarks ||
+    localSub?.additionalRemarks ||
+    parsedNotes.additionalRemarks;
 
   const handleReview = (isApproved: boolean) => {
     const trimmed = feedback.trim();
@@ -214,7 +277,6 @@ export function TaskReviewModal({
         isPdf,
       });
     } else {
-      // For docs/others, trigger download or open in new tab
       window.open(viewUrl, "_blank");
     }
   };
@@ -225,31 +287,39 @@ export function TaskReviewModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto sm:rounded-3xl border-border/60 bg-background/95 backdrop-blur-xl">
-          <div className="space-y-5">
-            <DialogHeader className="space-y-1.5 text-left">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <ShieldCheck className="h-4 w-4" />
-                </span>
-                <DialogTitle className="font-display text-xl font-bold">
-                  Review Task Submission
-                </DialogTitle>
-              </div>
-              <DialogDescription className="text-xs text-muted-foreground">
-                Examine the employee&apos;s deliverables, verify attached proof files, and award reward points.
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(95vw,700px)] max-w-[700px] max-h-[90dvh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl">
+          {/* Fixed Header */}
+          <DialogHeader className="p-5 pb-4 border-b border-border/50 shrink-0 pr-12 text-left space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <DialogTitle className="font-display text-xl font-bold tracking-tight text-foreground">
+                Review Task Submission
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground leading-normal">
+              Examine the employee&apos;s deliverables, verify attached proof files, and award reward points.
+            </DialogDescription>
+          </DialogHeader>
 
+          {/* Vertically Scrollable Body */}
+          <div className="p-5 overflow-y-auto overflow-x-hidden space-y-4 flex-1 min-h-0 min-w-0 max-w-full">
             {/* Task & Assignee Details Card */}
-            <div className="rounded-2xl border border-border/50 bg-card/40 p-4 space-y-4">
+            <div className="rounded-2xl border border-border/50 bg-card/40 p-4 space-y-3.5 min-w-0">
               {/* Header: Title & Badges */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h4 className="font-semibold text-base leading-snug">{task.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{task.description}</p>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-base leading-snug break-words text-foreground">
+                    {task.title}
+                  </h4>
+                  {task.description && (
+                    <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-line break-words leading-relaxed">
+                      {task.description}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0 sm:self-start">
                   <TaskStatusBadge
                     status={
                       task.reviewState === "in_review" ||
@@ -265,36 +335,45 @@ export function TaskReviewModal({
               </div>
 
               {/* Meta row: Assignee, Date, Points */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 border-t border-border/30 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
-                    <User className="h-3.5 w-3.5" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border/40 text-xs">
+                {/* Submitter Info */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                    <User className="h-4 w-4" />
                   </span>
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{submitterName}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] text-muted-foreground font-medium">Assigned To</div>
+                    <div className="font-semibold truncate text-foreground">{submitterName}</div>
                     {submitterEmail && (
-                      <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
-                        <Mail className="h-2.5 w-2.5" /> {submitterEmail}
+                      <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                        <Mail className="h-2.5 w-2.5 shrink-0" />
+                        <span className="truncate">{submitterEmail}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary shrink-0" />
-                  <div>
-                    <div className="text-muted-foreground text-[11px]">Due Date</div>
-                    <div className="font-medium">
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No deadline"}
+                {/* Due Date */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-muted/60 text-primary">
+                    <Calendar className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-muted-foreground text-[11px] font-medium">Due Date</div>
+                    <div className="font-semibold truncate text-foreground">
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { dateStyle: "medium" }) : "No deadline"}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-warning shrink-0" />
-                  <div>
-                    <div className="text-muted-foreground text-[11px]">Reward Points</div>
-                    <div className="font-bold text-warning">
+                {/* Reward Points */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-warning/15 text-warning">
+                    <Trophy className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-muted-foreground text-[11px] font-medium">Reward Points</div>
+                    <div className="font-bold text-warning truncate">
                       {task.points || task.rewardPoints || 0} pts
                     </div>
                   </div>
@@ -303,40 +382,44 @@ export function TaskReviewModal({
             </div>
 
             {/* MANDATORY SUBMITTED PROOF SECTION */}
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
+            <div className="rounded-2xl border border-border/60 bg-card/50 p-4 space-y-3 min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
                     <UploadCloud className="h-4 w-4" />
                   </span>
-                  <div>
-                    <h5 className="font-semibold text-sm leading-tight text-foreground">
+                  <div className="min-w-0">
+                    <h5 className="font-semibold text-sm leading-tight text-foreground truncate">
                       Submitted Task Proof
                     </h5>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground truncate">
                       Attached by employee as evidence of completion
                     </p>
                   </div>
                 </div>
 
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  proofList.length > 0
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                    : "bg-destructive/15 text-destructive border border-destructive/30"
-                }`}>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${
+                    proofList.length > 0
+                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                      : "bg-destructive/15 text-destructive border border-destructive/30"
+                  }`}
+                >
                   {proofList.length} proof file{proofList.length === 1 ? "" : "s"} attached
                 </span>
               </div>
 
               {/* Attribution Line */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/30 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <User className="h-3 w-3 text-primary" />
-                  Submitted by: <strong className="text-foreground">{submitterName}</strong> {submitterCode ? `(${submitterCode})` : ""}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/30 text-xs text-muted-foreground min-w-0">
+                <span className="inline-flex items-center gap-1.5 min-w-0 truncate">
+                  <User className="h-3 w-3 text-primary shrink-0" />
+                  <span className="truncate">
+                    Submitted by: <strong className="text-foreground">{submitterName}</strong> {submitterCode ? `(${submitterCode})` : ""}
+                  </span>
                 </span>
                 {submittedAt && (
-                  <span className="inline-flex items-center gap-1 text-[11px]">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="inline-flex items-center gap-1 text-[11px] shrink-0">
+                    <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
                     {new Date(submittedAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "short",
@@ -347,17 +430,16 @@ export function TaskReviewModal({
 
               {/* Proof Files List */}
               {proofList.length > 0 ? (
-                <div className="space-y-2 pt-1">
+                <div className="space-y-2 pt-1 min-w-0">
                   {proofList.map((file, i) => {
                     const isImg = isImageProof(file.mimeType, file.name);
-                    const isPdf = isPdfProof(file.mimeType, file.name);
 
                     return (
                       <div
                         key={`${file.name}-${i}`}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/50 p-3 transition-colors hover:border-primary/40"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/50 p-3 transition-colors hover:border-primary/40 min-w-0"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                             {isImg ? (
                               <FileImage className="h-5 w-5" />
@@ -365,23 +447,23 @@ export function TaskReviewModal({
                               <FileText className="h-5 w-5" />
                             )}
                           </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate text-foreground">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate break-all sm:break-normal text-foreground">
                               {file.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground truncate">
                               {file.size ? (typeof file.size === "number" ? `${Math.round(file.size / 1024)} KB` : String(file.size)) : "File"} · {file.name.slice(file.name.lastIndexOf(".")).toUpperCase() || "DOCUMENT"}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
                             onClick={() => handlePreviewFile(file)}
-                            className="h-8 gap-1.5 text-xs rounded-lg"
+                            className="h-8 gap-1.5 text-xs rounded-lg flex-1 sm:flex-initial"
                           >
                             <Eye className="h-3.5 w-3.5" /> Preview
                           </Button>
@@ -390,7 +472,7 @@ export function TaskReviewModal({
                             size="sm"
                             variant="secondary"
                             onClick={() => handleDownloadFile(file)}
-                            className="h-8 gap-1.5 text-xs rounded-lg bg-secondary hover:bg-secondary/80"
+                            className="h-8 gap-1.5 text-xs rounded-lg bg-secondary hover:bg-secondary/80 flex-1 sm:flex-initial"
                           >
                             <Download className="h-3.5 w-3.5" /> Download
                           </Button>
@@ -400,32 +482,109 @@ export function TaskReviewModal({
                   })}
                 </div>
               ) : (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex items-center gap-2">
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex items-center gap-2 min-w-0">
                   <XCircle className="h-4 w-4 shrink-0" />
-                  <span>No proof file uploaded with this submission.</span>
+                  <span className="truncate">No proof file uploaded with this submission.</span>
                 </div>
               )}
             </div>
 
-            {/* Employee Submission Notes */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <StickyNote className="h-3.5 w-3.5 text-primary" /> Submitted Work & Notes
+            {/* WORK SUMMARY (if present) */}
+            {workSummary && (
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5 text-primary" /> Work Summary
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 text-sm text-foreground/90 whitespace-pre-line break-words leading-relaxed max-h-48 overflow-y-auto">
+                  {workSummary}
+                </div>
               </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/30 p-3.5 text-sm whitespace-pre-line text-foreground/90 max-h-40 overflow-y-auto">
-                {task.notes || "No submission notes provided."}
+            )}
+
+            {/* DELIVERABLE LINKS (if present) */}
+            {deliverableLinks && (
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <ExternalLink className="h-3.5 w-3.5 text-primary" /> Deliverables & Links
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2 min-w-0">
+                  {deliverableLinks
+                    .split(/[\n,]+/)
+                    .map((link) => link.trim())
+                    .filter(Boolean)
+                    .map((link, idx) => {
+                      const isUrl = /^https?:\/\//i.test(link);
+                      const href = isUrl ? link : `https://${link}`;
+                      return (
+                        <div key={idx} className="flex items-start gap-2 min-w-0 text-sm">
+                          <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                          {isUrl || link.includes(".") ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline font-medium break-all min-w-0 flex-1 leading-snug"
+                            >
+                              {link}
+                            </a>
+                          ) : (
+                            <span className="text-foreground/90 break-words min-w-0 flex-1">
+                              {link}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* SUBMISSION NOTES / ISSUES & BLOCKERS */}
+            {submissionNotes && (
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <StickyNote className="h-3.5 w-3.5 text-primary" />
+                  {parsedNotes.issues || (localSub && localSub.issues) ? "Issues & Blockers" : "Submitted Work & Notes"}
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 text-sm text-foreground/90 whitespace-pre-line break-words leading-relaxed max-h-40 overflow-y-auto">
+                  {submissionNotes}
+                </div>
+              </div>
+            )}
+
+            {/* ADDITIONAL REMARKS (if present) */}
+            {additionalRemarks && (
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5 text-primary" /> Additional Remarks
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 text-sm text-foreground/90 whitespace-pre-line break-words leading-relaxed max-h-36 overflow-y-auto">
+                  {additionalRemarks}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback if no submission notes or work summary at all */}
+            {!workSummary && !deliverableLinks && !submissionNotes && !additionalRemarks && (
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <StickyNote className="h-3.5 w-3.5 text-primary" /> Submitted Work & Notes
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 text-sm text-muted-foreground italic">
+                  No submission notes provided.
+                </div>
+              </div>
+            )}
 
             {/* Previous Review Feedback History (if any) */}
             {(task.feedback || (task.reviews && task.reviews.length > 0)) && (
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                  <span className="flex items-center gap-1.5 text-foreground/90 font-medium">
-                    <MessageSquare className="h-3.5 w-3.5 text-primary" /> Previous Evaluation Feedback
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2.5 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-semibold text-muted-foreground min-w-0">
+                  <span className="flex items-center gap-1.5 text-foreground/90 font-medium truncate">
+                    <MessageSquare className="h-3.5 w-3.5 text-primary shrink-0" /> Previous Evaluation Feedback
                   </span>
                   {task.reviewedAt && (
-                    <span className="text-[11px] font-normal text-muted-foreground">
+                    <span className="text-[11px] font-normal text-muted-foreground shrink-0">
                       {new Date(task.reviewedAt).toLocaleDateString(undefined, {
                         dateStyle: "medium",
                       })}
@@ -433,12 +592,12 @@ export function TaskReviewModal({
                   )}
                 </div>
                 {task.feedback && (
-                  <div className="text-xs bg-background/50 border border-border/40 rounded-xl p-2.5 text-foreground/90 whitespace-pre-line">
-                    "{task.feedback}"
+                  <div className="text-xs bg-background/60 border border-border/40 rounded-xl p-3 text-foreground/90 whitespace-pre-line break-words leading-relaxed">
+                    &ldquo;{task.feedback}&rdquo;
                   </div>
                 )}
                 {task.reviewedBy && (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground truncate">
                     Reviewed by: <strong className="text-foreground">{task.reviewedBy}</strong>
                     {task.reviewStatus && (
                       <span className="ml-1.5 capitalize font-medium">
@@ -451,16 +610,16 @@ export function TaskReviewModal({
             )}
 
             {/* Admin Feedback Input */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="admin-feedback" className="text-sm font-semibold flex items-center gap-1.5">
-                  <MessageSquare className="h-4 w-4 text-primary" /> Written Feedback for Employee
+            <div className="space-y-2 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 min-w-0">
+                <Label htmlFor="admin-feedback" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                  <MessageSquare className="h-4 w-4 text-primary shrink-0" /> Written Feedback for Employee
                 </Label>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground shrink-0">
                   (Required for rejection, optional for approval)
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-normal">
                 This feedback will be saved against this submission and displayed to the employee on their task dashboard and details.
               </p>
               <Textarea
@@ -470,69 +629,73 @@ export function TaskReviewModal({
                 rows={3}
                 disabled={reviewMutation.isPending}
                 placeholder="e.g. Excellent work on this task. Proof verified and meets all requirements."
-                className="rounded-2xl resize-none font-sans text-sm"
+                className="rounded-xl resize-none font-sans text-sm border-border/60 bg-background/50 focus-visible:ring-primary/40 leading-relaxed"
               />
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <DialogFooter className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2">
+          {/* Action Buttons (Fixed Footer) */}
+          <DialogFooter className="p-4 border-t border-border/50 bg-background/95 backdrop-blur-md shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={reviewMutation.isPending}
+              className="rounded-xl h-10 px-4 text-sm font-medium border-border/70 hover:bg-muted/60 transition-colors w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={reviewMutation.isPending}
-                className="rounded-full"
+                onClick={() => handleReview(false)}
+                disabled={isRejectDisabled}
+                className="rounded-xl h-10 px-4 text-sm font-medium border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors disabled:opacity-50 w-full sm:w-auto"
               >
-                Cancel
+                {reviewMutation.isPending && pendingAction === "reject" ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Rejecting…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4" /> Reject & Request Changes
+                  </span>
+                )}
               </Button>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleReview(false)}
-                  disabled={isRejectDisabled}
-                  className="rounded-full border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-400"
-                >
-                  {reviewMutation.isPending && pendingAction === "reject" ? (
-                    "Rejecting…"
-                  ) : (
-                    <>
-                      <XCircle className="mr-1.5 h-4 w-4" /> Reject & Request Changes
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => handleReview(true)}
-                  disabled={isApproveDisabled}
-                  className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-glow"
-                >
-                  {reviewMutation.isPending && pendingAction === "approve" ? (
-                    "Approving…"
-                  ) : (
-                    <>
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Approve & Award Points
-                    </>
-                  )}
-                </Button>
-              </div>
-            </DialogFooter>
-          </div>
+              <Button
+                type="button"
+                onClick={() => handleReview(true)}
+                disabled={isApproveDisabled}
+                className="rounded-xl h-10 px-5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-glow transition-all disabled:opacity-50 w-full sm:w-auto"
+              >
+                {reviewMutation.isPending && pendingAction === "approve" ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Approving…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" /> Approve & Award Points
+                  </span>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Lightbox / Preview Modal */}
       {previewFile && (
         <Dialog open={Boolean(previewFile)} onOpenChange={(open) => !open && setPreviewFile(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden sm:rounded-3xl border-border/60 bg-background/98 p-5">
-            <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/40">
-              <div className="min-w-0 pr-4">
+          <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(95vw,800px)] max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border/60 bg-background/98 shadow-2xl">
+            <DialogHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-border/50 shrink-0 pr-12 text-left">
+              <div className="min-w-0 pr-2">
                 <DialogTitle className="text-base font-semibold truncate">
                   {previewFile.name}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground">
+                <DialogDescription className="text-xs text-muted-foreground truncate">
                   Task Proof Preview
                 </DialogDescription>
               </div>
@@ -546,18 +709,18 @@ export function TaskReviewModal({
               </Button>
             </DialogHeader>
 
-            <div className="mt-3 flex items-center justify-center max-h-[70vh] overflow-auto rounded-2xl bg-black/20 p-2">
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center max-h-[72dvh] rounded-b-2xl bg-black/20">
               {previewFile.isImg ? (
                 <img
                   src={previewFile.url}
                   alt={previewFile.name}
-                  className="max-h-[65vh] w-auto max-w-full rounded-xl object-contain shadow-md"
+                  className="max-h-[68dvh] w-auto max-w-full rounded-xl object-contain shadow-md"
                 />
               ) : previewFile.isPdf ? (
                 <iframe
                   src={previewFile.url}
                   title={previewFile.name}
-                  className="h-[65vh] w-full rounded-xl border-0"
+                  className="h-[68dvh] w-full rounded-xl border-0"
                 />
               ) : (
                 <div className="py-12 text-center text-sm text-muted-foreground">
