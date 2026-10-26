@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Archive,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { type Task, type TaskPriority, type TaskType, getCategoryLabel } from "@/features/tasks";
 import { useEmployeesQuery } from "@/features/employees";
+import type { AuthUser } from "@/auth/types/auth";
 import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
 import {
@@ -50,6 +51,8 @@ import {
   ALLOWED_TASK_ATTACHMENT_EXTENSIONS,
 } from "@/lib/cdn-upload";
 import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
+
+const EMPLOYEE_PAGE_SIZE = 20;
 
 export interface TaskAttachment {
   id?: string;
@@ -212,8 +215,40 @@ export function TaskForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
-  const { data: employeeData } = useEmployeesQuery();
-  const employeeList = employeeData?.employees || [];
+  const [employeePage, setEmployeePage] = useState(1);
+  const [employeeList, setEmployeeList] = useState<AuthUser[]>([]);
+  const employeePageRequestRef = useRef(false);
+  const { data: employeeData, isFetching: isEmployeesFetching } = useEmployeesQuery({
+    page: employeePage,
+    limit: EMPLOYEE_PAGE_SIZE,
+  });
+  const employeePagination = employeeData?.pagination;
+  const hasMoreEmployees = employeePagination
+    ? employeePagination.currentPage < employeePagination.totalPages
+    : (employeeData?.employees.length ?? 0) === EMPLOYEE_PAGE_SIZE;
+
+  useEffect(() => {
+    if (!employeeData) return;
+    setEmployeeList((current) => {
+      const seenIds = new Set(current.map((employee) => employee._id || employee.id));
+      return [
+        ...current,
+        ...employeeData.employees.filter((employee) => {
+          const id = employee._id || employee.id;
+          if (!id || seenIds.has(id)) return false;
+          seenIds.add(id);
+          return true;
+        }),
+      ];
+    });
+    employeePageRequestRef.current = false;
+  }, [employeeData]);
+
+  const loadMoreEmployees = () => {
+    if (isEmployeesFetching || employeePageRequestRef.current || !hasMoreEmployees) return;
+    employeePageRequestRef.current = true;
+    setEmployeePage((page) => page + 1);
+  };
   const activeProjects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
   const selectedProject = allProjectList.find(
     (p) => p.id === form.projectId || p._id === form.projectId,
@@ -790,7 +825,15 @@ export function TaskForm({
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="Select an employee" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                onScrollCapture={(event) => {
+                  const element = event.target;
+                  if (!(element instanceof HTMLElement)) return;
+                  if (element.scrollHeight - element.scrollTop - element.clientHeight < 48) {
+                    loadMoreEmployees();
+                  }
+                }}
+              >
                 {employeeList.map((e) => {
                   const targetId = e._id || e.id || "";
                   const code = e.empId || e.code || "";
@@ -811,6 +854,16 @@ export function TaskForm({
                     </SelectItem>
                   );
                 })}
+                {isEmployeesFetching && (
+                  <SelectItem disabled value="__employees-loading">
+                    Loading employees…
+                  </SelectItem>
+                )}
+                {!isEmployeesFetching && employeeList.length === 0 && (
+                  <SelectItem disabled value="__employees-empty">
+                    No employees found.
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
           </Field>

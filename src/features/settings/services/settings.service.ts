@@ -3,6 +3,8 @@ import { http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import type {
   CheckPasswordPayload,
+  EmailNotifications,
+  InAppNotifications,
   SessionsData,
   Setup2FaResponse,
   UpdatePasswordPayload,
@@ -28,38 +30,31 @@ function normalizePreferences(data: Partial<UserPreferences> | null | undefined)
     safeData.security?.twoFactor?.emailVerification ?? safeData.security?.emailOtpEnabled ?? true;
 
   const rawNotifications = safeData.notifications || {};
-  const rawEmail = rawNotifications.email || {};
-  const rawInApp = rawNotifications.inApp || {};
+  const rawEmail = (rawNotifications.email || {}) as Record<string, boolean>;
+  const rawInApp = (rawNotifications.inApp || {}) as Record<string, boolean>;
   const rawSchedule = rawNotifications.deliverySchedule || {};
 
-  const resolvedEmail = {
-    taskReviews: rawEmail.taskReviews ?? rawEmail.reviewRequests ?? rawNotifications.reviewRequests ?? true,
-    universalTaskApplications: rawEmail.universalTaskApplications ?? true,
-    universalTaskAssignments: rawEmail.universalTaskAssignments ?? rawEmail.taskAssignments ?? rawNotifications.taskAssignments ?? true,
-    taskAssignments: rawEmail.taskAssignments ?? rawNotifications.taskAssignments ?? true,
-    reviewRequests: rawEmail.reviewRequests ?? rawEmail.taskReviews ?? rawNotifications.reviewRequests ?? true,
-    weeklyDigest: rawEmail.weeklyDigest ?? rawNotifications.weeklyDigest ?? false,
+  // Defaults for exact backend field names
+  const resolvedEmail: EmailNotifications = {
+    taskAssignments: rawEmail.taskAssignments ?? true,
+    universalTask: rawEmail.universalTask ?? true,
+    reviewRequests: rawEmail.reviewRequests ?? true,
+    taskOverdue: rawEmail.taskOverdue ?? true,
     ...rawEmail,
   };
 
-  const resolvedInApp = {
-    taskReviews: rawInApp.taskReviews ?? true,
-    universalTaskApplications: rawInApp.universalTaskApplications ?? true,
-    overdueTasks: rawInApp.overdueTasks ?? rawInApp.deadlineReminders ?? rawNotifications.deadlineReminders ?? true,
-    taskAssignments: rawInApp.taskAssignments ?? rawNotifications.taskAssignments ?? true,
-    reviewAcceptance: rawInApp.reviewAcceptance ?? rawInApp.taskApprovals ?? rawNotifications.taskApprovals ?? true,
-    reviewRejection: rawInApp.reviewRejection ?? true,
-    universalTaskAssignments: rawInApp.universalTaskAssignments ?? true,
-    deadlineReminders: rawInApp.deadlineReminders ?? rawInApp.overdueTasks ?? rawNotifications.deadlineReminders ?? true,
-    taskApprovals: rawInApp.taskApprovals ?? rawInApp.reviewAcceptance ?? rawNotifications.taskApprovals ?? true,
-    pointsEarned: rawInApp.pointsEarned ?? rawNotifications.pointsEarned ?? true,
+  const resolvedInApp: InAppNotifications = {
+    taskAssignments: rawInApp.taskAssignments ?? true,
+    reviewRequests: rawInApp.reviewRequests ?? true,
+    taskOverdue: rawInApp.taskOverdue ?? true,
+    universalTask: rawInApp.universalTask ?? true,
+    reviewActions: rawInApp.reviewActions ?? true,
     ...rawInApp,
   };
 
   const resolvedSchedule = {
-    quietHoursStart: rawSchedule.quietHoursStart || rawNotifications.quietHoursStart || "22:00",
-    quietHoursEnd: rawSchedule.quietHoursEnd || rawNotifications.quietHoursEnd || "07:00",
-    ...rawSchedule,
+    quietHoursStart: rawSchedule.quietHoursStart || "22:00",
+    quietHoursEnd: rawSchedule.quietHoursEnd || "07:00",
   };
 
   return {
@@ -67,7 +62,6 @@ function normalizePreferences(data: Partial<UserPreferences> | null | undefined)
     userId: safeData.userId || "",
     theme: safeData.theme || "dark",
     notifications: {
-      ...rawNotifications,
       email: resolvedEmail,
       inApp: resolvedInApp,
       deliverySchedule: resolvedSchedule,
@@ -94,7 +88,7 @@ export const settingsService = {
   },
 
   updatePreferences: async (payload: UpdatePreferencesPayload): Promise<UserPreferences> => {
-    // Format payload for backend filterBody("notifications", "security", "theme")
+    // Send only the fields that are present in the payload — minimal partial update
     const formattedPayload: Record<string, unknown> = {};
 
     if (payload.theme) {
@@ -102,37 +96,24 @@ export const settingsService = {
     }
 
     if (payload.notifications) {
-      const email = payload.notifications.email || {};
-      const inApp = payload.notifications.inApp || {};
+      // Build notifications object with only changed sub-keys
+      const notifPayload: Record<string, unknown> = {};
 
-      // Mirror aliases so existing backend schema fields and extended fields are both sent
-      const mirroredEmail = {
-        ...email,
-        reviewRequests:
-          email.taskReviews !== undefined
-            ? email.taskReviews
-            : email.reviewRequests,
-        taskAssignments:
-          email.taskAssignments !== undefined
-            ? email.taskAssignments
-            : email.universalTaskAssignments !== undefined
-              ? email.universalTaskAssignments
-              : undefined,
-      };
+      if (payload.notifications.email && Object.keys(payload.notifications.email).length > 0) {
+        notifPayload.email = payload.notifications.email;
+      }
 
-      const mirroredInApp = {
-        ...inApp,
-        taskApprovals:
-          inApp.reviewAcceptance !== undefined ? inApp.reviewAcceptance : inApp.taskApprovals,
-        deadlineReminders:
-          inApp.overdueTasks !== undefined ? inApp.overdueTasks : inApp.deadlineReminders,
-      };
+      if (payload.notifications.inApp && Object.keys(payload.notifications.inApp).length > 0) {
+        notifPayload.inApp = payload.notifications.inApp;
+      }
 
-      formattedPayload.notifications = {
-        ...payload.notifications,
-        email: mirroredEmail,
-        inApp: mirroredInApp,
-      };
+      if (payload.notifications.deliverySchedule) {
+        notifPayload.deliverySchedule = payload.notifications.deliverySchedule;
+      }
+
+      if (Object.keys(notifPayload).length > 0) {
+        formattedPayload.notifications = notifPayload;
+      }
     }
 
     if (payload.security) {
@@ -156,7 +137,7 @@ export const settingsService = {
     const data = res && "preferences" in res ? res.preferences : (res as UserPreferences);
     const result = normalizePreferences(data);
 
-    // Ensure client updates are preserved in returned object for cache consistency
+    // Preserve optimistic client state in cache for instant UI feedback
     if (payload.notifications?.email) {
       result.notifications.email = {
         ...result.notifications.email,

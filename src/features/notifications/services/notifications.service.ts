@@ -6,9 +6,12 @@ export const notificationsService = {
   /**
    * Fetches real in-app notifications from the backend database for the authenticated user.
    */
-  getNotifications: async (): Promise<NotificationItem[]> => {
+  getNotifications: async (type?: string): Promise<NotificationItem[]> => {
     try {
-      const res = await apiClient.get<any>(API_ENDPOINTS.notifications.list);
+      const url = type && type !== "all"
+        ? `${API_ENDPOINTS.notifications.list}?type=${encodeURIComponent(type)}`
+        : API_ENDPOINTS.notifications.list;
+      const res = await apiClient.get<any>(url);
       const raw = res.data;
       let items: any[] = [];
 

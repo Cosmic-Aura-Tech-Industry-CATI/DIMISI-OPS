@@ -103,7 +103,7 @@ export const queryKeys = {
   },
   notifications: {
     all: ["notifications"] as const,
-    list: () => ["notifications", "list"] as const,
+    list: (type?: string) => ["notifications", "list", type ?? "all"] as const,
   },
   search: {
     all: ["search"] as const,
