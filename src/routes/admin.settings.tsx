@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -7,12 +7,9 @@ import {
   Check,
   CheckCircle2,
   Clock,
-  Key,
   Layers,
   ListTodo,
-  Loader2,
   Mail,
-  MessageSquare,
   Monitor,
   Moon,
   Palette,
@@ -681,6 +678,21 @@ export function ThemeSection() {
 
 /* ---------------- Notifications ---------------- */
 
+/** Debounce delay for quiet-hours inputs (ms). Toggle switches fire immediately. */
+const QUIET_HOURS_DEBOUNCE_MS = 800;
+
+/**
+ * Build the minimal partial payload for a single changed notification field.
+ * Only the field that changed is sent in the request body.
+ */
+function buildNotifPatch(
+  section: "inApp" | "email",
+  key: string,
+  value: boolean,
+): { notifications: { inApp?: Record<string, boolean>; email?: Record<string, boolean> } } {
+  return { notifications: { [section]: { [key]: value } } };
+}
+
 export function NotificationsSection({ role }: { role?: "admin" | "employee" }) {
   const { user } = useAuth();
   const effectiveRole =
@@ -690,167 +702,85 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
   const { data: preferences, isLoading, isError, refetch } = useUserPreferencesQuery();
   const updatePreferences = useUpdatePreferencesMutation();
 
+  // Local state mirrors server state for optimistic UI
   const [localInApp, setLocalInApp] = useState<Record<string, boolean>>({});
   const [localEmail, setLocalEmail] = useState<Record<string, boolean>>({});
   const [quietStart, setQuietStart] = useState("22:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
+
+  // Debounce ref for quiet-hours
+  const quietTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (preferences?.notifications) {
       const inApp = ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {};
       const email = ((preferences.notifications.email || {}) as Record<string, boolean>) || {};
       setLocalInApp(inApp);
-      setLocalEmail({
-        ...email,
-        taskReviews: email.taskReviews ?? email.reviewRequests ?? true,
-        taskAssignments: email.taskAssignments ?? email.universalTaskAssignments ?? true,
-        universalTaskAssignments: email.universalTaskAssignments ?? email.taskAssignments ?? true,
-      });
+      setLocalEmail(email);
       setQuietStart(preferences.notifications.deliverySchedule?.quietHoursStart || "22:00");
       setQuietEnd(preferences.notifications.deliverySchedule?.quietHoursEnd || "07:00");
     }
   }, [preferences]);
 
-  const handleInAppChange = (key: string, checked: boolean) => {
-    setLocalInApp((prev) => ({ ...prev, [key]: checked }));
-  };
-
-  const handleEmailChange = (key: string, checked: boolean) => {
-    setLocalEmail((prev) => {
-      const next = { ...prev, [key]: checked };
-      if (!isAdm && (key === "taskAssignments" || key === "universalTaskAssignments")) {
-        next.taskAssignments = checked;
-        next.universalTaskAssignments = checked;
-      }
-      return next;
-    });
-  };
-
-  const hasChanges = useMemo(() => {
-    if (!preferences?.notifications) return false;
-    const origInApp = (preferences.notifications.inApp || {}) as Record<string, boolean | undefined>;
-    const origEmail = (preferences.notifications.email || {}) as Record<string, boolean | undefined>;
-    const origSched = preferences.notifications.deliverySchedule || {};
-
-    const inAppKeys = isAdm
-      ? [
-          "taskReviews",
-          "universalTaskApplications",
-          "overdueTasks",
-          "universalTaskAssignments",
-          "taskAssignments",
-        ]
-      : [
-          "taskAssignments",
-          "universalTaskAssignments",
-          "reviewAcceptance",
-          "reviewRejection",
-          "overdueTasks",
-        ];
-
-    const emailKeys = isAdm
-      ? ["taskReviews", "universalTaskApplications"]
-      : ["taskAssignments", "universalTaskAssignments"];
-
-    const inAppChanged = inAppKeys.some(
-      (k) => localInApp[k] !== undefined && origInApp[k] !== undefined && localInApp[k] !== origInApp[k],
-    );
-    const emailChanged = emailKeys.some(
-      (k) => localEmail[k] !== undefined && origEmail[k] !== undefined && localEmail[k] !== origEmail[k],
-    );
-    const schedChanged =
-      quietStart !== (origSched.quietHoursStart || "22:00") ||
-      quietEnd !== (origSched.quietHoursEnd || "07:00");
-
-    return inAppChanged || emailChanged || schedChanged;
-  }, [preferences, localInApp, localEmail, quietStart, quietEnd, isAdm]);
-
-  const handleSave = () => {
-    const origNotifs = preferences?.notifications || {};
-    const origInApp = origNotifs.inApp || {};
-    const origEmail = origNotifs.email || {};
-    const origSched = origNotifs.deliverySchedule || {};
-
-    const payloadInApp: Record<string, boolean | undefined> = {
-      ...origInApp,
-      ...localInApp,
-      deadlineReminders:
-        localInApp.overdueTasks !== undefined ? localInApp.overdueTasks : origInApp.deadlineReminders,
-      taskApprovals:
-        localInApp.reviewAcceptance !== undefined ? localInApp.reviewAcceptance : origInApp.taskApprovals,
-    };
-
-    if (isAdm) {
-      if (localInApp.universalTaskAssignments !== undefined) {
-        payloadInApp.taskAssignments = localInApp.universalTaskAssignments;
-      }
-    }
-
-    const payloadEmail: Record<string, boolean | undefined> = {
-      ...origEmail,
-      ...localEmail,
-      ...(isAdm
-        ? {
-            reviewRequests:
-              localEmail.taskReviews !== undefined ? localEmail.taskReviews : origEmail.reviewRequests,
-          }
-        : {
-            taskAssignments:
-              localEmail.taskAssignments !== undefined
-                ? localEmail.taskAssignments
-                : localEmail.universalTaskAssignments !== undefined
-                  ? localEmail.universalTaskAssignments
-                  : origEmail.taskAssignments,
-            universalTaskAssignments:
-              localEmail.taskAssignments !== undefined
-                ? localEmail.taskAssignments
-                : localEmail.universalTaskAssignments !== undefined
-                  ? localEmail.universalTaskAssignments
-                  : origEmail.universalTaskAssignments,
-          }),
-    };
-
-    const payloadSchedule = {
-      ...origSched,
-      quietHoursStart: quietStart,
-      quietHoursEnd: quietEnd,
-    };
-
-    updatePreferences.mutate(
-      {
-        notifications: {
-          ...origNotifs,
-          inApp: payloadInApp,
-          email: payloadEmail,
-          deliverySchedule: payloadSchedule,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast.success("Notification preferences saved successfully.");
-        },
+  /** Toggle handler — fires API immediately with only the changed field */
+  const handleInAppToggle = useCallback(
+    (key: string, value: boolean) => {
+      setLocalInApp((prev) => ({ ...prev, [key]: value }));
+      updatePreferences.mutate(buildNotifPatch("inApp", key, value), {
+        onSuccess: () => toast.success("Notification preference updated."),
         onError: (err: any) => {
-          toast.error(err?.message || "Failed to update notification preferences.");
+          // Revert optimistic update on failure
+          setLocalInApp((prev) => ({ ...prev, [key]: !value }));
+          toast.error(err?.message || "Failed to update preference.");
         },
-      },
-    );
+      });
+    },
+    [updatePreferences],
+  );
+
+  const handleEmailToggle = useCallback(
+    (key: string, value: boolean) => {
+      setLocalEmail((prev) => ({ ...prev, [key]: value }));
+      updatePreferences.mutate(buildNotifPatch("email", key, value), {
+        onSuccess: () => toast.success("Notification preference updated."),
+        onError: (err: any) => {
+          setLocalEmail((prev) => ({ ...prev, [key]: !value }));
+          toast.error(err?.message || "Failed to update preference.");
+        },
+      });
+    },
+    [updatePreferences],
+  );
+
+  /** Quiet hours — debounced save triggered on input change */
+  const saveQuietHours = useCallback(
+    (start: string, end: string) => {
+      if (quietTimerRef.current) clearTimeout(quietTimerRef.current);
+      quietTimerRef.current = setTimeout(() => {
+        updatePreferences.mutate(
+          {
+            notifications: {
+              deliverySchedule: { quietHoursStart: start, quietHoursEnd: end },
+            },
+          },
+          {
+            onSuccess: () => toast.success("Quiet hours updated."),
+            onError: (err: any) => toast.error(err?.message || "Failed to update quiet hours."),
+          },
+        );
+      }, QUIET_HOURS_DEBOUNCE_MS);
+    },
+    [updatePreferences],
+  );
+
+  const handleQuietStartChange = (val: string) => {
+    setQuietStart(val);
+    saveQuietHours(val, quietEnd);
   };
 
-  const handleReset = () => {
-    if (preferences?.notifications) {
-      const inApp = ((preferences.notifications.inApp || {}) as Record<string, boolean>) || {};
-      const email = ((preferences.notifications.email || {}) as Record<string, boolean>) || {};
-      setLocalInApp(inApp);
-      setLocalEmail({
-        ...email,
-        taskReviews: email.taskReviews ?? email.reviewRequests ?? true,
-        taskAssignments: email.taskAssignments ?? email.universalTaskAssignments ?? true,
-        universalTaskAssignments: email.universalTaskAssignments ?? email.taskAssignments ?? true,
-      });
-      setQuietStart(preferences.notifications.deliverySchedule?.quietHoursStart || "22:00");
-      setQuietEnd(preferences.notifications.deliverySchedule?.quietHoursEnd || "07:00");
-      toast.info("Preferences reverted to last saved state.");
-    }
+  const handleQuietEndChange = (val: string) => {
+    setQuietEnd(val);
+    saveQuietHours(quietStart, val);
   };
 
   if (isLoading) {
@@ -888,139 +818,67 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
     );
   }
 
-  const saveButton = (
-    <Button
-      size="sm"
-      onClick={handleSave}
-      disabled={updatePreferences.isPending || !hasChanges}
-      className="rounded-md shadow-glow"
-    >
-      {updatePreferences.isPending ? (
-        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Save className="mr-1.5 h-3.5 w-3.5" />
-      )}
-      {updatePreferences.isPending ? "Saving..." : "Save"}
-    </Button>
-  );
-
   return (
     <div className="space-y-6">
-      {hasChanges && (
-        <div className="glass flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm text-foreground">
-          <span className="text-xs sm:text-sm font-medium">You have unsaved changes in your notification preferences.</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              disabled={updatePreferences.isPending}
-              className="h-8 text-xs rounded-md"
-            >
-              <RotateCcw className="mr-1 h-3 w-3" /> Revert
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={updatePreferences.isPending}
-              className="h-8 text-xs rounded-md shadow-glow"
-            >
-              {updatePreferences.isPending ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              ) : (
-                <Save className="mr-1 h-3 w-3" />
-              )}
-              Save preferences
-            </Button>
-          </div>
-        </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-2 items-start">
         {/* In-App Notifications */}
         <SettingCard
           title="In-App Notifications"
-          description="Control real-time notifications and alerts displayed in your notification tray."
-          actions={saveButton}
+          description="Control real-time alerts displayed in your notification tray."
         >
           <div className="space-y-3">
             {isAdm ? (
               <>
                 <ToggleRow
-                  title="Task reviews"
+                  title="New submissions"
                   description="When an employee submits a completed task for your review and approval."
                   icon={CheckCircle2}
-                  checked={localInApp.taskReviews ?? true}
+                  checked={localInApp.reviewRequests ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("taskReviews", c)}
+                  onChange={(c) => handleInAppToggle("reviewRequests", c)}
                 />
                 <ToggleRow
                   title="Universal task applications"
                   description="When an employee applies or requests to acquire an open universal task."
                   icon={Layers}
-                  checked={localInApp.universalTaskApplications ?? true}
+                  checked={localInApp.universalTask ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("universalTaskApplications", c)}
+                  onChange={(c) => handleInAppToggle("universalTask", c)}
                 />
                 <ToggleRow
                   title="Overdue tasks"
                   description="When tasks exceed their deadline or require immediate escalation."
                   icon={Clock}
-                  checked={localInApp.overdueTasks ?? localInApp.deadlineReminders ?? true}
+                  checked={localInApp.taskOverdue ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => {
-                    handleInAppChange("overdueTasks", c);
-                    handleInAppChange("deadlineReminders", c);
-                  }}
+                  onChange={(c) => handleInAppToggle("taskOverdue", c)}
                 />
               </>
             ) : (
               <>
                 <ToggleRow
                   title="Task assignments"
-                  description="When a new direct or project task is assigned directly to you."
+                  description="When a new task is assigned directly to you."
                   icon={ListTodo}
                   checked={localInApp.taskAssignments ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("taskAssignments", c)}
+                  onChange={(c) => handleInAppToggle("taskAssignments", c)}
                 />
                 <ToggleRow
-                  title="Universal task assignments"
-                  description="When an open universal task you applied for is approved and assigned to you."
-                  icon={Layers}
-                  checked={localInApp.universalTaskAssignments ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("universalTaskAssignments", c)}
-                />
-                <ToggleRow
-                  title="Review request acceptance"
-                  description="When an admin reviews and approves your task submission."
+                  title="Review actions"
+                  description="When your task submission is approved or rejected by an admin."
                   icon={CheckCircle2}
-                  checked={localInApp.reviewAcceptance ?? localInApp.taskApprovals ?? true}
+                  checked={localInApp.reviewActions ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => {
-                    handleInAppChange("reviewAcceptance", c);
-                    handleInAppChange("taskApprovals", c);
-                  }}
-                />
-                <ToggleRow
-                  title="Review request rejection"
-                  description="When your task submission requires revision, feedback, or is rejected."
-                  icon={AlertCircle}
-                  checked={localInApp.reviewRejection ?? true}
-                  disabled={updatePreferences.isPending}
-                  onChange={(c) => handleInAppChange("reviewRejection", c)}
+                  onChange={(c) => handleInAppToggle("reviewActions", c)}
                 />
                 <ToggleRow
                   title="Overdue tasks"
                   description="Reminders when your active assigned tasks are approaching deadline or overdue."
                   icon={Clock}
-                  checked={localInApp.overdueTasks ?? localInApp.deadlineReminders ?? true}
+                  checked={localInApp.taskOverdue ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => {
-                    handleInAppChange("overdueTasks", c);
-                    handleInAppChange("deadlineReminders", c);
-                  }}
+                  onChange={(c) => handleInAppToggle("taskOverdue", c)}
                 />
               </>
             )}
@@ -1031,37 +889,36 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
         <SettingCard
           title="Email Notifications"
           description="Configure email alerts for high-priority operational workflows."
-          actions={saveButton}
         >
           <div className="space-y-3">
             {isAdm ? (
               <>
                 <ToggleRow
-                  title="Task reviews"
+                  title="New submissions"
                   description="Receive email notifications when new submissions await your review."
                   icon={Mail}
-                  checked={localEmail.taskReviews ?? true}
+                  checked={localEmail.reviewRequests ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailChange("taskReviews", c)}
+                  onChange={(c) => handleEmailToggle("reviewRequests", c)}
                 />
                 <ToggleRow
                   title="Universal task applications"
                   description="Receive email notifications when an employee applies for an open task."
                   icon={Mail}
-                  checked={localEmail.universalTaskApplications ?? true}
+                  checked={localEmail.universalTask ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailChange("universalTaskApplications", c)}
+                  onChange={(c) => handleEmailToggle("universalTask", c)}
                 />
               </>
             ) : (
               <>
                 <ToggleRow
                   title="Task assignments"
-                  description="Receive email notifications when a task or universal task is assigned to you."
+                  description="Receive email notifications when a task is assigned to you."
                   icon={Mail}
-                  checked={localEmail.taskAssignments ?? localEmail.universalTaskAssignments ?? true}
+                  checked={localEmail.taskAssignments ?? true}
                   disabled={updatePreferences.isPending}
-                  onChange={(c) => handleEmailChange("taskAssignments", c)}
+                  onChange={(c) => handleEmailToggle("taskAssignments", c)}
                 />
               </>
             )}
@@ -1072,8 +929,7 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
         <div className="lg:col-span-2">
           <SettingCard
             title="Delivery schedule"
-            description="Quiet hours and preferred delivery windows."
-            actions={saveButton}
+            description="Quiet hours — non-urgent notifications will be batched during this window."
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -1081,7 +937,7 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                 <Input
                   type="time"
                   value={quietStart}
-                  onChange={(e) => setQuietStart(e.target.value)}
+                  onChange={(e) => handleQuietStartChange(e.target.value)}
                   disabled={updatePreferences.isPending}
                 />
               </div>
@@ -1090,14 +946,11 @@ export function NotificationsSection({ role }: { role?: "admin" | "employee" }) 
                 <Input
                   type="time"
                   value={quietEnd}
-                  onChange={(e) => setQuietEnd(e.target.value)}
+                  onChange={(e) => handleQuietEndChange(e.target.value)}
                   disabled={updatePreferences.isPending}
                 />
               </div>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Non-urgent notifications will be batched during this window.
-            </p>
           </SettingCard>
         </div>
       </div>
