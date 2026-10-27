@@ -18,6 +18,7 @@ import {
   type Task,
   type TaskQueryFilters,
   type TasksResult,
+  type TaskStatsResult,
   type UpdateTaskInput,
 } from "../types";
 
@@ -470,6 +471,35 @@ export const tasksService = {
     }
     return [];
   },
+
+  /**
+   * Fetches aggregate task statistics (GET /api/v1/tasks/stats).
+   * Maps all common count fields and preserves undefined for unprovided metrics.
+   */
+  async getTaskStats(): Promise<TaskStatsResult> {
+    const res = await http.get<any>(API_ENDPOINTS.tasks.stats);
+    const raw = res?.data?.stats || res?.stats || res?.data || res || {};
+
+    const findNum = (...keys: string[]): number | undefined => {
+      for (const k of keys) {
+        if (typeof raw[k] === "number" && !isNaN(raw[k])) return raw[k];
+        if (typeof raw[k] === "string" && raw[k].trim() !== "" && !isNaN(Number(raw[k]))) {
+          return Number(raw[k]);
+        }
+      }
+      return undefined;
+    };
+
+    return {
+      total: findNum("totalTasks", "total", "totalCount", "all"),
+      available: findNum("availableTasks", "available", "openTasks", "open", "availableCount"),
+      assigned: findNum("assignedTasks", "assigned", "assignedCount"),
+      inProgress: findNum("inProgressTasks", "inProgress", "in_progress", "inProgressCount"),
+      overdue: findNum("overdueTasks", "overdue", "overdueCount"),
+      inReview: findNum("inReviewTasks", "inReview", "in_review", "pendingReview", "underReview", "reviewCount"),
+      raw,
+    };
+  },
 };
 
 // Aliases for direct functional imports
@@ -482,3 +512,4 @@ export const startTask = tasksService.startTask.bind(tasksService);
 export const submitTask = tasksService.submitTask.bind(tasksService);
 export const reviewTask = tasksService.reviewTask.bind(tasksService);
 export const requestTask = tasksService.requestTask.bind(tasksService);
+export const getTaskStats = tasksService.getTaskStats.bind(tasksService);

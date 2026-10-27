@@ -92,6 +92,10 @@ export function EditProfileDialog({
                   ? String((uploadErr as { message: unknown }).message)
                   : "Failed to upload image to CDN.";
             toast.error(message);
+            // Data safety: Retain previous valid photo if replacement upload fails
+            setPhoto(profile.photo ?? user?.avatar ?? null);
+            setSelectedFile(null);
+            setStagedUpload(null);
             setIsUploadingToCdn(false);
             return;
           } finally {

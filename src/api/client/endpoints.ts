@@ -61,6 +61,7 @@ export const API_ENDPOINTS = {
     pending: "/tasks/pending",
     completed: "/tasks/completed",
     reviewCenter: "/tasks/review-center",
+    stats: "/tasks/stats",
   },
   accounts: {
     all: "/accounts/all",

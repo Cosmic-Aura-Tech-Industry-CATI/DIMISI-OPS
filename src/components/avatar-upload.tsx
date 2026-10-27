@@ -34,7 +34,6 @@ export function AvatarUpload({
   className = "",
   size = "md",
 }: AvatarUploadProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -87,7 +86,7 @@ export function AvatarUpload({
     const validation = validateAvatarFile(file);
     if (!validation.valid) {
       toast.error(validation.error || "Invalid file.");
-      if (fileRef.current) fileRef.current.value = "";
+      if (dropInputRef.current) dropInputRef.current.value = "";
       return;
     }
 
@@ -95,15 +94,18 @@ export function AvatarUpload({
     cleanupObjectUrl();
     const objectUrl = URL.createObjectURL(file);
     createdObjectUrlRef.current = objectUrl;
-    setPreview(objectUrl);
 
     // 3. If not autoUpload, notify parent component of selected file and preview
     if (!autoUpload) {
+      setPreview(objectUrl);
       onChange?.(objectUrl, file);
+      if (dropInputRef.current) dropInputRef.current.value = "";
       return;
     }
 
     // 4. Auto-upload mode (standalone avatar settings card)
+    // Retain previous valid preview in case replacement upload fails
+    const previousPreview = preview;
     try {
       setIsUploading(true);
       setUploadProgress(10);
@@ -112,7 +114,7 @@ export function AvatarUpload({
         setUploadProgress(percent);
       });
 
-      // Update preview to final public CDN URL
+      // Update preview to final public CDN URL only after success
       cleanupObjectUrl();
       setPreview(result.avatar);
 
@@ -122,9 +124,9 @@ export function AvatarUpload({
       }
       onChange?.(result.avatar, null);
     } catch (err: unknown) {
-      // Revert preview on failure
+      // Revert preview to previous valid attachment on failure
       cleanupObjectUrl();
-      setPreview(value || null);
+      setPreview(previousPreview ?? value ?? null);
       const message =
         err instanceof Error
           ? err.message
@@ -135,7 +137,7 @@ export function AvatarUpload({
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      if (fileRef.current) fileRef.current.value = "";
+      if (dropInputRef.current) dropInputRef.current.value = "";
     }
   };
 
@@ -144,7 +146,7 @@ export function AvatarUpload({
 
     cleanupObjectUrl();
     setPreview(null);
-    if (fileRef.current) fileRef.current.value = "";
+    if (dropInputRef.current) dropInputRef.current.value = "";
 
     try {
       setIsRemoving(true);
