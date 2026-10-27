@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Archive,
@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type Task, type TaskPriority, type TaskType, getCategoryLabel } from "@/features/tasks";
-import { useEmployeesQuery } from "@/features/employees";
+import { useEmployeesQuery, useEmployeeDetailsQuery } from "@/features/employees";
 import type { AuthUser } from "@/auth/types/auth";
 import { projectById } from "@/lib/projects";
 import { useProjectsQuery } from "@/features/projects";
@@ -52,7 +52,7 @@ import {
 } from "@/lib/cdn-upload";
 import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
-const EMPLOYEE_PAGE_SIZE = 20;
+const EMPLOYEE_PAGE_SIZE = 10;
 
 export interface TaskAttachment {
   id?: string;
@@ -217,38 +217,121 @@ export function TaskForm({
   const { data: allProjectList = [] } = useProjectsQuery();
   const [employeePage, setEmployeePage] = useState(1);
   const [employeeList, setEmployeeList] = useState<AuthUser[]>([]);
-  const employeePageRequestRef = useRef(false);
-  const { data: employeeData, isFetching: isEmployeesFetching } = useEmployeesQuery({
-    page: employeePage,
-    limit: EMPLOYEE_PAGE_SIZE,
+  const [hasOpenedEmployeeSelect, setHasOpenedEmployeeSelect] = useState(false);
+  const [isEmployeeSelectOpen, setIsEmployeeSelectOpen] = useState(false);
+  const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
+  const isFetchingMoreRef = useRef(false);
+  const sentinelObserverRef = useRef<IntersectionObserver | null>(null);
+
+  const isEmployeeQueryEnabled = hasOpenedEmployeeSelect || Boolean(form.assigneeId);
+  const {
+    data: employeeData,
+    isFetching: isEmployeesFetching,
+    error: employeeError,
+  } = useEmployeesQuery(
+    {
+      page: employeePage,
+      limit: EMPLOYEE_PAGE_SIZE,
+    },
+    {
+      enabled: isEmployeeQueryEnabled,
+    },
+  );
+
+  const { data: initialAssigneeData } = useEmployeeDetailsQuery(form.assigneeId, {
+    enabled: Boolean(form.assigneeId),
   });
-  const employeePagination = employeeData?.pagination;
-  const hasMoreEmployees = employeePagination
-    ? employeePagination.currentPage < employeePagination.totalPages
-    : (employeeData?.employees.length ?? 0) === EMPLOYEE_PAGE_SIZE;
+
+  useEffect(() => {
+    if (!initialAssigneeData) return;
+    setEmployeeList((current) => {
+      const id = initialAssigneeData._id || initialAssigneeData.id;
+      if (!id || current.some((e) => (e._id || e.id) === id)) return current;
+      return [initialAssigneeData, ...current];
+    });
+  }, [initialAssigneeData]);
 
   useEffect(() => {
     if (!employeeData) return;
     setEmployeeList((current) => {
       const seenIds = new Set(current.map((employee) => employee._id || employee.id));
-      return [
-        ...current,
-        ...employeeData.employees.filter((employee) => {
-          const id = employee._id || employee.id;
-          if (!id || seenIds.has(id)) return false;
-          seenIds.add(id);
-          return true;
-        }),
-      ];
+      const incoming = employeeData.employees.filter((employee) => {
+        const id = employee._id || employee.id;
+        if (!id || seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
+      return [...current, ...incoming];
     });
-    employeePageRequestRef.current = false;
+
+    if (employeeData.pagination) {
+      const { currentPage, totalPages } = employeeData.pagination;
+      setHasMoreEmployees(currentPage < totalPages);
+    } else {
+      setHasMoreEmployees(employeeData.employees.length >= EMPLOYEE_PAGE_SIZE);
+    }
+
+    isFetchingMoreRef.current = false;
   }, [employeeData]);
 
-  const loadMoreEmployees = () => {
-    if (isEmployeesFetching || employeePageRequestRef.current || !hasMoreEmployees) return;
-    employeePageRequestRef.current = true;
+  useEffect(() => {
+    if (employeeError) {
+      isFetchingMoreRef.current = false;
+    }
+  }, [employeeError]);
+
+  const loadMoreEmployees = useCallback(() => {
+    if (isEmployeesFetching || isFetchingMoreRef.current || !hasMoreEmployees) return;
+    isFetchingMoreRef.current = true;
     setEmployeePage((page) => page + 1);
+  }, [isEmployeesFetching, hasMoreEmployees]);
+
+  const handleScroll = (event: React.UIEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    const currentTarget = event.currentTarget as HTMLElement;
+    const el =
+      target && target.scrollHeight > target.clientHeight
+        ? target
+        : currentTarget && currentTarget.scrollHeight > currentTarget.clientHeight
+          ? currentTarget
+          : target || currentTarget;
+
+    if (!el) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      loadMoreEmployees();
+    }
   };
+
+  const handleWheel = (event: React.WheelEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    const el =
+      target.closest("[data-radix-select-viewport]") ||
+      target.closest("[role='listbox']") ||
+      (event.currentTarget as HTMLElement);
+
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      loadMoreEmployees();
+    }
+  };
+
+  const sentinelCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (sentinelObserverRef.current) {
+        sentinelObserverRef.current.disconnect();
+      }
+      if (!node || typeof IntersectionObserver === "undefined") return;
+      sentinelObserverRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) {
+            loadMoreEmployees();
+          }
+        },
+        { rootMargin: "48px" },
+      );
+      sentinelObserverRef.current.observe(node);
+    },
+    [loadMoreEmployees],
+  );
   const activeProjects = allProjectList.filter((p) => (p.status || "").toLowerCase() === "active");
   const selectedProject = allProjectList.find(
     (p) => p.id === form.projectId || p._id === form.projectId,
@@ -821,18 +904,26 @@ export function TaskForm({
 
         {form.taskType === "direct" && (
           <Field label="Assign employee" error={errors.assigneeId}>
-            <Select value={form.assigneeId} onValueChange={(v) => set("assigneeId", v)}>
+            <Select
+              value={form.assigneeId}
+              onValueChange={(v) => set("assigneeId", v)}
+              open={isEmployeeSelectOpen}
+              onOpenChange={(open) => {
+                setIsEmployeeSelectOpen(open);
+                if (open) {
+                  setHasOpenedEmployeeSelect(true);
+                }
+              }}
+            >
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="Select an employee" />
               </SelectTrigger>
               <SelectContent
-                onScrollCapture={(event) => {
-                  const element = event.target;
-                  if (!(element instanceof HTMLElement)) return;
-                  if (element.scrollHeight - element.scrollTop - element.clientHeight < 48) {
-                    loadMoreEmployees();
-                  }
-                }}
+                className="max-h-60 overflow-y-auto"
+                style={{ maxHeight: "240px", overflowY: "auto" }}
+                onScrollCapture={handleScroll}
+                onScroll={handleScroll}
+                onWheelCapture={handleWheel}
               >
                 {employeeList.map((e) => {
                   const targetId = e._id || e.id || "";
@@ -854,16 +945,35 @@ export function TaskForm({
                     </SelectItem>
                   );
                 })}
-                {isEmployeesFetching && (
-                  <SelectItem disabled value="__employees-loading">
-                    Loading employees…
+                {isEmployeesFetching && employeeList.length > 0 && (
+                  <SelectItem disabled value="__employees-loading-more">
+                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      Loading more employees…
+                    </span>
                   </SelectItem>
                 )}
-                {!isEmployeesFetching && employeeList.length === 0 && (
+                {isEmployeesFetching && employeeList.length === 0 && (
+                  <SelectItem disabled value="__employees-loading">
+                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      Loading employees…
+                    </span>
+                  </SelectItem>
+                )}
+                {!isEmployeesFetching && employeeList.length === 0 && !employeeError && (
                   <SelectItem disabled value="__employees-empty">
                     No employees found.
                   </SelectItem>
                 )}
+                {employeeError && employeeList.length === 0 && (
+                  <SelectItem disabled value="__employees-error">
+                    <span className="text-xs text-destructive">
+                      Failed to load employees.
+                    </span>
+                  </SelectItem>
+                )}
+                <div ref={sentinelCallback} className="h-px w-full pointer-events-none" aria-hidden="true" />
               </SelectContent>
             </Select>
           </Field>
