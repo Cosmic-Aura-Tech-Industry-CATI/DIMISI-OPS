@@ -23,6 +23,7 @@ import type {
   Task,
   TaskQueryFilters,
   TasksResult,
+  TaskStatsResult,
   UpdateTaskInput,
 } from "../types";
 
@@ -145,6 +146,23 @@ export function useReviewCenter(
 
 export const useReviewCenterQuery = useReviewCenter;
 
+/**
+ * Hook to fetch aggregate task statistics (GET /api/v1/tasks/stats).
+ */
+export function useTaskStatsQuery(
+  options?: Omit<UseQueryOptions<TaskStatsResult, ApiError>, "queryKey" | "queryFn">,
+) {
+  return useQuery<TaskStatsResult, ApiError>({
+    queryKey: taskKeys.stats(),
+    queryFn: () => tasksService.getTaskStats(),
+    staleTime: 1000 * 60 * 2, // 2 mins
+    retry: 1,
+    ...options,
+  });
+}
+
+export const useTaskStats = useTaskStatsQuery;
+
 /* -------------------------------- Mutations -------------------------------- */
 
 function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>, taskId?: string) {
@@ -153,6 +171,7 @@ function invalidateAllTaskQueries(queryClient: ReturnType<typeof useQueryClient>
   void queryClient.invalidateQueries({ queryKey: taskKeys.pending });
   void queryClient.invalidateQueries({ queryKey: taskKeys.completed });
   void queryClient.invalidateQueries({ queryKey: taskKeys.reviewCenter });
+  void queryClient.invalidateQueries({ queryKey: taskKeys.stats() });
   if (taskId) {
     void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
   }

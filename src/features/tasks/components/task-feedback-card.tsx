@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   History,
   Info,
+  Paperclip,
+  ExternalLink,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Task, TaskReviewFeedback } from "../types";
@@ -91,6 +93,11 @@ export function TaskFeedbackCard({
     );
   }
 
+  const attachmentMatch = task.feedback?.match(/Review Attachment:\s*([^\n(]+)\s*\((https?:\/\/[^\s)]+)\)/i);
+  const feedbackText = task.feedback ? task.feedback.replace(/\n\nReview Attachment:\s*[^\n(]+\s*\(https?:\/\/[^\s)]+\)/gi, "").trim() : "";
+  const attachmentName = task.reviewAttachment?.name || (attachmentMatch ? attachmentMatch[1].trim() : undefined);
+  const attachmentUrl = task.reviewAttachment?.url || (attachmentMatch ? attachmentMatch[2].trim() : undefined);
+
   return (
     <div
       className={`glass rounded-2xl p-6 space-y-4 border border-border/60 transition-all ${className}`}
@@ -156,13 +163,28 @@ export function TaskFeedbackCard({
       </div>
 
       {/* Feedback Message Box */}
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground/95 shadow-inner">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground/95 shadow-inner space-y-2">
         <div className="text-[11px] uppercase tracking-wider text-primary font-semibold mb-1 flex items-center gap-1">
           <ShieldCheck className="h-3 w-3" /> Reviewer Remarks
         </div>
         <p className="whitespace-pre-line leading-relaxed font-sans">
-          "{task.feedback}"
+          "{feedbackText || task.feedback}"
         </p>
+
+        {attachmentUrl && (
+          <div className="pt-2 border-t border-primary/10">
+            <a
+              href={attachmentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-background/70 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/10 transition-colors"
+            >
+              <Paperclip className="h-3.5 w-3.5 text-primary" />
+              <span className="truncate max-w-[240px]">{attachmentName || "Review Attachment"}</span>
+              <ExternalLink className="h-3 w-3 text-muted-foreground ml-0.5" />
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Review History (if more than one review recorded) */}

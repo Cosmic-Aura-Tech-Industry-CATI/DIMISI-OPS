@@ -12,6 +12,7 @@ export const taskKeys = {
   reviewCenter: ["tasks", "review-center"] as const,
   details: () => ["tasks", "detail"] as const,
   detail: (id: string) => ["tasks", "detail", id] as const,
+  stats: () => ["tasks", "stats"] as const,
 };
 
 export const queryKeys = {
@@ -45,6 +46,7 @@ export const queryKeys = {
     pending: () => taskKeys.pending,
     completed: () => taskKeys.completed,
     reviewCenter: () => taskKeys.reviewCenter,
+    stats: () => taskKeys.stats(),
   },
   admins: {
     all: ["admins"] as const,

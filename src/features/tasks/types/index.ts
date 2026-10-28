@@ -77,6 +77,7 @@ export interface TaskReviewFeedback {
   feedback: string;
   status: "approved" | "rejected";
   reviewedAt: string;
+  attachment?: ReviewAttachment;
 }
 
 export interface BackendTask {
@@ -175,6 +176,7 @@ export interface Task {
   reviewedAt?: string;
   reviewStatus?: "approved" | "rejected";
   reviews?: TaskReviewFeedback[];
+  reviewAttachment?: ReviewAttachment;
   notes?: string;
   projectId?: string;
   projectName?: string;
@@ -295,6 +297,7 @@ export interface SubmitTaskPayload {
 export interface ReviewTaskPayload {
   isApproved: boolean;
   feedback?: string;
+  attachment?: ReviewAttachment;
 }
 
 /* -------------------------------- Adapters -------------------------------- */
@@ -883,6 +886,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
               feedback: saved.feedback,
               status: saved.reviewStatus || (saved.isApproved ? "approved" : "rejected"),
               reviewedAt: saved.reviewedAt || new Date().toISOString(),
+              attachment: saved.attachment,
             });
           }
         }
@@ -936,6 +940,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     reviewedAt,
     reviewStatus,
     reviews,
+    reviewAttachment: (reviews.length > 0 ? reviews[reviews.length - 1]?.attachment : undefined) || (id && typeof window !== "undefined" ? (() => { try { return JSON.parse(localStorage.getItem("dimisi-task-reviews") || "{}")[id]?.attachment; } catch { return undefined; } })() : undefined),
     notes: doc.notes,
     attachments,
     rawAttachmentUrls,
@@ -1022,4 +1027,24 @@ export function buildUpdateTaskFormData(input: UpdateTaskInput): FormData {
   }
 
   return fd;
+}
+
+/* -------------------------------- Task Statistics -------------------------------- */
+
+export interface TaskStatsResult {
+  total?: number;
+  available?: number;
+  assigned?: number;
+  inProgress?: number;
+  overdue?: number;
+  inReview?: number;
+  raw?: Record<string, unknown>;
+}
+
+export interface ReviewAttachment {
+  name: string;
+  url?: string;
+  publicId?: string;
+  size?: number | string;
+  mimeType?: string;
 }

@@ -17,6 +17,7 @@ import {
   ExternalLink,
   MessageSquare,
   Loader2,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,10 +31,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { TaskPriorityBadge, TaskStatusBadge } from "@/components/task-status-badge";
-import { useReviewTaskMutation, type Task } from "@/features/tasks";
+import { useReviewTaskMutation, type Task, type ReviewAttachment } from "@/features/tasks";
 import { getSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
+import {
+  validateTaskAttachmentFile,
+  uploadTaskAttachment,
+  ALLOWED_TASK_ATTACHMENT_EXTENSIONS,
+} from "@/lib/cdn-upload";
+import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
 
 interface TaskReviewModalProps {
   task: Task | null;
@@ -104,6 +112,9 @@ export function TaskReviewModal({
   const [feedback, setFeedback] = useState("");
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; isImg: boolean; isPdf: boolean } | null>(null);
+  const [attachment, setAttachment] = useState<ReviewAttachment | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const reviewMutation = useReviewTaskMutation({
     onSuccess: () => {
@@ -112,6 +123,9 @@ export function TaskReviewModal({
       setFeedback("");
       setPendingAction(null);
       setPreviewFile(null);
+      setAttachment(null);
+      setIsUploadingAttachment(false);
+      setUploadProgress(0);
       onSuccess?.();
     },
     onError: () => {
@@ -124,6 +138,9 @@ export function TaskReviewModal({
       setFeedback("");
       setPendingAction(null);
       setPreviewFile(null);
+      setAttachment(null);
+      setIsUploadingAttachment(false);
+      setUploadProgress(0);
     }
   }, [open]);
 
@@ -194,7 +211,83 @@ export function TaskReviewModal({
     localSub?.additionalRemarks ||
     parsedNotes.additionalRemarks;
 
+  const handleAttachmentFile = async (file: File) => {
+    if (!file || isUploadingAttachment) return;
+
+    const validation = validateTaskAttachmentFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid file for review attachment.");
+      return;
+    }
+
+    // Preserve previous valid attachment in case new upload fails (Data safety requirement)
+    const previousAttachment = attachment;
+
+    try {
+      setIsUploadingAttachment(true);
+      setUploadProgress(10);
+
+      const res = await uploadTaskAttachment(file, (percent) => {
+        setUploadProgress(percent);
+      });
+
+      // Update state to the new uploaded replacement attachment
+      setAttachment({
+        name: res.name || file.name,
+        url: res.url,
+        publicId: res.publicId,
+        size: res.size,
+        mimeType: file.type,
+      });
+      toast.success(`Attached "${res.name || file.name}" to review.`);
+    } catch (err: unknown) {
+      // Retain previous valid attachment on failure
+      setAttachment(previousAttachment);
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Failed to upload review attachment.";
+      toast.error(`Attachment upload failed: ${message}`);
+    } finally {
+      setIsUploadingAttachment(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    if (isUploadingAttachment) return;
+    setAttachment(null);
+  };
+
+  const {
+    isDragging: isAttachmentDragging,
+    inputRef: attachmentInputRef,
+    openFileDialog: openAttachmentDialog,
+    dragProps: attachmentDragProps,
+    pasteProps: attachmentPasteProps,
+    keyboardProps: attachmentKeyboardProps,
+  } = useFileDropPaste({
+    accept: ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(","),
+    maxSize: 10 * 1024 * 1024,
+    multiple: false,
+    disabled: isUploadingAttachment || reviewMutation.isPending,
+    label: "review attachment",
+    validateFile: validateTaskAttachmentFile,
+    onFiles: (files) => {
+      if (files[0]) {
+        void handleAttachmentFile(files[0]);
+      }
+    },
+  });
+
   const handleReview = (isApproved: boolean) => {
+    if (isUploadingAttachment) {
+      toast.info("Please wait for attachment upload to complete before submitting.");
+      return;
+    }
+
     const trimmed = feedback.trim();
     if (!isApproved && trimmed.length < 5) {
       toast.error("Feedback required for rejection", {
@@ -203,7 +296,12 @@ export function TaskReviewModal({
       return;
     }
 
-    const feedbackMessage = trimmed || (isApproved ? "Approved by Admin" : "Revision requested by Admin");
+    const defaultMsg = isApproved ? "Approved by Admin" : "Revision requested by Admin";
+    const feedbackBase = trimmed || defaultMsg;
+    // Format feedback to include the attachment link in the notes/feedback string supported by the existing API
+    const feedbackMessage = attachment
+      ? `${feedbackBase}\n\nReview Attachment: ${attachment.name} (${attachment.url})`
+      : feedbackBase;
 
     // Persist to local storage dimisi-task-reviews for optimistic persistence across refresh
     try {
@@ -215,6 +313,7 @@ export function TaskReviewModal({
         feedback: feedbackMessage,
         status: isApproved ? "approved" : "rejected",
         reviewedAt: new Date().toISOString(),
+        attachment: attachment || undefined,
       };
       cached[taskId] = {
         feedback: feedbackMessage,
@@ -223,6 +322,7 @@ export function TaskReviewModal({
         reviewedAt: new Date().toISOString(),
         reviewStatus: isApproved ? "approved" : "rejected",
         reviews: [...existingReviews, newReviewItem],
+        attachment: attachment || undefined,
       };
       localStorage.setItem("dimisi-task-reviews", JSON.stringify(cached));
     } catch {
@@ -233,7 +333,7 @@ export function TaskReviewModal({
     reviewMutation.mutate({
       id: taskId,
       isApproved,
-      feedback: trimmed || undefined,
+      feedback: feedbackMessage,
     });
   };
 
@@ -281,8 +381,8 @@ export function TaskReviewModal({
     }
   };
 
-  const isRejectDisabled = feedback.trim().length < 5 || reviewMutation.isPending;
-  const isApproveDisabled = reviewMutation.isPending;
+  const isRejectDisabled = feedback.trim().length < 5 || reviewMutation.isPending || isUploadingAttachment;
+  const isApproveDisabled = reviewMutation.isPending || isUploadingAttachment;
 
   return (
     <>
@@ -510,9 +610,9 @@ export function TaskReviewModal({
                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2 min-w-0">
                   {deliverableLinks
                     .split(/[\n,]+/)
-                    .map((link) => link.trim())
+                    .map((link: string) => link.trim())
                     .filter(Boolean)
-                    .map((link, idx) => {
+                    .map((link: string, idx: number) => {
                       const isUrl = /^https?:\/\//i.test(link);
                       const href = isUrl ? link : `https://${link}`;
                       return (
@@ -631,6 +731,126 @@ export function TaskReviewModal({
                 placeholder="e.g. Excellent work on this task. Proof verified and meets all requirements."
                 className="rounded-xl resize-none font-sans text-sm border-border/60 bg-background/50 focus-visible:ring-primary/40 leading-relaxed"
               />
+            </div>
+
+            {/* Admin Review Attachment (Optional) */}
+            <div className="space-y-2 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 min-w-0">
+                <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                  <Paperclip className="h-4 w-4 text-primary shrink-0" /> Review Attachment (Optional)
+                </Label>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  (Single-file replacement up to 10 MB)
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-normal">
+                Attach feedback notes, annotated deliverables, or revision guidelines during acceptance or rejection.
+              </p>
+
+              {attachment ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/60 p-3 transition-colors shadow-sm min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                      {attachment.mimeType?.startsWith("image/") ? (
+                        <FileImage className="h-5 w-5" />
+                      ) : (
+                        <FileText className="h-5 w-5" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate text-foreground">
+                        {attachment.name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {attachment.size} · Attached to review
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setPreviewFile({
+                          name: attachment.name,
+                          url: attachment.url || "",
+                          isImg: isImageProof(attachment.mimeType, attachment.name),
+                          isPdf: isPdfProof(attachment.mimeType, attachment.name),
+                        })
+                      }
+                      className="h-8 gap-1 text-xs rounded-lg"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Preview
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={openAttachmentDialog}
+                      disabled={isUploadingAttachment || reviewMutation.isPending}
+                      className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Change
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleRemoveAttachment}
+                      disabled={isUploadingAttachment || reviewMutation.isPending}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      title="Remove attachment"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  {...attachmentDragProps}
+                  {...attachmentPasteProps}
+                  {...attachmentKeyboardProps}
+                  onClick={openAttachmentDialog}
+                  className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    isAttachmentDragging
+                      ? "border-primary bg-primary/10 shadow-glow scale-[1.01]"
+                      : "border-border/60 bg-background/40 hover:border-primary/50 hover:bg-primary/5"
+                  } ${isUploadingAttachment ? "pointer-events-none opacity-60" : ""}`}
+                >
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    accept={ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                    className="sr-only"
+                    disabled={isUploadingAttachment || reviewMutation.isPending}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        void handleAttachmentFile(e.target.files[0]);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <UploadCloud className="h-4 w-4 text-primary" />
+                    <span>
+                      Drag & drop file, paste (Ctrl+V), or{" "}
+                      <strong className="text-primary hover:underline font-medium">browse</strong> to attach
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {isUploadingAttachment && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                    <span>Uploading attachment to storage…</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-1.5" />
+                </div>
+              )}
             </div>
           </div>
 
