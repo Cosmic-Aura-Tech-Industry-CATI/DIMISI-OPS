@@ -49,7 +49,20 @@ import {
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { admins, type Task, type TaskPriority, type TaskStatus, type TaskType } from "@/lib/mock-data";
-import { useTasksQuery, useDeleteTask, mapTaskResponse, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
+import {
+  useTasksQuery,
+  useTaskStatsQuery,
+  useDeleteTask,
+  mapTaskResponse,
+  getCategoryLabel,
+  formatTaskSubtitle,
+} from "@/features/tasks";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TaskTypeBadge } from "@/components/status-badge";
 import { projectName } from "@/lib/projects";
 import { IdBadge } from "@/components/id-badge";
@@ -131,7 +144,7 @@ function TasksPage() {
   );
 
   const { data: tasks = [], isLoading: isBaseLoading, isError, refetch } = useTasksQuery(taskFilters);
-  const { data: allUnfilteredTasks = [] } = useTasksQuery();
+  const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useTaskStatsQuery();
   const deleteTask = useDeleteTask({
     onSuccess: () => {
       toast.success("Task deleted");
@@ -167,8 +180,8 @@ function TasksPage() {
   const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
 
   const categories = useMemo(
-    () => Array.from(new Set(allUnfilteredTasks.map((t) => getCategoryLabel(t.category)))).sort(),
-    [allUnfilteredTasks],
+    () => Array.from(new Set(tasks.map((t) => getCategoryLabel(t.category)))).sort(),
+    [tasks],
   );
 
   const filtered = useMemo(() => {
@@ -238,12 +251,49 @@ function TasksPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard label="Total" value={allUnfilteredTasks.length} tone="text-foreground" />
-        <SummaryCard label="Available" value={allUnfilteredTasks.filter((t) => t.status === "available").length} tone="text-primary" />
-        <SummaryCard label="Assigned" value={allUnfilteredTasks.filter((t) => t.status === "assigned" || t.status === "pending").length} tone="text-info" />
-        <SummaryCard label="In progress" value={allUnfilteredTasks.filter((t) => t.status === "in_progress").length} tone="text-primary" />
-        <SummaryCard label="Overdue" value={allUnfilteredTasks.filter((t) => t.status === "overdue").length} tone="text-destructive" />
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <SummaryCard
+          label="Total"
+          value={statsData?.total}
+          tone="text-foreground"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
+        <SummaryCard
+          label="Available"
+          value={statsData?.available}
+          tone="text-primary"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
+        <SummaryCard
+          label="Assigned"
+          value={statsData?.assigned}
+          tone="text-info"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
+        <SummaryCard
+          label="In progress"
+          value={statsData?.inProgress}
+          tone="text-primary"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
+        <SummaryCard
+          label="Overdue"
+          value={statsData?.overdue}
+          tone="text-destructive"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
+        <SummaryCard
+          label="In review"
+          value={statsData?.inReview}
+          tone="text-warning"
+          isLoading={isStatsLoading}
+          isError={isStatsError}
+        />
       </div>
 
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center">
@@ -341,7 +391,14 @@ function TasksPage() {
                   </div>
                 }
                 title={
-                  <Link to="/admin/tasks/$id" params={{ id: t.id }} className="hover:text-primary">{t.title}</Link>
+                  <Link
+                    to="/admin/tasks/$id"
+                    params={{ id: t.id }}
+                    className="hover:text-primary line-clamp-2 break-words"
+                    title={t.title}
+                  >
+                    {t.title}
+                  </Link>
                 }
                 subtitle={formatTaskSubtitle(t.category, t.id)}
                 badges={<><TaskTypeBadge type={t.taskType} /><StatusBadge status={t.status} /><PriorityBadge priority={t.priority} /></>}
@@ -386,7 +443,7 @@ function TasksPage() {
             <table className="w-full min-w-[760px] whitespace-nowrap text-sm xl:min-w-[900px]">
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-5 py-3 font-medium"><SortBtn label="Title" active={sortKey === "title"} dir={sortDir} onClick={() => toggleSort("title")} /></th>
+                  <th className="px-5 py-3 font-medium min-w-[200px] max-w-[320px]"><SortBtn label="Title" active={sortKey === "title"} dir={sortDir} onClick={() => toggleSort("title")} /></th>
                   <th className="px-5 py-3 font-medium">Type</th>
                   <th className="px-5 py-3 font-medium">Employee</th>
                   <th className="px-5 py-3 font-medium"><SortBtn label="Priority" active={sortKey === "priority"} dir={sortDir} onClick={() => toggleSort("priority")} /></th>
@@ -409,9 +466,25 @@ function TasksPage() {
                     className="border-t border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
                     style={{ animationDelay: `${i * 20}ms` }}
                   >
-                    <td className="px-5 py-3.5">
-                      <Link to="/admin/tasks/$id" params={{ id: t.id }} className="block font-medium hover:text-primary">{t.title}</Link>
-                      <div className="text-xs text-muted-foreground">{formatTaskSubtitle(t.category, t.id)}</div>
+                    <td className="px-5 py-3.5 max-w-[240px] xl:max-w-[340px] min-w-0">
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link
+                              to="/admin/tasks/$id"
+                              params={{ id: t.id }}
+                              className="block font-medium hover:text-primary truncate"
+                              title={t.title}
+                            >
+                              {t.title}
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-md break-words">
+                            <p>{t.title}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <div className="text-xs text-muted-foreground truncate">{formatTaskSubtitle(t.category, t.id)}</div>
                     </td>
                     <td className="px-5 py-3.5">
                       <TaskTypeBadge type={t.taskType} />
@@ -553,11 +626,35 @@ function TasksPage() {
   );
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: string }) {
+function SummaryCard({
+  label,
+  value,
+  tone,
+  isLoading,
+  isError,
+}: {
+  label: string;
+  value?: number;
+  tone: string;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
   return (
-    <div className="glass rounded-2xl p-4">
+    <div className="glass rounded-2xl p-4 transition-all">
       <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-2 font-display text-2xl font-semibold ${tone}`}>{value}</p>
+      {isLoading ? (
+        <div className="mt-2.5 h-7 w-16 animate-pulse rounded-md bg-muted/50" />
+      ) : isError ? (
+        <p className="mt-2 font-display text-sm font-medium text-destructive">Error</p>
+      ) : value !== undefined && value !== null ? (
+        <p className={`mt-2 font-display text-2xl font-semibold ${tone}`}>
+          {value.toLocaleString()}
+        </p>
+      ) : (
+        <p className="mt-2 font-display text-sm font-medium text-muted-foreground" title="Count missing in API response">
+          N/A
+        </p>
+      )}
     </div>
   );
 }

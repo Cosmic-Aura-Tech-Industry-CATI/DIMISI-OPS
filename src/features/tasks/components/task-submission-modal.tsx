@@ -89,6 +89,7 @@ export function TaskSubmissionModal({
       setProofFiles([]);
       setFileError(null);
       setTouched(false);
+      setReplaceIndex(null);
       onSuccess?.();
     },
     onError: (err) => {
@@ -103,6 +104,7 @@ export function TaskSubmissionModal({
       setProofFiles([]);
       setFileError(null);
       setTouched(false);
+      setReplaceIndex(null);
       setTimeout(() => {
         textareaRef.current?.focus();
       }, 100);
@@ -159,7 +161,10 @@ export function TaskSubmissionModal({
       valid.push(f);
     }
 
-    if (valid.length === 0) return;
+    if (valid.length === 0) {
+      setReplaceIndex(null);
+      return;
+    }
 
     if (replaceIndex !== null && replaceIndex >= 0) {
       // Replace specific file
