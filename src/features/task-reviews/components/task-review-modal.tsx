@@ -54,7 +54,7 @@ function isImageProof(type?: string, name?: string): boolean {
   if (type && type.startsWith("image/")) return true;
   if (!name) return false;
   const ext = name.toLowerCase().slice(name.lastIndexOf("."));
-  return ext === ".jpg" || ext === ".jpeg" || ext === ".png";
+  return ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".webp" || ext === ".gif";
 }
 
 function isPdfProof(type?: string, name?: string): boolean {
@@ -63,8 +63,38 @@ function isPdfProof(type?: string, name?: string): boolean {
   return name.toLowerCase().endsWith(".pdf");
 }
 
+function formatDateSafe(
+  dateValue?: string | number | Date,
+  options?: Intl.DateTimeFormatOptions,
+  fallback = "No deadline"
+): string {
+  if (!dateValue) return fallback;
+  try {
+    const d = new Date(dateValue);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toLocaleDateString(undefined, options || { dateStyle: "medium" });
+  } catch {
+    return fallback;
+  }
+}
+
+function formatDateTimeSafe(
+  dateValue?: string | number | Date,
+  options?: Intl.DateTimeFormatOptions,
+  fallback = "N/A"
+): string {
+  if (!dateValue) return fallback;
+  try {
+    const d = new Date(dateValue);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toLocaleString(undefined, options || { dateStyle: "medium", timeStyle: "short" });
+  } catch {
+    return fallback;
+  }
+}
+
 function parseSubmissionNotes(notes?: string) {
-  if (!notes) return {};
+  if (!notes || typeof notes !== "string") return {};
   const sections: {
     workSummary?: string;
     deliverableLinks?: string;
@@ -144,75 +174,8 @@ export function TaskReviewModal({
     }
   }, [open]);
 
-  if (!task) return null;
-
-  const taskId = task._id || task.id;
-  const localSub = taskId ? getSubmission(taskId) : undefined;
-
-  // Resolve proof files (from API task.proofFiles, fallback to attachments, fallback to local submission store)
-  const proofList: Array<{
-    name: string;
-    size?: string | number;
-    url?: string;
-    dataUrl?: string;
-    mimeType?: string;
-  }> = [];
-
-  if (task.proofFiles && task.proofFiles.length > 0) {
-    proofList.push(...task.proofFiles);
-  } else if (localSub?.files && localSub.files.length > 0) {
-    proofList.push(
-      ...localSub.files.map((f) => ({
-        name: f.name,
-        size: typeof f.size === "number" ? `${Math.round(f.size / 1024)} KB` : String(f.size),
-        url: f.dataUrl || "",
-        dataUrl: f.dataUrl,
-        mimeType: f.type,
-      })),
-    );
-  } else if (task.attachments && task.attachments.length > 0) {
-    proofList.push(
-      ...task.attachments.map((a) => ({
-        name: a.name,
-        size: a.size,
-        url: a.url,
-      })),
-    );
-  }
-
-  const submitterName =
-    task.submittedBy || localSub?.employeeName || task.assignee || "Assigned Employee";
-  const submitterCode = task.assigneeCode || localSub?.employeeCode;
-  const submitterEmail = task.assigneeEmail;
-  const submittedAt = task.submittedAt || localSub?.submittedAt;
-
-  // Structured fields: workSummary, deliverableLinks, issues/submissionNotes, additionalRemarks
-  const parsedNotes = parseSubmissionNotes(task.notes);
-
-  const workSummary =
-    (task as any).workSummary ||
-    localSub?.workSummary ||
-    parsedNotes.workSummary;
-
-  const deliverableLinks =
-    (task as any).deliverableLinks ||
-    localSub?.deliverableLinks ||
-    parsedNotes.deliverableLinks;
-
-  const submissionNotes =
-    (task as any).issues ||
-    localSub?.issues ||
-    parsedNotes.issues ||
-    parsedNotes.generalNotes ||
-    (!workSummary && !deliverableLinks ? task.notes : undefined);
-
-  const additionalRemarks =
-    (task as any).additionalRemarks ||
-    localSub?.additionalRemarks ||
-    parsedNotes.additionalRemarks;
-
   const handleAttachmentFile = async (file: File) => {
-    if (!file || isUploadingAttachment) return;
+    if (!file || isUploadingAttachment || !task) return;
 
     const validation = validateTaskAttachmentFile(file);
     if (!validation.valid) {
@@ -272,7 +235,7 @@ export function TaskReviewModal({
     accept: ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(","),
     maxSize: 10 * 1024 * 1024,
     multiple: false,
-    disabled: isUploadingAttachment || reviewMutation.isPending,
+    disabled: !task || isUploadingAttachment || reviewMutation.isPending,
     label: "review attachment",
     validateFile: validateTaskAttachmentFile,
     onFiles: (files) => {
@@ -282,7 +245,98 @@ export function TaskReviewModal({
     },
   });
 
+  // ALL HOOKS EXECUTED UNCONDITIONALLY ABOVE.
+  // Returning null here is now 100% compliant with React's Rules of Hooks.
+  if (!task) return null;
+
+  const taskId = task._id || task.id || "";
+  const localSub = taskId ? getSubmission(taskId) : undefined;
+
+  // Resolve proof files safely (from API task.proofFiles, fallback to attachments, fallback to local submission store)
+  const proofList: Array<{
+    name: string;
+    size?: string | number;
+    url?: string;
+    dataUrl?: string;
+    mimeType?: string;
+  }> = [];
+
+  if (Array.isArray(task.proofFiles) && task.proofFiles.length > 0) {
+    proofList.push(
+      ...task.proofFiles.map((p) => ({
+        name: p?.name || "Proof File",
+        size: p?.size,
+        url: p?.url,
+        mimeType: p?.mimeType,
+      })),
+    );
+  } else if (localSub?.files && Array.isArray(localSub.files) && localSub.files.length > 0) {
+    proofList.push(
+      ...localSub.files.map((f) => ({
+        name: f.name || "Proof File",
+        size: typeof f.size === "number" ? `${Math.round(f.size / 1024)} KB` : String(f.size || "File"),
+        url: f.dataUrl || "",
+        dataUrl: f.dataUrl,
+        mimeType: f.type,
+      })),
+    );
+  } else if (Array.isArray(task.attachments) && task.attachments.length > 0) {
+    proofList.push(
+      ...task.attachments.map((a) => ({
+        name: a?.name || "Attachment",
+        size: a?.size,
+        url: a?.url,
+      })),
+    );
+  }
+
+  const submitterName =
+    task.submittedBy || localSub?.employeeName || task.assignee || "Assigned Employee";
+  const submitterCode = task.assigneeCode || localSub?.employeeCode;
+  const submitterEmail = task.assigneeEmail;
+  const submittedAt = task.submittedAt || localSub?.submittedAt;
+
+  // Structured fields: workSummary, deliverableLinks, issues/submissionNotes, additionalRemarks
+  const parsedNotes = parseSubmissionNotes(task.notes);
+
+  const workSummary =
+    (task as any).workSummary ||
+    localSub?.workSummary ||
+    parsedNotes.workSummary;
+
+  const rawDeliverableLinks =
+    (task as any).deliverableLinks ||
+    localSub?.deliverableLinks ||
+    parsedNotes.deliverableLinks;
+
+  const deliverableLinksList: string[] = Array.isArray(rawDeliverableLinks)
+    ? rawDeliverableLinks.map((l) => String(l || "").trim()).filter(Boolean)
+    : typeof rawDeliverableLinks === "string"
+      ? rawDeliverableLinks
+          .split(/[\n,]+/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+      : [];
+
+  const deliverableLinks = deliverableLinksList.join("\n");
+
+  const submissionNotes =
+    (task as any).issues ||
+    localSub?.issues ||
+    parsedNotes.issues ||
+    parsedNotes.generalNotes ||
+    (!workSummary && deliverableLinksList.length === 0 ? task.notes : undefined);
+
+  const additionalRemarks =
+    (task as any).additionalRemarks ||
+    localSub?.additionalRemarks ||
+    parsedNotes.additionalRemarks;
+
   const handleReview = (isApproved: boolean) => {
+    if (!taskId) {
+      toast.error("Task identifier is missing.");
+      return;
+    }
     if (isUploadingAttachment) {
       toast.info("Please wait for attachment upload to complete before submitting.");
       return;
@@ -305,26 +359,28 @@ export function TaskReviewModal({
 
     // Persist to local storage dimisi-task-reviews for optimistic persistence across refresh
     try {
-      const cached = JSON.parse(localStorage.getItem("dimisi-task-reviews") || "{}");
-      const existingReviews = Array.isArray(cached[taskId]?.reviews) ? cached[taskId].reviews : [];
-      const newReviewItem = {
-        reviewerName: user?.name || "Admin",
-        reviewerEmail: user?.email || "",
-        feedback: feedbackMessage,
-        status: isApproved ? "approved" : "rejected",
-        reviewedAt: new Date().toISOString(),
-        attachment: attachment || undefined,
-      };
-      cached[taskId] = {
-        feedback: feedbackMessage,
-        reviewerName: user?.name || "Admin",
-        reviewerEmail: user?.email || "",
-        reviewedAt: new Date().toISOString(),
-        reviewStatus: isApproved ? "approved" : "rejected",
-        reviews: [...existingReviews, newReviewItem],
-        attachment: attachment || undefined,
-      };
-      localStorage.setItem("dimisi-task-reviews", JSON.stringify(cached));
+      if (typeof window !== "undefined" && window.localStorage && taskId) {
+        const cached = JSON.parse(localStorage.getItem("dimisi-task-reviews") || "{}");
+        const existingReviews = Array.isArray(cached[taskId]?.reviews) ? cached[taskId].reviews : [];
+        const newReviewItem = {
+          reviewerName: user?.name || "Admin",
+          reviewerEmail: user?.email || "",
+          feedback: feedbackMessage,
+          status: isApproved ? "approved" : "rejected",
+          reviewedAt: new Date().toISOString(),
+          attachment: attachment || undefined,
+        };
+        cached[taskId] = {
+          feedback: feedbackMessage,
+          reviewerName: user?.name || "Admin",
+          reviewerEmail: user?.email || "",
+          reviewedAt: new Date().toISOString(),
+          reviewStatus: isApproved ? "approved" : "rejected",
+          reviews: [...existingReviews, newReviewItem],
+          attachment: attachment || undefined,
+        };
+        localStorage.setItem("dimisi-task-reviews", JSON.stringify(cached));
+      }
     } catch {
       // ignore
     }
@@ -353,7 +409,7 @@ export function TaskReviewModal({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success(`Downloading ${file.name}`);
+      toast.success(`Downloading ${file.name || "task-proof"}`);
     } catch {
       window.open(downloadUrl, "_blank");
     }
@@ -371,7 +427,7 @@ export function TaskReviewModal({
 
     if (isImg || isPdf) {
       setPreviewFile({
-        name: file.name,
+        name: file.name || "Proof File",
         url: viewUrl,
         isImg,
         isPdf,
@@ -461,7 +517,7 @@ export function TaskReviewModal({
                   <div className="min-w-0 flex-1">
                     <div className="text-muted-foreground text-[11px] font-medium">Due Date</div>
                     <div className="font-semibold truncate text-foreground">
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { dateStyle: "medium" }) : "No deadline"}
+                      {formatDateSafe(task.dueDate, { dateStyle: "medium" }, "No deadline")}
                     </div>
                   </div>
                 </div>
@@ -520,7 +576,7 @@ export function TaskReviewModal({
                 {submittedAt && (
                   <span className="inline-flex items-center gap-1 text-[11px] shrink-0">
                     <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                    {new Date(submittedAt).toLocaleString(undefined, {
+                    {formatDateTimeSafe(submittedAt, {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })}
@@ -552,7 +608,11 @@ export function TaskReviewModal({
                               {file.name}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">
-                              {file.size ? (typeof file.size === "number" ? `${Math.round(file.size / 1024)} KB` : String(file.size)) : "File"} · {file.name.slice(file.name.lastIndexOf(".")).toUpperCase() || "DOCUMENT"}
+                              {file.size ? (typeof file.size === "number" ? `${Math.round(file.size / 1024)} KB` : String(file.size)) : "File"} · {(() => {
+                                const fn = file.name || "";
+                                const dot = fn.lastIndexOf(".");
+                                return dot >= 0 ? fn.slice(dot).toUpperCase() : "DOCUMENT";
+                              })()}
                             </p>
                           </div>
                         </div>
@@ -602,39 +662,35 @@ export function TaskReviewModal({
             )}
 
             {/* DELIVERABLE LINKS (if present) */}
-            {deliverableLinks && (
+            {deliverableLinksList.length > 0 && (
               <div className="space-y-1.5 min-w-0">
                 <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <ExternalLink className="h-3.5 w-3.5 text-primary" /> Deliverables & Links
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2 min-w-0">
-                  {deliverableLinks
-                    .split(/[\n,]+/)
-                    .map((link: string) => link.trim())
-                    .filter(Boolean)
-                    .map((link: string, idx: number) => {
-                      const isUrl = /^https?:\/\//i.test(link);
-                      const href = isUrl ? link : `https://${link}`;
-                      return (
-                        <div key={idx} className="flex items-start gap-2 min-w-0 text-sm">
-                          <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                          {isUrl || link.includes(".") ? (
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline font-medium break-all min-w-0 flex-1 leading-snug"
-                            >
-                              {link}
-                            </a>
-                          ) : (
-                            <span className="text-foreground/90 break-words min-w-0 flex-1">
-                              {link}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                  {deliverableLinksList.map((link: string, idx: number) => {
+                    const isUrl = /^https?:\/\//i.test(link);
+                    const href = isUrl ? link : `https://${link}`;
+                    return (
+                      <div key={idx} className="flex items-start gap-2 min-w-0 text-sm">
+                        <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        {isUrl || link.includes(".") ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline font-medium break-all min-w-0 flex-1 leading-snug"
+                          >
+                            {link}
+                          </a>
+                        ) : (
+                          <span className="text-foreground/90 break-words min-w-0 flex-1">
+                            {link}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -685,7 +741,7 @@ export function TaskReviewModal({
                   </span>
                   {task.reviewedAt && (
                     <span className="text-[11px] font-normal text-muted-foreground shrink-0">
-                      {new Date(task.reviewedAt).toLocaleDateString(undefined, {
+                      {formatDateSafe(task.reviewedAt, {
                         dateStyle: "medium",
                       })}
                     </span>
@@ -934,6 +990,16 @@ export function TaskReviewModal({
                 <img
                   src={previewFile.url}
                   alt={previewFile.name}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    const parent = e.currentTarget.parentElement;
+                    if (parent && !parent.querySelector(".img-error-fallback")) {
+                      const fallback = document.createElement("div");
+                      fallback.className = "img-error-fallback py-12 text-center text-sm text-muted-foreground";
+                      fallback.innerHTML = "<p>Preview could not be loaded from remote storage.</p>";
+                      parent.appendChild(fallback);
+                    }
+                  }}
                   className="max-h-[68dvh] w-auto max-w-full rounded-xl object-contain shadow-md"
                 />
               ) : previewFile.isPdf ? (

@@ -39,7 +39,24 @@ export const Route = createFileRoute("/admin/task-reviews")({
     ],
   }),
   component: ReviewCenterPage,
+  errorComponent: ReviewCenterError,
 });
+
+function ReviewCenterError({ error, reset }: { error: any; reset: () => void }) {
+  return (
+    <>
+      <PageHeader
+        title="Review Center"
+        subtitle="Evaluate employee task submissions, approve points, or request changes."
+      />
+      <ErrorState
+        title="Could not load Review Center"
+        description={error?.message || "An unexpected error occurred while loading task reviews."}
+        onRetry={reset}
+      />
+    </>
+  );
+}
 
 function ReviewCenterPage() {
   const [query, setQuery] = useState("");
@@ -59,10 +76,11 @@ function ReviewCenterPage() {
     highPriority: 0,
     pointsAtStake: 0,
   };
-  const tasks = data?.tasks ?? [];
+  const tasks = useMemo(() => data?.tasks ?? [], [data?.tasks]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
+      if (!t) return false;
       // Ensure only tasks actively pending review are displayed
       const raw = (t.rawStatus || "").toLowerCase().trim();
       const st = (t.status || "").toLowerCase().trim();
@@ -72,17 +90,24 @@ function ReviewCenterPage() {
       if (raw === "in_progress" && rev !== "in_review") return false;
 
       const q = query.trim().toLowerCase();
+      const titleStr = (t.title || "").toLowerCase();
+      const assigneeStr = (t.assignee || "").toLowerCase();
+      const emailStr = (t.assigneeEmail || "").toLowerCase();
+      const notesStr = (t.notes || "").toLowerCase();
+      const catStr = getCategoryLabel(t.category).toLowerCase();
+
       const matchesQuery =
         !q ||
-        t.title.toLowerCase().includes(q) ||
-        t.assignee.toLowerCase().includes(q) ||
-        (t.assigneeEmail && t.assigneeEmail.toLowerCase().includes(q)) ||
-        (t.notes && t.notes.toLowerCase().includes(q)) ||
-        getCategoryLabel(t.category).toLowerCase().includes(q);
+        titleStr.includes(q) ||
+        assigneeStr.includes(q) ||
+        emailStr.includes(q) ||
+        notesStr.includes(q) ||
+        catStr.includes(q);
 
+      const taskPriority = (t.priority || "").toLowerCase();
       const matchesPriority =
         priorityFilter === "all" ||
-        t.priority.toLowerCase() === priorityFilter.toLowerCase();
+        taskPriority === priorityFilter.toLowerCase();
 
       return matchesQuery && matchesPriority;
     });
@@ -202,7 +227,8 @@ function ReviewCenterPage() {
               </thead>
               <tbody className="divide-y divide-border/40">
                 {filteredTasks.map((task, idx) => {
-                  const taskId = task._id || task.id;
+                  const taskId = task._id || task.id || "";
+                  const isIdValid = Boolean(taskId);
                   return (
                     <tr
                       key={taskId || idx}
@@ -210,13 +236,19 @@ function ReviewCenterPage() {
                     >
                       {/* Task Name */}
                       <td className="px-5 py-4 max-w-xs">
-                        <Link
-                          to="/admin/tasks/$id"
-                          params={{ id: taskId }}
-                          className="font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors cursor-pointer"
-                        >
-                          {task.title}
-                        </Link>
+                        {isIdValid ? (
+                          <Link
+                            to="/admin/tasks/$id"
+                            params={{ id: taskId }}
+                            className="font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors cursor-pointer"
+                          >
+                            {task.title || "Untitled Task"}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-foreground line-clamp-1">
+                            {task.title || "Untitled Task"}
+                          </span>
+                        )}
                         {getCategoryLabel(task.category) !== "Uncategorized" && (
                           <span className="mt-1 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
                             {getCategoryLabel(task.category)}
@@ -245,7 +277,7 @@ function ReviewCenterPage() {
 
                       {/* Priority */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <TaskPriorityBadge priority={task.priority} />
+                        <TaskPriorityBadge priority={task.priority || "medium"} />
                       </td>
 
                       {/* Reward Points */}
@@ -271,7 +303,18 @@ function ReviewCenterPage() {
                         <div className="inline-flex items-center gap-1.5 text-xs">
                           <Calendar className="h-3.5 w-3.5 text-primary" />
                           <span>
-                            {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "Pending"}
+                            {task.dueDate ? (
+                              (() => {
+                                try {
+                                  const d = new Date(task.dueDate);
+                                  return !isNaN(d.getTime()) ? d.toLocaleDateString() : "Pending";
+                                } catch {
+                                  return "Pending";
+                                }
+                              })()
+                            ) : (
+                              "Pending"
+                            )}
                           </span>
                         </div>
                       </td>
@@ -310,17 +353,19 @@ function ReviewCenterPage() {
       )}
 
       {/* Task Review Modal */}
-      <TaskReviewModal
-        task={selectedTask}
-        open={Boolean(selectedTask)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedTask(null);
-        }}
-        onSuccess={() => {
-          setSelectedTask(null);
-          void refetch();
-        }}
-      />
+      {selectedTask && (
+        <TaskReviewModal
+          task={selectedTask}
+          open={Boolean(selectedTask)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedTask(null);
+          }}
+          onSuccess={() => {
+            setSelectedTask(null);
+            void refetch();
+          }}
+        />
+      )}
     </>
   );
 }
