@@ -111,14 +111,6 @@ export function TaskSubmissionModal({
     }
   }, [open, task]);
 
-  if (!task) return null;
-
-  const trimmed = notes.trim();
-  const isNotesValid = trimmed.length >= 10 && trimmed.length <= 5000;
-  const isTooShort = touched && trimmed.length > 0 && trimmed.length < 10;
-  const isTooLong = trimmed.length > 5000;
-  const isNotesEmpty = touched && trimmed.length === 0;
-
   const handleFilesSelected = (filesList: FileList | File[] | null) => {
     if (!filesList) return;
 
@@ -198,7 +190,7 @@ export function TaskSubmissionModal({
     accept: ACCEPT_FILE_TYPES,
     maxSize: MAX_FILE_SIZE_BYTES,
     multiple: true,
-    disabled: submitMutation.isPending,
+    disabled: !task || submitMutation.isPending,
     existingFiles: proofFiles,
     enableWindowPaste: open,
     label: "proof file",
@@ -206,6 +198,15 @@ export function TaskSubmissionModal({
       handleFilesSelected(incomingFiles);
     },
   });
+
+  // ALL HOOKS EXECUTED UNCONDITIONALLY ABOVE
+  if (!task) return null;
+
+  const trimmed = notes.trim();
+  const isNotesValid = trimmed.length >= 10 && trimmed.length <= 5000;
+  const isTooShort = touched && trimmed.length > 0 && trimmed.length < 10;
+  const isTooLong = trimmed.length > 5000;
+  const isNotesEmpty = touched && trimmed.length === 0;
 
   const handleTriggerReplace = (index: number) => {
     setReplaceIndex(index);
