@@ -29,9 +29,9 @@ export function TaskTable({ tasks, showAssignee = true }: { tasks: Task[]; showA
                 className="border-b border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
                 style={{ animationDelay: `${i * 25}ms` }}
               >
-                <td className="px-5 py-3.5">
-                  <div className="font-medium">{t.title}</div>
-                  <div className="text-xs text-muted-foreground">{t.category}</div>
+                <td className="px-5 py-3.5 max-w-xs min-w-[180px] whitespace-normal">
+                  <div className="font-medium line-clamp-2 break-words leading-snug" title={t.title}>{t.title}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{t.category}</div>
                 </td>
                 {showAssignee && (
                   <td className="px-5 py-3.5">

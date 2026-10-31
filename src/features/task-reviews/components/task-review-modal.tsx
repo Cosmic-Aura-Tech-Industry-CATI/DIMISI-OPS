@@ -202,7 +202,11 @@ export function TaskReviewModal({
         size: res.size,
         mimeType: file.type,
       });
-      toast.success(`Attached "${res.name || file.name}" to review.`);
+      toast.success(
+        previousAttachment
+          ? `Replaced attachment with "${res.name || file.name}".`
+          : `Attached "${res.name || file.name}" to review.`
+      );
     } catch (err: unknown) {
       // Retain previous valid attachment on failure
       setAttachment(previousAttachment);
@@ -216,12 +220,28 @@ export function TaskReviewModal({
     } finally {
       setIsUploadingAttachment(false);
       setUploadProgress(0);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
     }
   };
 
   const handleRemoveAttachment = () => {
     if (isUploadingAttachment) return;
     setAttachment(null);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  };
+
+  const handleCancel = () => {
+    if (reviewMutation.isPending) return;
+    setFeedback("");
+    setAttachment(null);
+    setPreviewFile(null);
+    setPendingAction(null);
+    setIsUploadingAttachment(false);
+    onOpenChange(false);
   };
 
   const {
@@ -390,6 +410,15 @@ export function TaskReviewModal({
       id: taskId,
       isApproved,
       feedback: feedbackMessage,
+      attachment: attachment
+        ? {
+            name: attachment.name,
+            url: attachment.url,
+            publicId: attachment.publicId,
+            size: attachment.size,
+            mimeType: attachment.mimeType,
+          }
+        : undefined,
     });
   };
 
@@ -443,7 +472,7 @@ export function TaskReviewModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(95vw,700px)] max-w-[700px] max-h-[90dvh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl">
+        <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(96vw,840px)] max-w-[min(96vw,840px)] sm:max-w-[840px] max-h-[90dvh] sm:max-h-[90dvh] flex flex-col p-0 sm:p-0 sm:pb-0 gap-0 sm:gap-0 overflow-hidden rounded-2xl sm:rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl">
           {/* Fixed Header */}
           <DialogHeader className="p-5 pb-4 border-b border-border/50 shrink-0 pr-12 text-left space-y-1">
             <div className="flex items-center gap-2.5">
@@ -466,11 +495,11 @@ export function TaskReviewModal({
               {/* Header: Title & Badges */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0 flex-1">
-                  <h4 className="font-semibold text-base leading-snug break-words text-foreground">
+                  <h4 className="font-semibold text-base leading-snug break-words [overflow-wrap:anywhere] text-foreground">
                     {task.title}
                   </h4>
                   {task.description && (
-                    <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-line break-words leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-line break-words [overflow-wrap:anywhere] leading-relaxed">
                       {task.description}
                     </p>
                   )}
@@ -494,7 +523,7 @@ export function TaskReviewModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border/40 text-xs">
                 {/* Submitter Info */}
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary text-xs font-semibold">
                     <User className="h-4 w-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -803,8 +832,23 @@ export function TaskReviewModal({
                 Attach feedback notes, annotated deliverables, or revision guidelines during acceptance or rejection.
               </p>
 
+              {/* Hidden file input always mounted so Change button, browse, drop, and paste always function reliably */}
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept={ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                className="sr-only"
+                disabled={isUploadingAttachment || reviewMutation.isPending}
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    void handleAttachmentFile(e.target.files[0]);
+                    e.target.value = "";
+                  }
+                }}
+              />
+
               {attachment ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/60 p-3 transition-colors shadow-sm min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/60 p-3 transition-colors shadow-sm min-w-0">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                       {attachment.mimeType?.startsWith("image/") ? (
@@ -818,12 +862,12 @@ export function TaskReviewModal({
                         {attachment.name}
                       </p>
                       <p className="text-[11px] text-muted-foreground truncate">
-                        {attachment.size} · Attached to review
+                        {attachment.size} · {isUploadingAttachment ? "Replacement uploading…" : "Attached to review"}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                     <Button
                       type="button"
                       size="sm"
@@ -836,6 +880,7 @@ export function TaskReviewModal({
                           isPdf: isPdfProof(attachment.mimeType, attachment.name),
                         })
                       }
+                      disabled={isUploadingAttachment}
                       className="h-8 gap-1 text-xs rounded-lg"
                     >
                       <Eye className="h-3.5 w-3.5" /> Preview
@@ -843,10 +888,11 @@ export function TaskReviewModal({
                     <Button
                       type="button"
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       onClick={openAttachmentDialog}
                       disabled={isUploadingAttachment || reviewMutation.isPending}
-                      className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      className="h-8 px-2.5 text-xs text-foreground hover:bg-muted/60"
+                      title="Replace current attachment with a new file"
                     >
                       Change
                     </Button>
@@ -875,19 +921,6 @@ export function TaskReviewModal({
                       : "border-border/60 bg-background/40 hover:border-primary/50 hover:bg-primary/5"
                   } ${isUploadingAttachment ? "pointer-events-none opacity-60" : ""}`}
                 >
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    accept={ALLOWED_TASK_ATTACHMENT_EXTENSIONS.map((e) => `.${e}`).join(",")}
-                    className="sr-only"
-                    disabled={isUploadingAttachment || reviewMutation.isPending}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        void handleAttachmentFile(e.target.files[0]);
-                        e.target.value = "";
-                      }
-                    }}
-                  />
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <UploadCloud className="h-4 w-4 text-primary" />
                     <span>
@@ -901,7 +934,7 @@ export function TaskReviewModal({
               {isUploadingAttachment && (
                 <div className="space-y-1 pt-1">
                   <div className="flex justify-between text-[11px] text-muted-foreground">
-                    <span>Uploading attachment to storage…</span>
+                    <span>{attachment ? "Uploading replacement file to storage…" : "Uploading attachment to storage…"}</span>
                     <span>{uploadProgress}%</span>
                   </div>
                   <Progress value={uploadProgress} className="h-1.5" />
@@ -911,24 +944,24 @@ export function TaskReviewModal({
           </div>
 
           {/* Action Buttons (Fixed Footer) */}
-          <DialogFooter className="p-4 border-t border-border/50 bg-background/95 backdrop-blur-md shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <DialogFooter className="p-4 border-t border-border/50 bg-background/95 backdrop-blur-md shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between sm:justify-between sm:space-x-0 gap-3">
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleCancel}
               disabled={reviewMutation.isPending}
-              className="rounded-xl h-10 px-4 text-sm font-medium border-border/70 hover:bg-muted/60 transition-colors w-full sm:w-auto"
+              className="rounded-xl h-10 px-5 text-sm font-medium border-border/70 hover:bg-muted/60 transition-colors w-full sm:w-auto shrink-0 order-last sm:order-first"
             >
               Cancel
             </Button>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleReview(false)}
                 disabled={isRejectDisabled}
-                className="rounded-xl h-10 px-4 text-sm font-medium border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors disabled:opacity-50 w-full sm:w-auto"
+                className="rounded-xl h-10 px-4 text-sm font-medium border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
               >
                 {reviewMutation.isPending && pendingAction === "reject" ? (
                   <span className="flex items-center gap-2">
@@ -945,7 +978,7 @@ export function TaskReviewModal({
                 type="button"
                 onClick={() => handleReview(true)}
                 disabled={isApproveDisabled}
-                className="rounded-xl h-10 px-5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-glow transition-all disabled:opacity-50 w-full sm:w-auto"
+                className="rounded-xl h-10 px-5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-glow transition-all disabled:opacity-50 w-full sm:w-auto shrink-0"
               >
                 {reviewMutation.isPending && pendingAction === "approve" ? (
                   <span className="flex items-center gap-2">
@@ -965,7 +998,7 @@ export function TaskReviewModal({
       {/* Lightbox / Preview Modal */}
       {previewFile && (
         <Dialog open={Boolean(previewFile)} onOpenChange={(open) => !open && setPreviewFile(null)}>
-          <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(95vw,800px)] max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl border-border/60 bg-background/98 shadow-2xl">
+          <DialogContent className="inset-x-auto bottom-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(96vw,860px)] max-w-[min(96vw,860px)] sm:max-w-[860px] max-h-[92dvh] sm:max-h-[92dvh] flex flex-col p-0 sm:p-0 sm:pb-0 gap-0 sm:gap-0 overflow-hidden rounded-2xl sm:rounded-2xl border-border/60 bg-background/98 shadow-2xl">
             <DialogHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-border/50 shrink-0 pr-12 text-left">
               <div className="min-w-0 pr-2">
                 <DialogTitle className="text-base font-semibold truncate">

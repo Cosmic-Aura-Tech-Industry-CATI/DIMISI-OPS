@@ -26,6 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TaskStatusBadge, TaskPriorityBadge } from "@/components/task-status-badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TaskReviewModal } from "@/features/task-reviews/components/task-review-modal";
 import { useReviewCenter, type Task, getCategoryLabel } from "@/features/tasks";
 
@@ -235,20 +241,33 @@ function ReviewCenterPage() {
                       className="transition-colors hover:bg-muted/30 animate-in fade-in"
                     >
                       {/* Task Name */}
-                      <td className="px-5 py-4 max-w-xs">
-                        {isIdValid ? (
-                          <Link
-                            to="/admin/tasks/$id"
-                            params={{ id: taskId }}
-                            className="font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors cursor-pointer"
-                          >
-                            {task.title || "Untitled Task"}
-                          </Link>
-                        ) : (
-                          <span className="font-semibold text-foreground line-clamp-1">
-                            {task.title || "Untitled Task"}
-                          </span>
-                        )}
+                      <td className="px-5 py-4 max-w-[280px] min-w-[180px] whitespace-normal">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {isIdValid ? (
+                                <Link
+                                  to="/admin/tasks/$id"
+                                  params={{ id: taskId }}
+                                  className="font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors cursor-pointer break-words leading-snug"
+                                  title={task.title || "Untitled Task"}
+                                >
+                                  {task.title || "Untitled Task"}
+                                </Link>
+                              ) : (
+                                <span
+                                  className="font-semibold text-foreground line-clamp-2 break-words leading-snug"
+                                  title={task.title || "Untitled Task"}
+                                >
+                                  {task.title || "Untitled Task"}
+                                </span>
+                              )}
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs break-words">
+                              <p>{task.title || "Untitled Task"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         {getCategoryLabel(task.category) !== "Uncategorized" && (
                           <span className="mt-1 inline-block rounded-md bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
                             {getCategoryLabel(task.category)}

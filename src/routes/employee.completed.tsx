@@ -121,11 +121,12 @@ function CompletedTasksPage() {
                       className="transition-colors hover:bg-muted/30 animate-in fade-in"
                     >
                       {/* Task Name & Description */}
-                      <td className="px-5 py-4 max-w-sm">
+                      <td className="px-5 py-4 max-w-sm min-w-[200px] whitespace-normal">
                         <Link
                           to="/employee/tasks/$id"
                           params={{ id: taskId }}
-                          className="font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors cursor-pointer"
+                          className="font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors cursor-pointer break-words leading-snug"
+                          title={task.title}
                         >
                           {task.title}
                         </Link>

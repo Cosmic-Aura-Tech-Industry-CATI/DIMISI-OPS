@@ -466,14 +466,14 @@ function TasksPage() {
                     className="border-t border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
                     style={{ animationDelay: `${i * 20}ms` }}
                   >
-                    <td className="px-5 py-3.5 max-w-[240px] xl:max-w-[340px] min-w-0">
+                    <td className="px-5 py-3.5 max-w-[240px] xl:max-w-[340px] min-w-[180px] whitespace-normal">
                       <TooltipProvider delayDuration={200}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Link
                               to="/admin/tasks/$id"
                               params={{ id: t.id }}
-                              className="block font-medium hover:text-primary truncate"
+                              className="block font-medium hover:text-primary line-clamp-2 break-words leading-snug"
                               title={t.title}
                             >
                               {t.title}
@@ -484,7 +484,7 @@ function TasksPage() {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <div className="text-xs text-muted-foreground truncate">{formatTaskSubtitle(t.category, t.id)}</div>
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">{formatTaskSubtitle(t.category, t.id)}</div>
                     </td>
                     <td className="px-5 py-3.5">
                       <TaskTypeBadge type={t.taskType} />

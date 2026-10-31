@@ -212,6 +212,8 @@ export function TaskForm({
   const [pointsInput, setPointsInput] = useState<string>(
     initial.points !== undefined && initial.points !== null ? String(initial.points) : "50",
   );
+  const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
@@ -403,6 +405,109 @@ export function TaskForm({
         ),
       }));
       toast.error(`Upload failed for ${item.name}: ${message}`);
+    }
+  };
+
+  const handleTriggerReplace = (id?: string) => {
+    if (!id || busy) return;
+    setReplacingAttachmentId(id);
+    if (replaceFileInputRef.current) {
+      replaceFileInputRef.current.value = "";
+      replaceFileInputRef.current.click();
+    }
+  };
+
+  const handleReplaceFile = async (file: File) => {
+    if (!file || !replacingAttachmentId) return;
+
+    const validation = validateTaskAttachmentFile(file);
+    if (!validation.valid) {
+      toast.error(`${file.name}: ${validation.error || "Invalid file"}`);
+      setReplacingAttachmentId(null);
+      return;
+    }
+
+    const targetId = replacingAttachmentId;
+    const targetItem = form.attachments.find((a) => a.id === targetId);
+    if (!targetItem) {
+      setReplacingAttachmentId(null);
+      return;
+    }
+
+    // Retain previous attachment in case replacement upload fails
+    const previousItem = { ...targetItem };
+
+    const formattedSize =
+      file.size < 1024 * 1024
+        ? `${(file.size / 1024).toFixed(0)} KB`
+        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+    // Keep previous attachment visible while uploading replacement
+    setForm((prev) => ({
+      ...prev,
+      attachments: prev.attachments.map((att) =>
+        att.id === targetId
+          ? {
+              ...att,
+              isUploading: true,
+              uploadProgress: 10,
+              error: undefined,
+            }
+          : att,
+      ),
+    }));
+
+    try {
+      const res = await uploadTaskAttachment(file, (percent) => {
+        setForm((prev) => ({
+          ...prev,
+          attachments: prev.attachments.map((att) =>
+            att.id === targetId ? { ...att, uploadProgress: percent } : att,
+          ),
+        }));
+      });
+
+      // Update state: REPLACE the old attachment completely with the new replacement
+      setForm((prev) => ({
+        ...prev,
+        attachments: prev.attachments.map((att) =>
+          att.id === targetId
+            ? {
+                id: `replaced-${Date.now()}-${res.name || file.name}`,
+                name: res.name || file.name,
+                size: res.size || formattedSize,
+                url: res.url,
+                publicId: res.publicId,
+                file,
+                isUploading: false,
+                uploadProgress: 100,
+                error: undefined,
+              }
+            : att,
+        ),
+      }));
+
+      toast.success(`Replaced "${previousItem.name}" with "${res.name || file.name}".`);
+    } catch (err: unknown) {
+      // Retain previous valid attachment on failure
+      setForm((prev) => ({
+        ...prev,
+        attachments: prev.attachments.map((att) =>
+          att.id === targetId ? previousItem : att,
+        ),
+      }));
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Replacement upload failed.";
+      toast.error(`Failed to replace ${previousItem.name}: ${message}`);
+    } finally {
+      setReplacingAttachmentId(null);
+      if (replaceFileInputRef.current) {
+        replaceFileInputRef.current.value = "";
+      }
     }
   };
 
@@ -644,6 +749,20 @@ export function TaskForm({
                 e.target.value = "";
               }}
             />
+            {/* Dedicated input for single attachment replacement */}
+            <input
+              ref={replaceFileInputRef}
+              type="file"
+              accept={attachmentAccept}
+              disabled={busy}
+              className="sr-only"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  void handleReplaceFile(e.target.files[0]);
+                  e.target.value = "";
+                }
+              }}
+            />
           </div>
 
           {form.attachments.length > 0 && (
@@ -682,6 +801,17 @@ export function TaskForm({
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg"
+                            onClick={() => handleTriggerReplace(a.id)}
+                            disabled={busy}
+                            title="Replace this attachment with a different file"
+                          >
+                            <RotateCw className="mr-1 h-3 w-3" /> Replace
+                          </Button>
                         </span>
                       )}
 
