@@ -80,6 +80,8 @@ export function ProofUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const objectUrlsRef = useRef<Set<string>>(new Set());
+  const [replacingProofId, setReplacingProofId] = useState<string | null>(null);
+  const replaceProofInputRef = useRef<HTMLInputElement>(null);
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -129,6 +131,116 @@ export function ProofUploader({
 
       onChange(files.map((f) => (f.id === item.id ? { ...f, isUploading: false, error: msg } : f)));
       toast.error(`Failed to upload ${item.name}: ${msg}`);
+    }
+  };
+
+  const handleTriggerReplace = (id: string) => {
+    if (isAnyUploading) return;
+    setReplacingProofId(id);
+    if (replaceProofInputRef.current) {
+      replaceProofInputRef.current.value = "";
+      replaceProofInputRef.current.click();
+    }
+  };
+
+  const handleReplaceProof = async (file: File) => {
+    if (!file || !replacingProofId) return;
+
+    const validation = validateTaskProofFile(file);
+    if (!validation.valid) {
+      toast.error(`${file.name}: ${validation.error || "Invalid file"}`);
+      setReplacingProofId(null);
+      return;
+    }
+
+    const targetId = replacingProofId;
+    const targetItem = files.find((f) => f.id === targetId);
+    if (!targetItem) {
+      setReplacingProofId(null);
+      return;
+    }
+
+    const previousItem = { ...targetItem };
+
+    let previewUrl: string | undefined;
+    if (file.type.startsWith("image/")) {
+      previewUrl = URL.createObjectURL(file);
+      objectUrlsRef.current.add(previewUrl);
+    }
+    const dataUrl = await readAsDataUrl(file);
+
+    // Keep previous valid proof visible while uploading replacement
+    onChange(
+      files.map((f) =>
+        f.id === targetId
+          ? {
+              ...f,
+              isUploading: true,
+              uploadProgress: 10,
+              error: undefined,
+            }
+          : f,
+      ),
+    );
+
+    try {
+      const res = await uploadTaskProof(file, (percent) => {
+        onChange(
+          files.map((f) =>
+            f.id === targetId ? { ...f, uploadProgress: percent } : f,
+          ),
+        );
+      });
+
+      if (previousItem.previewUrl) {
+        URL.revokeObjectURL(previousItem.previewUrl);
+        objectUrlsRef.current.delete(previousItem.previewUrl);
+      }
+
+      // Replace old proof completely with newly uploaded proof
+      onChange(
+        files.map((f) =>
+          f.id === targetId
+            ? {
+                id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`,
+                name: res.name || file.name,
+                size: res.size || file.size,
+                type: res.type || file.type || "application/octet-stream",
+                file,
+                url: res.url,
+                publicId: res.publicId,
+                previewUrl,
+                dataUrl,
+                isUploading: false,
+                uploadProgress: 100,
+                error: undefined,
+              }
+            : f,
+        ),
+      );
+
+      toast.success(`Replaced "${previousItem.name}" with "${res.name || file.name}".`);
+    } catch (err: unknown) {
+      // Retain previous valid proof on failure
+      onChange(
+        files.map((f) => (f.id === targetId ? previousItem : f)),
+      );
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        objectUrlsRef.current.delete(previewUrl);
+      }
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Upload failed.";
+      toast.error(`Failed to replace ${previousItem.name}: ${msg}`);
+    } finally {
+      setReplacingProofId(null);
+      if (replaceProofInputRef.current) {
+        replaceProofInputRef.current.value = "";
+      }
     }
   };
 
@@ -316,6 +428,20 @@ export function ProofUploader({
             e.target.value = "";
           }}
         />
+        {/* Dedicated input for single proof replacement */}
+        <input
+          ref={replaceProofInputRef}
+          type="file"
+          accept={ACCEPTED}
+          className="sr-only"
+          disabled={isAnyUploading}
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              void handleReplaceProof(e.target.files[0]);
+              e.target.value = "";
+            }
+          }}
+        />
       </div>
 
       {images.length > 0 && (
@@ -373,14 +499,26 @@ export function ProofUploader({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => remove(f.id)}
-                  className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-md bg-background/80 text-foreground backdrop-blur transition-colors hover:text-destructive shadow-sm"
-                  aria-label={`Remove ${f.name}`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                <div className="absolute right-1.5 top-1.5 flex items-center gap-1 z-10">
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerReplace(f.id)}
+                    disabled={isAnyUploading}
+                    className="grid h-7 w-7 place-items-center rounded-md bg-background/80 text-foreground backdrop-blur transition-colors hover:text-primary shadow-sm"
+                    title="Replace this image"
+                    aria-label={`Replace ${f.name}`}
+                  >
+                    <RotateCw className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(f.id)}
+                    className="grid h-7 w-7 place-items-center rounded-md bg-background/80 text-foreground backdrop-blur transition-colors hover:text-destructive shadow-sm"
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 <div className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-2 py-1 text-[10px] text-white">
                   {f.name}
                 </div>
@@ -435,15 +573,28 @@ export function ProofUploader({
                       )}
 
                       {!f.isUploading && f.url && (
-                        <a
-                          href={f.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="grid h-7 w-7 place-items-center rounded-md border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/40"
-                          title="View file"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
+                        <>
+                          <a
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="grid h-7 w-7 place-items-center rounded-md border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/40"
+                            title="View file"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg"
+                            onClick={() => handleTriggerReplace(f.id)}
+                            disabled={isAnyUploading}
+                            title="Replace this file"
+                          >
+                            <RotateCw className="mr-1 h-3 w-3" /> Replace
+                          </Button>
+                        </>
                       )}
 
                       {!f.isUploading && f.error && f.file && (

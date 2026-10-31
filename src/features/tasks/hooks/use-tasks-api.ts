@@ -17,6 +17,7 @@ import { authService } from "@/auth/services/auth.service";
 import { tasksService } from "../services/tasks.service";
 import type {
   CreateTaskInput,
+  ReviewAttachment,
   ReviewCenterResponse,
   ReviewTaskPayload,
   SubmitTaskPayload,
@@ -303,13 +304,14 @@ export function useReviewTaskMutation(
   options?: UseMutationOptions<
     Task,
     ApiError,
-    { id: string; isApproved: boolean; feedback?: string }
+    { id: string; isApproved: boolean; feedback?: string; attachment?: ReviewAttachment }
   >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation<Task, ApiError, { id: string; isApproved: boolean; feedback?: string }>({
-    mutationFn: ({ id, isApproved, feedback }) => tasksService.reviewTask(id, isApproved, feedback),
+  return useMutation<Task, ApiError, { id: string; isApproved: boolean; feedback?: string; attachment?: ReviewAttachment }>({
+    mutationFn: ({ id, isApproved, feedback, attachment }) =>
+      tasksService.reviewTask(id, { isApproved, feedback, attachment }),
     onSuccess: (...args) => {
       const [, variables] = args;
       // Immediately remove the reviewed task from the Review Center query cache
