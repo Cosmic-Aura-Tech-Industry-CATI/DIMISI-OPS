@@ -549,6 +549,26 @@ export function resolveTaskCategory(doc: unknown): string {
  * Formats the task subtitle for display.
  * Never displays a raw MongoDB ObjectId.
  */
+export function safeToIsoString(val: unknown, fallback?: string): string {
+  if (val === undefined || val === null || val === "") {
+    return fallback !== undefined ? fallback : new Date().toISOString();
+  }
+  try {
+    const d = new Date(val as string | number | Date);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  } catch {}
+  return fallback !== undefined ? fallback : new Date().toISOString();
+}
+
+export function safeToIsoDate(val: unknown, fallback = ""): string {
+  if (val === undefined || val === null || val === "") return fallback;
+  try {
+    const d = new Date(val as string | number | Date);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch {}
+  return fallback;
+}
+
 export function formatTaskSubtitle(category: unknown, id?: string): string {
   const catLabel = getCategoryLabel(category);
   if (id && typeof id === "string" && id.trim() && !isMongoObjectId(id.trim())) {
@@ -638,7 +658,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
   }
 
   // Parse requests
-  const requests = (doc.requests || []).map((req: any) => {
+  const requests = (Array.isArray(doc.requests) ? doc.requests : []).map((req: any) => {
     const isPopulated = typeof req.employeeId === "object" && req.employeeId !== null;
     return {
       _id: req._id ? String(req._id) : undefined,
@@ -653,7 +673,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
 
   // Parse rejection / feedback from notes if available
   let rejectionReason: string | undefined;
-  if (doc.notes && doc.notes.includes("Admin Feedback:")) {
+  if (doc.notes && typeof doc.notes === "string" && doc.notes.includes("Admin Feedback:")) {
     const parts = doc.notes.split("Admin Feedback:");
     rejectionReason = parts[parts.length - 1]?.trim();
   }
@@ -835,7 +855,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
       employeeId: r.employeeId ? (typeof r.employeeId === "object" ? r.employeeId._id : String(r.employeeId)) : undefined,
       feedback: r.feedback || "",
       status: r.status === "approved" ? "approved" : "rejected",
-      reviewedAt: r.reviewedAt ? new Date(r.reviewedAt).toISOString() : new Date().toISOString(),
+      reviewedAt: safeToIsoString(r.reviewedAt),
     };
   });
 
@@ -885,7 +905,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
               reviewerName: saved.reviewerName || "Admin",
               feedback: saved.feedback,
               status: saved.reviewStatus || (saved.isApproved ? "approved" : "rejected"),
-              reviewedAt: saved.reviewedAt || new Date().toISOString(),
+              reviewedAt: safeToIsoString(saved.reviewedAt),
               attachment: saved.attachment,
             });
           }
@@ -895,11 +915,11 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
   }
 
   const dueDate = doc.deadline
-    ? new Date(doc.deadline).toISOString().slice(0, 10)
+    ? safeToIsoDate(doc.deadline)
     : doc.dueDate
-      ? new Date(doc.dueDate).toISOString().slice(0, 10)
+      ? safeToIsoDate(doc.dueDate)
       : doc.createdAt
-        ? new Date(doc.createdAt).toISOString().slice(0, 10)
+        ? safeToIsoDate(doc.createdAt)
         : "";
 
   const points = Number(doc.rewardPoints ?? 0);
@@ -918,8 +938,8 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     points,
     dueDate,
     deadline: doc.deadline,
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-    updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : new Date().toISOString(),
+    createdAt: safeToIsoDate(doc.createdAt, new Date().toISOString().slice(0, 10)),
+    updatedAt: safeToIsoString(doc.updatedAt),
     assignedTo: doc.assignedTo,
     assignee,
     assigneeId,

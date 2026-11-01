@@ -16,6 +16,20 @@ import { Toaster } from "@/components/ui/sonner";
 import { PwaController } from "@/components/pwa-controller";
 import { RealtimeNotificationListener } from "@/features/notifications";
 
+function getRoleHome(): string {
+  if (typeof window === "undefined") return "/";
+  try {
+    const raw = localStorage.getItem("poll-auth-user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      const role = String(u?.role || "").trim().toLowerCase();
+      if (role === "admin" || role === "director") return "/admin";
+      if (role === "employee" || role === "intern") return "/employee";
+    }
+  } catch {}
+  return "/login";
+}
+
 function NotFoundComponent() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
@@ -75,15 +89,19 @@ function ErrorComponent({ error, reset }: { error: any; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
-              reset();
+              try {
+                router.invalidate();
+                reset();
+              } catch {
+                window.location.reload();
+              }
             }}
             className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow"
           >
             Try again
           </button>
           <a
-            href="/"
+            href={getRoleHome()}
             className="rounded-md border border-border bg-background/60 px-4 py-2 text-sm font-medium"
           >
             Go home

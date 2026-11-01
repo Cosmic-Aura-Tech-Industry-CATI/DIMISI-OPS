@@ -19,12 +19,14 @@ export function IncomingCallDialog() {
 
   if (isIncoming && incomingCall) {
     const isVideo = incomingCall.callType === "video";
-    const initials = incomingCall.callerName
+    const callerNameStr = String(incomingCall.callerName || "User");
+    const initials = callerNameStr
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .slice(0, 2)
-      .toUpperCase();
+      .toUpperCase() || "U";
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-300">

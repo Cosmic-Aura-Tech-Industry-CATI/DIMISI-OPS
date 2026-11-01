@@ -82,6 +82,12 @@ export function ProofUploader({
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const [replacingProofId, setReplacingProofId] = useState<string | null>(null);
   const replaceProofInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef(files);
+  const cancelledIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -92,22 +98,26 @@ export function ProofUploader({
     };
   }, []);
 
-  const uploadSingleProof = async (item: ProofFile) => {
-    if (!item.file) return;
+  const uploadSingleProof = useCallback(
+    async (item: ProofFile) => {
+    if (!item.file || cancelledIdsRef.current.has(item.id)) return;
 
     onChange(
-      files.map((f) =>
+      filesRef.current.map((f) =>
         f.id === item.id ? { ...f, isUploading: true, uploadProgress: 10, error: undefined } : f,
       ),
     );
 
     try {
       const res = await uploadTaskProof(item.file, (percent) => {
-        onChange(files.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)));
+        if (cancelledIdsRef.current.has(item.id)) return;
+        onChange(filesRef.current.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)));
       });
 
+      if (cancelledIdsRef.current.has(item.id)) return;
+
       onChange(
-        files.map((f) =>
+        filesRef.current.map((f) =>
           f.id === item.id
             ? {
                 ...f,
@@ -122,6 +132,7 @@ export function ProofUploader({
       );
       toast.success(`${item.name} uploaded to storage.`);
     } catch (err: unknown) {
+      if (cancelledIdsRef.current.has(item.id)) return;
       const msg =
         err instanceof Error
           ? err.message
@@ -129,10 +140,12 @@ export function ProofUploader({
             ? String((err as { message: unknown }).message)
             : "Upload failed.";
 
-      onChange(files.map((f) => (f.id === item.id ? { ...f, isUploading: false, error: msg } : f)));
+      onChange(filesRef.current.map((f) => (f.id === item.id ? { ...f, isUploading: false, error: msg } : f)));
       toast.error(`Failed to upload ${item.name}: ${msg}`);
     }
-  };
+  },
+  [onChange],
+);
 
   const handleTriggerReplace = (id: string) => {
     if (isAnyUploading) return;
@@ -171,7 +184,7 @@ export function ProofUploader({
 
     // Keep previous valid proof visible while uploading replacement
     onChange(
-      files.map((f) =>
+      filesRef.current.map((f) =>
         f.id === targetId
           ? {
               ...f,
@@ -185,12 +198,21 @@ export function ProofUploader({
 
     try {
       const res = await uploadTaskProof(file, (percent) => {
+        if (cancelledIdsRef.current.has(targetId)) return;
         onChange(
-          files.map((f) =>
+          filesRef.current.map((f) =>
             f.id === targetId ? { ...f, uploadProgress: percent } : f,
           ),
         );
       });
+
+      if (cancelledIdsRef.current.has(targetId)) {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          objectUrlsRef.current.delete(previewUrl);
+        }
+        return;
+      }
 
       if (previousItem.previewUrl) {
         URL.revokeObjectURL(previousItem.previewUrl);
@@ -199,7 +221,7 @@ export function ProofUploader({
 
       // Replace old proof completely with newly uploaded proof
       onChange(
-        files.map((f) =>
+        filesRef.current.map((f) =>
           f.id === targetId
             ? {
                 id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`,
@@ -221,9 +243,10 @@ export function ProofUploader({
 
       toast.success(`Replaced "${previousItem.name}" with "${res.name || file.name}".`);
     } catch (err: unknown) {
+      if (cancelledIdsRef.current.has(targetId)) return;
       // Retain previous valid proof on failure
       onChange(
-        files.map((f) => (f.id === targetId ? previousItem : f)),
+        filesRef.current.map((f) => (f.id === targetId ? previousItem : f)),
       );
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
@@ -291,52 +314,19 @@ export function ProofUploader({
 
       if (itemsToAdd.length === 0) return;
 
-      const updatedList = [...files, ...itemsToAdd];
+      // Clear any prior cancelled status for newly added items
+      itemsToAdd.forEach((item) => cancelledIdsRef.current.delete(item.id));
+
+      const updatedList = [...filesRef.current, ...itemsToAdd];
       onChange(updatedList);
 
-      // Perform direct CDN upload for each new file
+      // Perform direct CDN upload for each new file independently
       for (const item of itemsToAdd) {
         if (!item.file) continue;
-        try {
-          const res = await uploadTaskProof(item.file, (percent) => {
-            onChange(
-              updatedList.map((f) => (f.id === item.id ? { ...f, uploadProgress: percent } : f)),
-            );
-          });
-
-          onChange(
-            updatedList.map((f) =>
-              f.id === item.id
-                ? {
-                    ...f,
-                    url: res.url,
-                    publicId: res.publicId,
-                    isUploading: false,
-                    uploadProgress: 100,
-                    error: undefined,
-                  }
-                : f,
-            ),
-          );
-          toast.success(`${item.name} uploaded to storage.`);
-        } catch (err: unknown) {
-          const msg =
-            err instanceof Error
-              ? err.message
-              : typeof err === "object" && err !== null && "message" in err
-                ? String((err as { message: unknown }).message)
-                : "Upload failed.";
-
-          onChange(
-            updatedList.map((f) =>
-              f.id === item.id ? { ...f, isUploading: false, error: msg } : f,
-            ),
-          );
-          toast.error(`Failed to upload ${item.name}: ${msg}`);
-        }
+        void uploadSingleProof(item);
       }
     },
-    [files, onChange],
+    [files, onChange, uploadSingleProof],
   );
 
   const isAnyUploading = files.some((f) => f.isUploading);
@@ -363,12 +353,19 @@ export function ProofUploader({
   });
 
   const remove = (id: string) => {
-    const f = files.find((x) => x.id === id);
+    cancelledIdsRef.current.add(id);
+    const f = filesRef.current.find((x) => x.id === id);
     if (f?.previewUrl) {
       URL.revokeObjectURL(f.previewUrl);
       objectUrlsRef.current.delete(f.previewUrl);
     }
-    onChange(files.filter((x) => x.id !== id));
+    if (dropInputRef.current) {
+      dropInputRef.current.value = "";
+    }
+    if (replaceProofInputRef.current) {
+      replaceProofInputRef.current.value = "";
+    }
+    onChange(filesRef.current.filter((x) => x.id !== id));
   };
 
   const images = files.filter((f) => f.type.startsWith("image/"));

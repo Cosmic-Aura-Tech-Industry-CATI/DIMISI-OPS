@@ -81,6 +81,16 @@ function AuditLogsRoute() {
 
 type DateRange = "all" | "today" | "7d" | "30d" | "custom";
 
+function safeIso(v: any, fallback = new Date().toISOString()): string {
+  if (!v) return fallback;
+  try {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? fallback : d.toISOString();
+  } catch {
+    return fallback;
+  }
+}
+
 function getDateFilters(range: DateRange, from: string, to: string) {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -90,8 +100,8 @@ function getDateFilters(range: DateRange, from: string, to: string) {
   if (range === "30d") return { startDate: new Date(startOfToday.getTime() - 29 * 86400_000).toISOString() };
   if (range === "custom") {
     return {
-      ...(from ? { startDate: new Date(`${from}T00:00:00`).toISOString() } : {}),
-      ...(to ? { endDate: new Date(`${to}T23:59:59.999`).toISOString() } : {}),
+      ...(from ? { startDate: safeIso(`${from}T00:00:00`) } : {}),
+      ...(to ? { endDate: safeIso(`${to}T23:59:59.999`) } : {}),
     };
   }
   return {};
@@ -124,7 +134,7 @@ function toAuditEntry(log: ActivityLog): AuditEntry {
 
   return {
     id: log._id || log.id || `${log.createdAt}-${log.action}`,
-    timestamp: new Date(log.createdAt).toISOString(),
+    timestamp: safeIso(log.createdAt),
     actorName,
     actorId,
     category,

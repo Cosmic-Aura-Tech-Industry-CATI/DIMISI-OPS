@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, Link, useNavigate, useParams, useRouter } from "@tanstack/react-router";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   CalendarClock,
@@ -54,6 +54,7 @@ export const Route = createFileRoute("/employee/tasks/$id/submit")({
     ],
   }),
   component: SubmitProofPage,
+  errorComponent: SubmitProofError,
 });
 
 const taskTypeLabel: Record<string, string> = {
@@ -79,6 +80,22 @@ const fmtDate = (v?: string) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
 
+function SubmitProofError({ error, reset }: { error: Error | { message?: string }; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="glass max-w-xl mx-auto rounded-3xl p-8 text-center my-10">
+      <h2 className="font-display text-lg font-semibold text-foreground">Unable to load submission form</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {error?.message || "Something went wrong loading this task submission. Please try again."}
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <Button onClick={() => { router.invalidate(); reset(); }}>Try again</Button>
+        <Button variant="outline" asChild><Link to="/employee/tasks">Back to my tasks</Link></Button>
+      </div>
+    </div>
+  );
+}
+
 function SubmitProofPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submit" });
   const navigate = useNavigate();
@@ -102,14 +119,16 @@ function SubmitProofPage() {
     verified: existing?.checklist?.verified ?? true,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const hasHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (existing) {
-      if (existing.files?.length && files.length === 0) setFiles(existing.files);
-      if (existing.workSummary && !workSummary) setWorkSummary(existing.workSummary);
-      if (existing.deliverableLinks && !deliverableLinks) setDeliverableLinks(existing.deliverableLinks);
-      if (existing.issues && !issues) setIssues(existing.issues);
-      if (existing.additionalRemarks && !additionalRemarks) setAdditionalRemarks(existing.additionalRemarks);
+    if (!hasHydratedRef.current && existing) {
+      hasHydratedRef.current = true;
+      if (existing.files?.length) setFiles(existing.files);
+      if (existing.workSummary) setWorkSummary((curr) => curr || existing.workSummary || "");
+      if (existing.deliverableLinks) setDeliverableLinks((curr) => curr || existing.deliverableLinks || "");
+      if (existing.issues) setIssues((curr) => curr || existing.issues || "");
+      if (existing.additionalRemarks) setAdditionalRemarks((curr) => curr || existing.additionalRemarks || "");
       if (existing.checklist) {
         setChecks({
           completed: existing.checklist.completed ?? true,
@@ -176,15 +195,15 @@ function SubmitProofPage() {
   const project = task.projectId
     ? safeProjects.find((p) => p.id === task.projectId || p._id === task.projectId)
     : undefined;
-  const assignedBy = (task as any).assignedByName || task.createdBy || "Admin";
-  const normalizedStatus = (task.status?.toLowerCase() as Task["status"]) || "in_progress";
+  const assignedBy = (task as { assignedByName?: string }).assignedByName || task.createdBy || "Admin";
+  const normalizedStatus = ((typeof task.status === "string" ? task.status.toLowerCase() : "") as Task["status"]) || "in_progress";
   const currentStatus =
     task.reviewState === "in_review"
       ? "Pending Review"
       : statusLabel[normalizedStatus] || task.status || "In Progress";
-  const taskType = (task.taskType?.toLowerCase() || "direct") as string;
+  const taskType = (typeof task.taskType === "string" ? task.taskType.toLowerCase() : "direct");
   const typeLabel = taskTypeLabel[taskType] || task.taskType || "Direct";
-  const normalizedPriority = (task.priority?.toLowerCase() as TaskPriority) || "medium";
+  const normalizedPriority = ((typeof task.priority === "string" ? task.priority.toLowerCase() : "") as TaskPriority) || "medium";
 
   const packageInput = () => ({
     taskId: task.id || task._id || id,
@@ -295,7 +314,7 @@ function SubmitProofPage() {
         proofUrl: primaryProof?.url,
         proofPublicId: primaryProof?.publicId,
       });
-    } catch (err: any) {
+    } catch (_err: unknown) {
       // Handled via submitMutation onError callback
     }
   };

@@ -29,11 +29,12 @@ interface TaskStatusBadgeProps {
   showIcon?: boolean;
 }
 
-export function normalizeTaskStatus(status?: string): {
+export function normalizeTaskStatus(status?: unknown): {
   key: "OPEN" | "ASSIGNED" | "IN_PROGRESS" | "IN_REVIEW" | "COMPLETED" | "REJECTED" | "OVERDUE";
   label: string;
 } {
-  const s = (status || "").toLowerCase().trim().replace(/[\s_-]+/g, "_");
+  const rawStr = typeof status === "string" ? status : status && typeof status === "object" && "name" in status && typeof (status as { name?: unknown }).name === "string" ? String((status as { name: unknown }).name) : status ? String(status) : "";
+  const s = rawStr.toLowerCase().trim().replace(/[\s_-]+/g, "_");
 
   switch (s) {
     case "open":
@@ -56,7 +57,7 @@ export function normalizeTaskStatus(status?: string): {
     case "cancelled":
       return { key: "OVERDUE", label: "Overdue" };
     default:
-      return { key: "ASSIGNED", label: status ? status.replace(/_/g, " ") : "Assigned" };
+      return { key: "ASSIGNED", label: rawStr ? rawStr.replace(/_/g, " ") : "Assigned" };
   }
 }
 
@@ -102,7 +103,7 @@ const statusConfig: Record<
 };
 
 export function TaskStatusBadge({ status, reviewState, className, showIcon = true }: TaskStatusBadgeProps) {
-  const rev = (reviewState || "").toLowerCase().trim();
+  const rev = typeof reviewState === "string" ? reviewState.toLowerCase().trim() : "";
   const effectiveStatus =
     rev === "in_review"
       ? "IN_REVIEW"
@@ -113,8 +114,8 @@ export function TaskStatusBadge({ status, reviewState, className, showIcon = tru
           : status;
 
   const { key, label } = normalizeTaskStatus(effectiveStatus);
-  const cfg = statusConfig[key];
-  const IconComponent = cfg.icon;
+  const cfg = statusConfig[key] || statusConfig.ASSIGNED;
+  const IconComponent = cfg.icon || Clock;
 
   return (
     <span
@@ -131,8 +132,8 @@ export function TaskStatusBadge({ status, reviewState, className, showIcon = tru
   );
 }
 
-export function TaskPriorityBadge({ priority, className }: { priority?: string; className?: string }) {
-  const p = (priority || "").toLowerCase().trim();
+export function TaskPriorityBadge({ priority, className }: { priority?: unknown; className?: string }) {
+  const p = typeof priority === "string" ? priority.toLowerCase().trim() : "";
   let style = "bg-muted text-muted-foreground border-border";
 
   if (p === "high" || p === "urgent") {

@@ -129,10 +129,10 @@ function SubmissionDetailsPage() {
             <div className="flex items-center gap-2">
               <Paperclip className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold">
-                Submitted files ({submission?.files.length ?? 0})
+                Submitted files ({submission?.files?.length ?? (task.proofFiles?.length ?? 0)})
               </h2>
             </div>
-            {submission?.files.length ? (
+            {submission?.files && submission.files.length > 0 ? (
               <ul className="mt-3 space-y-2">
                 {submission.files.map((f) => (
                   <li
@@ -194,14 +194,14 @@ function SubmissionDetailsPage() {
             </dl>
           </div>
 
-          {submission && (
+          {submission && submission.checklist && (
             <div className="glass rounded-2xl p-6">
               <h2 className="font-display font-semibold">Checklist</h2>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 {[
-                  ["Task completed", submission.checklist.completed],
-                  ["Proof attached", submission.checklist.proof],
-                  ["Information verified", submission.checklist.verified],
+                  ["Task completed", submission.checklist?.completed],
+                  ["Proof attached", submission.checklist?.proof],
+                  ["Information verified", submission.checklist?.verified],
                 ].map(([label, done]) => (
                   <li key={label as string} className="flex items-center gap-2">
                     <CheckCircle2
