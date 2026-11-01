@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Component, type ReactNode, type ErrorInfo } from "react";
+import { toast } from "sonner";
 import {
   ClipboardCheck,
   Search,
@@ -35,6 +36,41 @@ import {
 import { TaskReviewModal } from "@/features/task-reviews/components/task-review-modal";
 import { useReviewCenter, type Task, getCategoryLabel } from "@/features/tasks";
 
+interface TaskReviewErrorBoundaryProps {
+  children: ReactNode;
+  onReset: () => void;
+}
+
+interface TaskReviewErrorBoundaryState {
+  hasError: boolean;
+}
+
+class TaskReviewErrorBoundary extends Component<TaskReviewErrorBoundaryProps, TaskReviewErrorBoundaryState> {
+  constructor(props: TaskReviewErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): TaskReviewErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("[TaskReviewErrorBoundary]: Caught error rendering review modal", error, errorInfo);
+    toast.error("Could not display task review dialog", {
+      description: error?.message || "An unexpected error occurred while preparing this submission.",
+    });
+    this.props.onReset();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 export const Route = createFileRoute("/admin/task-reviews")({
   head: () => ({
     meta: [
@@ -48,7 +84,7 @@ export const Route = createFileRoute("/admin/task-reviews")({
   errorComponent: ReviewCenterError,
 });
 
-function ReviewCenterError({ error, reset }: { error: any; reset: () => void }) {
+function ReviewCenterError({ error, reset }: { error: Error | { message?: string }; reset: () => void }) {
   return (
     <>
       <PageHeader
@@ -355,6 +391,7 @@ function ReviewCenterPage() {
                       {/* Actions */}
                       <td className="px-5 py-4 text-right whitespace-nowrap">
                         <Button
+                          type="button"
                           size="sm"
                           onClick={() => setSelectedTask(task)}
                           className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
@@ -373,17 +410,19 @@ function ReviewCenterPage() {
 
       {/* Task Review Modal */}
       {selectedTask && (
-        <TaskReviewModal
-          task={selectedTask}
-          open={Boolean(selectedTask)}
-          onOpenChange={(open) => {
-            if (!open) setSelectedTask(null);
-          }}
-          onSuccess={() => {
-            setSelectedTask(null);
-            void refetch();
-          }}
-        />
+        <TaskReviewErrorBoundary onReset={() => setSelectedTask(null)}>
+          <TaskReviewModal
+            task={selectedTask}
+            open={Boolean(selectedTask)}
+            onOpenChange={(open) => {
+              if (!open) setSelectedTask(null);
+            }}
+            onSuccess={() => {
+              setSelectedTask(null);
+              void refetch();
+            }}
+          />
+        </TaskReviewErrorBoundary>
       )}
     </>
   );

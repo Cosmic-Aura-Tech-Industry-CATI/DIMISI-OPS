@@ -60,7 +60,9 @@ function setState(next: Submission[]) {
         KEY,
         JSON.stringify(next.map((s) => ({ ...s, files: s.files.map(({ dataUrl: _d, ...f }) => f) }))),
       );
-    } catch {}
+    } catch {
+      // ignore quota or serialization errors
+    }
   }
   listeners.forEach((l) => l());
 }
@@ -71,11 +73,14 @@ function hydrate() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      state = JSON.parse(raw) as Submission[];
+      const parsed = JSON.parse(raw);
+      state = Array.isArray(parsed) ? parsed : empty;
       g.__dimisiSubmissions = state;
       listeners.forEach((l) => l());
     }
-  } catch {}
+  } catch {
+    state = empty;
+  }
 }
 
 function subscribe(cb: () => void) {
@@ -84,7 +89,7 @@ function subscribe(cb: () => void) {
   return () => listeners.delete(cb);
 }
 
-const getSnapshot = () => state;
+const getSnapshot = () => (Array.isArray(state) ? state : empty);
 const getServerSnapshot = () => empty;
 
 export function useSubmissions(): Submission[] {
@@ -94,21 +99,26 @@ export function useSubmissions(): Submission[] {
 /** Submissions keyed by task id. */
 export function useSubmissionMap(): Record<string, Submission> {
   const list = useSubmissions();
+  if (!Array.isArray(list)) return {};
   return Object.fromEntries(list.map((s) => [s.taskId, s]));
 }
 
 export function getSubmission(taskId: string): Submission | undefined {
   hydrate();
-  return state.find((s) => s.taskId === taskId);
+  if (!Array.isArray(state) || !taskId) return undefined;
+  return state.find((s) => s && s.taskId === taskId);
 }
 
 export function useSubmission(taskId: string): Submission | undefined {
-  return useSubmissions().find((s) => s.taskId === taskId);
+  const list = useSubmissions();
+  if (!Array.isArray(list) || !taskId) return undefined;
+  return list.find((s) => s && s.taskId === taskId);
 }
 
 function upsert(next: Submission) {
   hydrate();
-  setState([...state.filter((s) => s.taskId !== next.taskId), next]);
+  const currentList = Array.isArray(state) ? state : [];
+  setState([...currentList.filter((s) => s && s.taskId !== next.taskId), next]);
 }
 
 export function saveDraft(input: Omit<Submission, "status" | "updatedAt" | "submittedAt">) {

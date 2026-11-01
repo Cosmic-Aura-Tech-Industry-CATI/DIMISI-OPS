@@ -132,7 +132,7 @@ function SubmissionDetailsPage() {
                 Submitted files ({submission?.files?.length ?? (task.proofFiles?.length ?? 0)})
               </h2>
             </div>
-            {(submission?.files?.length ?? 0) > 0 ? (
+            {submission?.files && submission.files.length > 0 ? (
               <ul className="mt-3 space-y-2">
                 {submission.files.map((f) => (
                   <li

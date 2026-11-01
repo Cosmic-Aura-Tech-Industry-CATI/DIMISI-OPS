@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useParams, useRouter } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   CalendarClock,
@@ -80,7 +80,7 @@ const fmtDate = (v?: string) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
 
-function SubmitProofError({ error, reset }: { error: any; reset: () => void }) {
+function SubmitProofError({ error, reset }: { error: Error | { message?: string }; reset: () => void }) {
   const router = useRouter();
   return (
     <div className="glass max-w-xl mx-auto rounded-3xl p-8 text-center my-10">
@@ -119,14 +119,16 @@ function SubmitProofPage() {
     verified: existing?.checklist?.verified ?? true,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const hasHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (existing) {
-      if (existing.files?.length && files.length === 0) setFiles(existing.files);
-      if (existing.workSummary && !workSummary) setWorkSummary(existing.workSummary);
-      if (existing.deliverableLinks && !deliverableLinks) setDeliverableLinks(existing.deliverableLinks);
-      if (existing.issues && !issues) setIssues(existing.issues);
-      if (existing.additionalRemarks && !additionalRemarks) setAdditionalRemarks(existing.additionalRemarks);
+    if (!hasHydratedRef.current && existing) {
+      hasHydratedRef.current = true;
+      if (existing.files?.length) setFiles(existing.files);
+      if (existing.workSummary) setWorkSummary((curr) => curr || existing.workSummary || "");
+      if (existing.deliverableLinks) setDeliverableLinks((curr) => curr || existing.deliverableLinks || "");
+      if (existing.issues) setIssues((curr) => curr || existing.issues || "");
+      if (existing.additionalRemarks) setAdditionalRemarks((curr) => curr || existing.additionalRemarks || "");
       if (existing.checklist) {
         setChecks({
           completed: existing.checklist.completed ?? true,
@@ -193,7 +195,7 @@ function SubmitProofPage() {
   const project = task.projectId
     ? safeProjects.find((p) => p.id === task.projectId || p._id === task.projectId)
     : undefined;
-  const assignedBy = (task as any).assignedByName || task.createdBy || "Admin";
+  const assignedBy = (task as { assignedByName?: string }).assignedByName || task.createdBy || "Admin";
   const normalizedStatus = ((typeof task.status === "string" ? task.status.toLowerCase() : "") as Task["status"]) || "in_progress";
   const currentStatus =
     task.reviewState === "in_review"
@@ -312,7 +314,7 @@ function SubmitProofPage() {
         proofUrl: primaryProof?.url,
         proofPublicId: primaryProof?.publicId,
       });
-    } catch (err: any) {
+    } catch (_err: unknown) {
       // Handled via submitMutation onError callback
     }
   };

@@ -46,6 +46,9 @@ export function UploadEntriesDialog({ open, onOpenChange, onSuccess }: UploadEnt
     setFile(null);
     setUploadProgress(0);
     setUploadResult(null);
+    if (dropInputRef.current) {
+      dropInputRef.current.value = "";
+    }
   };
 
   const validatePdfFile = (selectedFile: File) => {
@@ -124,8 +127,13 @@ export function UploadEntriesDialog({ open, onOpenChange, onSuccess }: UploadEnt
       setUploadResult(res);
       toast.success("PDF uploaded successfully and added to processing queue");
       onSuccess?.(res);
-    } catch (err: any) {
-      const msg = err?.message || err?.error || "Failed to upload statement PDF";
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Failed to upload statement PDF";
       toast.error(msg);
       setUploadProgress(0);
     }
