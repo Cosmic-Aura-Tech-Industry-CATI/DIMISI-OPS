@@ -5,7 +5,6 @@ import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 import { cn } from "@/lib/utils";
 
@@ -24,15 +23,13 @@ export const Route = createFileRoute("/admin/leaderboard")({
   head: () => ({
     meta: [
       { title: "Leaderboard — Dimisi" },
-      { name: "description", content: "See who's leading the pack this month." },
+      { name: "description", content: "See who's leading the pack." },
       { property: "og:title", content: "Leaderboard — Dimisi" },
-      { property: "og:description", content: "See who's leading the pack this month." },
+      { property: "og:description", content: "See who's leading the pack." },
     ],
   }),
   component: LeaderboardPage,
 });
-
-type Range = "weekly" | "monthly" | "yearly";
 
 const podium = [Trophy, Medal, Award];
 const podiumColor = [
@@ -51,18 +48,7 @@ function initials(name: string) {
 }
 
 function LeaderboardPage() {
-  const navigate = Route.useNavigate();
-  const searchParams = Route.useSearch();
-  const range: Range = searchParams.period === "weekly" || searchParams.period === "yearly" ? searchParams.period : "monthly";
-
   const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
-
-  const handleRangeChange = (newRange: Range) => {
-    navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, period: newRange }),
-      replace: true,
-    });
-  };
 
   const leaderboard = useMemo(() => {
     return (Array.isArray(rawLeaderboard) ? rawLeaderboard : [])
@@ -97,16 +83,7 @@ function LeaderboardPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title="Leaderboard" subtitle="The top performers, powered by points." />
-        <Tabs value={range} onValueChange={(v) => handleRangeChange(v as Range)}>
-          <TabsList>
-            <TabsTrigger value="weekly">Weekly</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      <PageHeader title="Leaderboard" subtitle="The top performers, powered by points." />
 
       {isLoading ? (
         <div className="space-y-6">

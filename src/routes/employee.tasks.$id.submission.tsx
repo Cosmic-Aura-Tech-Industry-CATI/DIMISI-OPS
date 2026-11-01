@@ -52,6 +52,15 @@ const fmt = (d?: string) =>
       })
     : "—";
 
+function stripLegacyProofAndUrls(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/Proof files attached[^\n]*\n[\s\S]*?(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/gi, "")
+    .replace(/https?:\/\/res\.cloudinary\.com[^\s)]+/gi, "")
+    .replace(/\[\s*\{[\s\S]*?\}\s*\]/g, "")
+    .trim();
+}
+
 function SubmissionDetailsPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submission" });
   const { data: task, isLoading } = useTaskQuery(id);
@@ -146,14 +155,57 @@ function SubmissionDetailsPage() {
                         {formatFileSize(f.size)}
                       </span>
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 rounded-md"
-                      onClick={() => downloadSubmissionFile(f)}
-                    >
-                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {f.url && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0 rounded-md h-8 text-xs"
+                          asChild
+                        >
+                          <a href={f.url} target="_blank" rel="noopener noreferrer">
+                            View
+                          </a>
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-md h-8 text-xs"
+                        onClick={() => downloadSubmissionFile(f)}
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : task.proofFiles && task.proofFiles.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {task.proofFiles.map((p, i) => (
+                  <li
+                    key={i}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{p.name || "Proof File"}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {typeof p.size === "number" ? formatFileSize(p.size) : String(p.size || "File")}
+                      </span>
+                    </span>
+                    {p.url && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-md h-8 text-xs"
+                        asChild
+                      >
+                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                          View
+                        </a>
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>

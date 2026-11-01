@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -42,16 +41,13 @@ export const Route = createFileRoute("/employee/leaderboard")({
   head: () => ({
     meta: [
       { title: "Leaderboard — Dimisi" },
-      { name: "description", content: "See where you rank against your teammates this cycle." },
+      { name: "description", content: "See where you rank against your teammates." },
       { property: "og:title", content: "Leaderboard — Dimisi" },
-      { property: "og:description", content: "See where you rank against your teammates this cycle." },
+      { property: "og:description", content: "See where you rank against your teammates." },
     ],
   }),
   component: EmployeeLeaderboardPage,
 });
-
-type Range = "weekly" | "monthly" | "yearly";
-
 
 const podium = [
   { Icon: Crown, ring: "from-[oklch(0.85_0.16_85)] to-[oklch(0.75_0.19_65)]", label: "Champion" },
@@ -80,21 +76,10 @@ function badgesFor(points: number, completionRate: number | null) {
 
 function EmployeeLeaderboardPage() {
   const { user: currentUser } = useAuth();
-  const navigate = Route.useNavigate();
-  const searchParams = Route.useSearch();
-  const range: Range = searchParams.period === "weekly" || searchParams.period === "yearly" ? searchParams.period : "monthly";
-
   const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
 
   const [department, setDepartment] = useState<string>("all");
   const [search, setSearch] = useState("");
-
-  const handleRangeChange = (newRange: Range) => {
-    navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, period: newRange }),
-      replace: true,
-    });
-  };
 
   const leaderboardEntries = useMemo(() => {
     return (Array.isArray(rawLeaderboard) ? rawLeaderboard : [])
@@ -185,39 +170,30 @@ function EmployeeLeaderboardPage() {
         subtitle="Track how you stack up against teammates across the org."
       />
 
-      {/* Range + Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={range} onValueChange={(v) => handleRangeChange(v as Range)}>
-          <TabsList>
-            <TabsTrigger value="weekly">Weekly</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search teammate"
-              className="pl-9 sm:w-64"
-            />
-          </div>
-          <Select value={department} onValueChange={setDepartment}>
-            <SelectTrigger className="sm:w-48">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Filters */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search teammate"
+            className="pl-9 sm:w-64"
+          />
         </div>
+        <Select value={department} onValueChange={setDepartment}>
+          <SelectTrigger className="sm:w-48">
+            <SelectValue placeholder="Department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All departments</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -308,7 +284,7 @@ function EmployeeLeaderboardPage() {
               <div>
                 <h3 className="font-display text-base font-semibold">Full ranking</h3>
                 <p className="text-xs text-muted-foreground">
-                  {range.charAt(0).toUpperCase() + range.slice(1)} standings
+                  Overall standings
                   {department !== "all" && ` · ${department}`}
                 </p>
               </div>

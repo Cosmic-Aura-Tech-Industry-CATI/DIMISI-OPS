@@ -266,19 +266,19 @@ function SubmitProofPage() {
 
     const uploadedProofFiles = files.filter((f) => f.url && f.publicId);
     const primaryProof = uploadedProofFiles[0];
-
-    const fileSummary =
-      uploadedProofFiles.length > 0
-        ? `Proof files attached (${uploadedProofFiles.length}):\n` +
-          uploadedProofFiles.map((f) => `- ${f.name}: ${f.url}`).join("\n")
-        : files.length > 0
-          ? `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}`
-          : "";
+    const mappedProofFiles = uploadedProofFiles.map((f) => ({
+      url: f.url!,
+      publicId: f.publicId!,
+      name: f.name,
+      size: f.size,
+      mimeType: f.type,
+      dataUrl: f.dataUrl,
+    }));
 
     const formattedNotes = [
       workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
       deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
-      fileSummary,
+
       issues.trim() ? `Issues & Blockers:\n${issues.trim()}` : "",
       additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
     ].filter(Boolean).join("\n\n") || "Task completed and submitted for review.";
@@ -313,6 +313,7 @@ function SubmitProofPage() {
           : undefined,
         proofUrl: primaryProof?.url,
         proofPublicId: primaryProof?.publicId,
+        proofFiles: mappedProofFiles,
       });
     } catch (_err: unknown) {
       // Handled via submitMutation onError callback

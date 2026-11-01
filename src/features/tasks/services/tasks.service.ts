@@ -156,41 +156,10 @@ export const tasksService = {
       return mapTaskResponse(raw);
     }
 
-    // Direct JSON payload for tasks created with client-side uploaded attachments
-    const jsonBody: Record<string, unknown> = {
-      title: input.title.trim(),
-      description: input.description.trim(),
-      category: input.category.trim(),
-      priority: toBackendTaskPriority(input.priority),
-      type: toBackendTaskType(input.taskType),
-      rewardPoints: input.points || 0,
-      deadline: input.dueDate ? new Date(input.dueDate).toISOString() : undefined,
-      notes: input.notes?.trim() || undefined,
-      estimatedTime: input.estimatedTime?.trim() || undefined,
-      projectId: input.taskType === "project" ? input.projectId : undefined,
-      assignedTo: input.taskType === "direct" ? input.assigneeId : undefined,
-      attachments: (input.uploadedAttachments || []).map((att) => ({
-        url: att.url,
-        publicId: att.publicId,
-        name: att.name,
-        size: att.size,
-      })),
-    };
-
-    try {
-      const res = await http.post<any>(API_ENDPOINTS.tasks.createV2, jsonBody);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    } catch (v2Err: any) {
-      // Graceful fallback to v1 multipart if v2 is not supported in environment
-      if (v2Err?.status === 404 || v2Err?.response?.status === 404) {
-        const body = buildCreateTaskFormData(input);
-        const res = await http.post<any>(API_ENDPOINTS.tasks.create, body);
-        const raw = res?.task || res?.data?.task || res;
-        return mapTaskResponse(raw);
-      }
-      throw v2Err;
-    }
+    const body = buildCreateTaskFormData(input);
+    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, body);
+    const raw = res?.task || res?.data?.task || res;
+    return mapTaskResponse(raw);
   },
 
   /**
@@ -204,42 +173,10 @@ export const tasksService = {
       return mapTaskResponse(raw);
     }
 
-    const jsonBody: Record<string, unknown> = {};
-    if (input.title !== undefined) jsonBody.title = input.title.trim();
-    if (input.description !== undefined) jsonBody.description = input.description.trim();
-    if (input.category !== undefined) jsonBody.category = input.category.trim();
-    if (input.priority !== undefined) jsonBody.priority = toBackendTaskPriority(input.priority);
-    if (input.taskType !== undefined) jsonBody.type = toBackendTaskType(input.taskType);
-    if (input.points !== undefined) jsonBody.rewardPoints = input.points;
-    if (input.dueDate !== undefined)
-      jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
-    if (input.notes !== undefined) jsonBody.notes = input.notes.trim();
-    if (input.estimatedTime !== undefined) jsonBody.estimatedTime = input.estimatedTime.trim();
-    if (input.projectId !== undefined) jsonBody.projectId = input.projectId;
-    if (input.assigneeId !== undefined) jsonBody.assignedTo = input.assigneeId;
-
-    if (input.uploadedAttachments !== undefined) {
-      jsonBody.attachments = input.uploadedAttachments.map((att) => ({
-        url: att.url,
-        publicId: att.publicId,
-        name: att.name,
-        size: att.size,
-      }));
-    }
-
-    try {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.updateV2(id), jsonBody);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    } catch (v2Err: any) {
-      if (v2Err?.status === 404 || v2Err?.response?.status === 404) {
-        const body = buildUpdateTaskFormData(input);
-        const res = await http.patch<any>(API_ENDPOINTS.tasks.update(id), body);
-        const raw = res?.task || res?.data?.task || res;
-        return mapTaskResponse(raw);
-      }
-      throw v2Err;
-    }
+    const body = buildUpdateTaskFormData(input);
+    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), body);
+    const raw = res?.task || res?.data?.task || res;
+    return mapTaskResponse(raw);
   },
 
   /**

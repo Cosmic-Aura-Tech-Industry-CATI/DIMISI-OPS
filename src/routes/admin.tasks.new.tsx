@@ -69,6 +69,9 @@ function NewTaskPage() {
             projectId: v.taskType === "project" ? v.projectId : undefined,
             assigneeId: v.taskType === "direct" ? v.assigneeId : undefined,
             uploadedAttachments,
+            attachments: v.attachments
+              .map((a) => a.file)
+              .filter((f): f is File => f instanceof File),
           });
         }}
       />
