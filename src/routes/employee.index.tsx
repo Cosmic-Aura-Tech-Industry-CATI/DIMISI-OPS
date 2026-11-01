@@ -160,7 +160,11 @@ function EmployeeOverview() {
         if (t.dueDate && new Date(t.dueDate).getTime() < now) return false;
         return true;
       })
-      .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
+      .sort((a, b) => {
+        const timeA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const timeB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return (isNaN(timeA) ? Infinity : timeA) - (isNaN(timeB) ? Infinity : timeB);
+      })
       .slice(0, 4);
   }, [tasksDeadlines?.upcomingDeadlines, mine]);
 

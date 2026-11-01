@@ -97,7 +97,7 @@ function EmployeeLeaderboardPage() {
   };
 
   const leaderboardEntries = useMemo(() => {
-    return rawLeaderboard
+    return (Array.isArray(rawLeaderboard) ? rawLeaderboard : [])
       .map((item, index) => {
         const deptName =
           typeof item.department === "object" && item.department

@@ -1,7 +1,7 @@
 import { logAudit } from "@/lib/audit-log";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authService } from "@/auth/services/auth.service";
-import { setUnauthorizedHandler } from "@/api/client/client";
+import { setUnauthorizedHandler, resetRefreshState } from "@/api/client/client";
 import { clearTokens } from "@/api/client/token-store";
 
 export type Role = "director" | "admin" | "employee" | "intern";
@@ -48,7 +48,10 @@ export function normalizeUser(raw: any): AuthUser {
     empId: String(raw?.empId || raw?.code || raw?._id || raw?.id || ""),
     name: raw?.name || "User",
     email: raw?.email || "",
-    role: raw?.role || "employee",
+    role: (() => {
+      const r = String(raw?.role || "employee").trim().toLowerCase();
+      return (["director", "admin", "employee", "intern"].includes(r) ? r : "employee") as Role;
+    })(),
     department: raw?.department,
     designation: raw?.designation,
     isActive: raw?.isActive ?? true,
@@ -112,10 +115,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
 
     // Listen for unauthorized 401s from Axios response interceptor
+    let isRedirectingToLogin = false;
     setUnauthorizedHandler(() => {
       clearTokens();
+      resetRefreshState();
       setUser(null);
-      if (window.location.pathname !== "/login") {
+      if (!isRedirectingToLogin && typeof window !== "undefined" && window.location.pathname !== "/login") {
+        isRedirectingToLogin = true;
         window.location.href = "/login";
       }
     });
@@ -127,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWith = (u: AuthUser) => {
+    resetRefreshState();
     const normalized = normalizeUser(u);
     setUser(normalized);
     logAudit({
@@ -156,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
       clearTokens();
+      resetRefreshState();
       setUser(null);
     }
   };
