@@ -437,6 +437,16 @@ function CopyableId({ id, label = "ID" }: { id: string; label?: string }) {
   );
 }
 
+const safeIso = (v: any) => {
+  if (!v) return new Date().toISOString();
+  try {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+};
+
 function ActivityPage() {
   const { user } = useAuth();
   const isDirector = String(user?.role || "").toLowerCase() === "director";
@@ -541,7 +551,7 @@ function ActivityPage() {
           initials: actorInitials,
         },
         metadata: log.metadata,
-        timestamp: new Date(log.createdAt).toISOString(),
+        timestamp: safeIso(log.createdAt),
       };
     });
 
@@ -562,7 +572,7 @@ function ActivityPage() {
       description: log.details || `${log.action} on ${log.target}`,
       actor: {
         id: log.actorId,
-        empId: log.actorId.startsWith("DMS") ? log.actorId : undefined,
+        empId: typeof log.actorId === "string" && log.actorId.startsWith("DMS") ? log.actorId : undefined,
         name: log.actorName,
         avatar: "",
         initials: (log.actorName || "US")

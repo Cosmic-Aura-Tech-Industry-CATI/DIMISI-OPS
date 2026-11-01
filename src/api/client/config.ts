@@ -6,7 +6,7 @@
  * on top of these values.
  */
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const rawBaseUrl = (typeof import.meta !== "undefined" && import.meta?.env?.VITE_API_BASE_URL) || "/api/v1";
 
 /** Base URL of the backend, without a trailing slash. */
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
@@ -32,7 +32,7 @@ export function getApiV2Endpoint(path: string): string {
   return `/api/v2${cleanPath}`;
 }
 
-if (!API_BASE_URL && import.meta.env.DEV) {
+if (!API_BASE_URL && typeof import.meta !== "undefined" && import.meta?.env?.DEV) {
   console.warn(
     "[api] VITE_API_BASE_URL is not set — requests will be sent relative to the current origin.",
   );

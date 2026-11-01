@@ -97,9 +97,9 @@ function DepartmentsPage() {
     if (!q) return departments;
     return departments.filter(
       (d) =>
-        d.name.toLowerCase().includes(q) ||
-        d.code.toLowerCase().includes(q) ||
-        (d.description && d.description.toLowerCase().includes(q)),
+        (d.name || "").toLowerCase().includes(q) ||
+        (d.code || "").toLowerCase().includes(q) ||
+        Boolean(d.description && d.description.toLowerCase().includes(q)),
     );
   }, [departments, query]);
 

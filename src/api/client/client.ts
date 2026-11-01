@@ -86,6 +86,15 @@ export function refreshAccessToken(): Promise<boolean> {
       const ok = res.status === 200 || res.data?.status === "success";
       if (ok) {
         refreshFailed = false;
+        const rawData = res.data as any;
+        const newToken =
+          rawData?.accessToken ||
+          rawData?.data?.accessToken ||
+          rawData?.token ||
+          rawData?.data?.token;
+        if (newToken) {
+          setAccessToken(newToken);
+        }
       } else {
         refreshFailed = true;
       }
@@ -125,6 +134,10 @@ apiClient.interceptors.response.use(
       config._retried = true;
       const refreshed = await refreshAccessToken();
       if (refreshed) {
+        const token = getAccessToken();
+        if (token) {
+          config.headers.set("Authorization", `Bearer ${token}`);
+        }
         return apiClient(config);
       }
 

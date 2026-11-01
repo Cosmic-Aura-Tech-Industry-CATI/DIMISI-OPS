@@ -80,7 +80,7 @@ export function useProjectReport(timeframe: TimeframeFilter = "weekly") {
 
   return useMemo<ProjectReportRow[]>(() => {
     // If backend reports returned project stats, map them
-    if (reportProjects.length > 0) {
+    if (Array.isArray(reportProjects) && reportProjects.length > 0) {
       return reportProjects.map((rp) => {
         const fullProject = projectList.find(
           (p) => (p._id || p.id) === (rp.projectId || rp._id) || p.name === rp.name,
@@ -145,7 +145,7 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
 
   // Employee report rows
   const employeeReport = useMemo<EmployeeReportRow[]>(() => {
-    if (rawEmployeeReports.length > 0) {
+    if (Array.isArray(rawEmployeeReports) && rawEmployeeReports.length > 0) {
       return rawEmployeeReports.map((e) => {
         const name = safeExtractString(e.name, "Employee");
         const dept = safeExtractString(e.department, "—");
@@ -269,7 +269,7 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
 
   // Department report rows
   const departmentReport = useMemo<DepartmentReportRow[]>(() => {
-    if (rawDepartmentReports.length > 0) {
+    if (Array.isArray(rawDepartmentReports) && rawDepartmentReports.length > 0) {
       return rawDepartmentReports.map((d) => {
         const dept = safeExtractString(d.department || d._id, "General");
         const employeesCount = Number(d.headcount || 0);

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -54,6 +54,7 @@ export const Route = createFileRoute("/employee/tasks/$id/submit")({
     ],
   }),
   component: SubmitProofPage,
+  errorComponent: SubmitProofError,
 });
 
 const taskTypeLabel: Record<string, string> = {
@@ -78,6 +79,22 @@ const fmtDate = (v?: string) => {
   const d = new Date(v);
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
+
+function SubmitProofError({ error, reset }: { error: any; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="glass max-w-xl mx-auto rounded-3xl p-8 text-center my-10">
+      <h2 className="font-display text-lg font-semibold text-foreground">Unable to load submission form</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {error?.message || "Something went wrong loading this task submission. Please try again."}
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <Button onClick={() => { router.invalidate(); reset(); }}>Try again</Button>
+        <Button variant="outline" asChild><Link to="/employee/tasks">Back to my tasks</Link></Button>
+      </div>
+    </div>
+  );
+}
 
 function SubmitProofPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submit" });
@@ -177,14 +194,14 @@ function SubmitProofPage() {
     ? safeProjects.find((p) => p.id === task.projectId || p._id === task.projectId)
     : undefined;
   const assignedBy = (task as any).assignedByName || task.createdBy || "Admin";
-  const normalizedStatus = (task.status?.toLowerCase() as Task["status"]) || "in_progress";
+  const normalizedStatus = ((typeof task.status === "string" ? task.status.toLowerCase() : "") as Task["status"]) || "in_progress";
   const currentStatus =
     task.reviewState === "in_review"
       ? "Pending Review"
       : statusLabel[normalizedStatus] || task.status || "In Progress";
-  const taskType = (task.taskType?.toLowerCase() || "direct") as string;
+  const taskType = (typeof task.taskType === "string" ? task.taskType.toLowerCase() : "direct");
   const typeLabel = taskTypeLabel[taskType] || task.taskType || "Direct";
-  const normalizedPriority = (task.priority?.toLowerCase() as TaskPriority) || "medium";
+  const normalizedPriority = ((typeof task.priority === "string" ? task.priority.toLowerCase() : "") as TaskPriority) || "medium";
 
   const packageInput = () => ({
     taskId: task.id || task._id || id,

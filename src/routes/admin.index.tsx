@@ -175,7 +175,7 @@ function AdminOverview() {
 
   // Dynamic Task Distribution by Department
   const taskDistributionData = useMemo(() => {
-    if (dashboard?.taskDistribution && dashboard.taskDistribution.length > 0) {
+    if (Array.isArray(dashboard?.taskDistribution) && dashboard.taskDistribution.length > 0) {
       return dashboard.taskDistribution.map((d) => ({
         department:
           typeof d.department === "object" && d.department !== null
@@ -197,7 +197,7 @@ function AdminOverview() {
 
   // Dynamic Department Performance
   const departmentPerformanceData = useMemo(() => {
-    if (dashboard?.departmentPerformance && dashboard.departmentPerformance.length > 0) {
+    if (Array.isArray(dashboard?.departmentPerformance) && dashboard.departmentPerformance.length > 0) {
       return dashboard.departmentPerformance.map((d) => ({
         department: getCategoryLabel(d.department),
         tasks: Number(d.tasks || 0),
