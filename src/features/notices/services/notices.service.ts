@@ -53,7 +53,7 @@ function buildNoticeFormData(input: CreateNoticeInput | UpdateNoticeInput): Form
   if ("expiryDate" in input && input.expiryDate) {
     formData.append("expiryDate", input.expiryDate);
   }
-  if ("existingAttachments" in input && input.existingAttachments) {
+  if ("existingAttachments" in input && input.existingAttachments !== undefined) {
     formData.append("existingAttachments", JSON.stringify(input.existingAttachments));
   }
   if (input.attachments && input.attachments.length > 0) {

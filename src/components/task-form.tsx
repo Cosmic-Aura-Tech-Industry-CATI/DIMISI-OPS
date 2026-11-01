@@ -143,7 +143,7 @@ export function taskToValues(t: Task): TaskFormValues {
     assigneeId:
       t.assigneeId ||
       (typeof t.assignedTo === "object" && t.assignedTo
-        ? (t.assignedTo as any)._id
+        ? (t.assignedTo as { _id?: string; id?: string })._id || (t.assignedTo as { _id?: string; id?: string }).id || ""
         : typeof t.assignedTo === "string"
           ? t.assignedTo
           : ""),
@@ -214,6 +214,7 @@ export function TaskForm({
   );
   const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const cancelledAttachmentIdsRef = useRef<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialog, setDialog] = useState<"create" | "edit" | "archive" | null>(null);
   const { data: allProjectList = [] } = useProjectsQuery();
@@ -351,12 +352,13 @@ export function TaskForm({
   };
 
   const uploadSingleFile = async (item: TaskAttachment) => {
-    if (!item.file) return;
+    const itemId = item.id;
+    if (!item.file || !itemId || cancelledAttachmentIdsRef.current.has(itemId)) return;
 
     setForm((prev) => ({
       ...prev,
       attachments: prev.attachments.map((att) =>
-        att.id === item.id
+        att.id === itemId
           ? { ...att, isUploading: true, uploadProgress: 10, error: undefined }
           : att,
       ),
@@ -364,18 +366,20 @@ export function TaskForm({
 
     try {
       const res = await uploadTaskAttachment(item.file, (percent) => {
+        if (cancelledAttachmentIdsRef.current.has(itemId)) return;
         setForm((prev) => ({
           ...prev,
           attachments: prev.attachments.map((att) =>
-            att.id === item.id ? { ...att, uploadProgress: percent } : att,
+            att.id === itemId ? { ...att, uploadProgress: percent } : att,
           ),
         }));
       });
 
+      if (cancelledAttachmentIdsRef.current.has(itemId)) return;
       setForm((prev) => ({
         ...prev,
         attachments: prev.attachments.map((att) =>
-          att.id === item.id
+          att.id === itemId
             ? {
                 ...att,
                 url: res.url,
@@ -389,6 +393,7 @@ export function TaskForm({
             : att,
         ),
       }));
+      if (cancelledAttachmentIdsRef.current.has(itemId)) return;
       toast.success(`${item.name} uploaded to storage.`);
     } catch (err: unknown) {
       const message =
@@ -398,10 +403,11 @@ export function TaskForm({
             ? String((err as { message: unknown }).message)
             : "Failed to upload file.";
 
+      if (cancelledAttachmentIdsRef.current.has(itemId)) return;
       setForm((prev) => ({
         ...prev,
         attachments: prev.attachments.map((att) =>
-          att.id === item.id ? { ...att, isUploading: false, error: message } : att,
+          att.id === itemId ? { ...att, isUploading: false, error: message } : att,
         ),
       }));
       toast.error(`Upload failed for ${item.name}: ${message}`);
@@ -428,7 +434,7 @@ export function TaskForm({
     }
 
     const targetId = replacingAttachmentId;
-    const targetItem = form.attachments.find((a) => a.id === targetId);
+    const targetItem = form.attachments.find((att) => att.id === targetId);
     if (!targetItem) {
       setReplacingAttachmentId(null);
       return;
@@ -459,6 +465,7 @@ export function TaskForm({
 
     try {
       const res = await uploadTaskAttachment(file, (percent) => {
+        if (targetId && cancelledAttachmentIdsRef.current.has(targetId)) return;
         setForm((prev) => ({
           ...prev,
           attachments: prev.attachments.map((att) =>
@@ -468,6 +475,7 @@ export function TaskForm({
       });
 
       // Update state: REPLACE the old attachment completely with the new replacement
+      if (targetId && cancelledAttachmentIdsRef.current.has(targetId)) return;
       setForm((prev) => ({
         ...prev,
         attachments: prev.attachments.map((att) =>
@@ -490,6 +498,7 @@ export function TaskForm({
       toast.success(`Replaced "${previousItem.name}" with "${res.name || file.name}".`);
     } catch (err: unknown) {
       // Retain previous valid attachment on failure
+      if (targetId && cancelledAttachmentIdsRef.current.has(targetId)) return;
       setForm((prev) => ({
         ...prev,
         attachments: prev.attachments.map((att) =>
@@ -556,6 +565,8 @@ export function TaskForm({
 
     if (itemsToAdd.length === 0) return;
 
+    itemsToAdd.forEach((item) => { if (item.id) cancelledAttachmentIdsRef.current.delete(item.id); });
+
     // Add files to state
     setForm((prev) => ({
       ...prev,
@@ -592,6 +603,21 @@ export function TaskForm({
       handleFiles(newFiles);
     },
   });
+
+  const handleRemoveAttachment = (targetId?: string) => {
+    if (!targetId) return;
+    cancelledAttachmentIdsRef.current.add(targetId);
+    setForm((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((att) => att.id !== targetId),
+    }));
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+    if (replaceFileInputRef.current) {
+      replaceFileInputRef.current.value = "";
+    }
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -839,12 +865,7 @@ export function TaskForm({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() =>
-                          set(
-                            "attachments",
-                            form.attachments.filter((_, idx) => idx !== i),
-                          )
-                        }
+                        onClick={() => handleRemoveAttachment(a.id || String(i))}
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>

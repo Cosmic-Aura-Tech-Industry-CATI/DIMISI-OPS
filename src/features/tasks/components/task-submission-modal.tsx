@@ -173,9 +173,18 @@ export function TaskSubmissionModal({
   };
 
   const handleRemoveFile = (index: number) => {
-    setProofFiles((prev) => prev.filter((_, i) => i !== index));
-    if (proofFiles.length <= 1) {
-      setFileError("Please upload proof of your completed task.");
+    setProofFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setFileError("Please upload proof of your completed task.");
+      }
+      return next;
+    });
+    if (dropInputRef.current) {
+      dropInputRef.current.value = "";
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 

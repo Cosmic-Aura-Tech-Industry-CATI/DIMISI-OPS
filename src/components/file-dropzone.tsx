@@ -97,7 +97,12 @@ export function FileDropzone({
               type="button"
               variant="ghost"
               size="icon"
-              onClick={onClearFile}
+              onClick={() => {
+                if (inputRef.current) {
+                  inputRef.current.value = "";
+                }
+                onClearFile();
+              }}
               disabled={disabled}
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
               title="Remove file"

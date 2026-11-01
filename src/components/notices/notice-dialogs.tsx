@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Paperclip, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -184,8 +184,7 @@ export function EditNoticeDialog({
   const updateNoticeMutation = useUpdateNotice();
 
   // Keep state synced when notice changes
-  const prevId = notice?._id || notice?.id;
-  useState(() => {
+  useEffect(() => {
     if (notice) {
       setHeadline(notice.headline || notice.title || "");
       setContent(notice.content || "");
@@ -196,9 +195,13 @@ export function EditNoticeDialog({
       setExpiryDate(
         notice.expiryDate ? new Date(notice.expiryDate).toISOString().slice(0, 10) : "",
       );
-      setExistingAttachments(notice.attachments || []);
+      const safeAttachments: string[] = ((notice.attachments as unknown[]) || [])
+        .map((a) => (typeof a === "string" ? a : typeof a === "object" && a !== null && "url" in a && typeof (a as { url: unknown }).url === "string" ? (a as { url: string }).url : ""))
+        .filter((u): u is string => typeof u === "string" && u.length > 0);
+      setExistingAttachments(safeAttachments);
+      setNewAttachment(undefined);
     }
-  });
+  }, [notice]);
 
   const handleSave = () => {
     if (!notice) return;
@@ -338,7 +341,7 @@ export function EditNoticeDialog({
                         className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-xs"
                       >
                         <Paperclip className="h-3.5 w-3.5 text-primary" />
-                        <span className="max-w-[160px] truncate">{url.split("/").pop()}</span>
+                        <span className="max-w-[160px] truncate">{typeof url === "string" ? url.split("/").pop() : "attachment"}</span>
                         <button
                           type="button"
                           onClick={() =>

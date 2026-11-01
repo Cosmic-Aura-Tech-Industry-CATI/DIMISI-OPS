@@ -19,7 +19,7 @@ function EditTaskPage() {
   const updateTask = useUpdateTask({
     onSuccess: (updated) => {
       toast.success("Task updated", { description: `${updated.title} saved successfully.` });
-      navigate({ to: "/admin/tasks/$id", params: { id: updated.id || (updated as any)._id || id } });
+      navigate({ to: "/admin/tasks/$id", params: { id: updated.id || (updated as { _id?: string })._id || id } });
     },
     onError: (err) => {
       toast.error("Failed to update task", {
@@ -100,39 +100,40 @@ function EditTaskPage() {
     }
 
     // Attachments tracking
-    const uploadedAttachments = v.attachments
-      .filter((a) => a.url && a.publicId)
-      .map((a) => ({
-        url: a.url!,
-        publicId: a.publicId!,
-        name: a.name,
-        size: a.size,
-      }));
-
+    const initialUrls: string[] = (task.attachments || []).map((a) => a.url).filter((u): u is string => typeof u === "string" && u.length > 0);
     const retainedUrls = v.attachments
       .map((a) => a.url)
       .filter((u): u is string => typeof u === "string" && u.length > 0);
 
-    const initialUrls = (task.attachments || []).map((a) => a.url).filter(Boolean);
-    const attachmentsChanged =
-      retainedUrls.length !== initialUrls.length ||
-      retainedUrls.some((u, idx) => u !== initialUrls[idx]) ||
-      uploadedAttachments.length > 0;
+    const newlyAdded = v.attachments.filter((a) => !a.url || !initialUrls.includes(a.url));
+    const deletedUrls = initialUrls.filter((u) => !retainedUrls.includes(u));
+
+    const attachmentsChanged = deletedUrls.length > 0 || newlyAdded.length > 0;
 
     if (attachmentsChanged) {
       input.existingAttachments = retainedUrls;
-      input.uploadedAttachments = uploadedAttachments;
+      input.uploadedAttachments = v.attachments
+        .filter((a) => a.url && a.publicId)
+        .map((a) => ({
+          url: a.url!,
+          publicId: a.publicId!,
+          name: a.name,
+          size: a.size,
+        }));
+      input.attachments = v.attachments
+        .map((a) => a.file)
+        .filter((f): f is File => f instanceof File);
       hasChanges = true;
     }
 
     if (!hasChanges) {
       toast.info("No changes were made to the task.");
-      navigate({ to: "/admin/tasks/$id", params: { id: task.id || (task as any)._id || id } });
+      navigate({ to: "/admin/tasks/$id", params: { id: task.id || (task as { _id?: string })._id || id } });
       return;
     }
 
     updateTask.mutate({
-      id: task.id || (task as any)._id || id,
+      id: task.id || (task as { _id?: string })._id || id,
       input,
     });
   };
@@ -142,7 +143,7 @@ function EditTaskPage() {
       <div>
         <Link
           to="/admin/tasks/$id"
-          params={{ id: task.id || (task as any)._id || id }}
+          params={{ id: task.id || (task as { _id?: string })._id || id }}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to task
@@ -157,7 +158,7 @@ function EditTaskPage() {
         submitLabel="Update Task"
         isSubmitting={updateTask.isPending}
         apiError={updateTask.error?.message}
-        onCancel={() => navigate({ to: "/admin/tasks/$id", params: { id: task.id || (task as any)._id || id } })}
+        onCancel={() => navigate({ to: "/admin/tasks/$id", params: { id: task.id || (task as { _id?: string })._id || id } })}
         onSubmit={handleSubmit}
       />
     </>
