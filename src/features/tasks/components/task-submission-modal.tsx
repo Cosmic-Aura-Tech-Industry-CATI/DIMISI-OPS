@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Loader2,
   Paperclip,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,7 +31,7 @@ import type { Task } from "../types";
 import { useAuth } from "@/lib/auth";
 import { submitForReview } from "@/lib/submission-store";
 import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
-import { uploadTaskProof } from "@/lib/cdn-upload";
+import { uploadTaskProof, extractCloudinaryPublicId } from "@/lib/cdn-upload";
 
 interface TaskSubmissionModalProps {
   task: Task | null;
@@ -218,6 +219,12 @@ export function TaskSubmissionModal({
   const isTooLong = trimmed.length > 500;
   const isNotesEmpty = touched && trimmed.length === 0;
 
+  const handlePreviewLocalFile = (f: File) => {
+    const url = URL.createObjectURL(f);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
+
   const handleTriggerReplace = (index: number) => {
     setReplaceIndex(index);
     if (dropInputRef.current) {
@@ -293,7 +300,10 @@ export function TaskSubmissionModal({
             url = res.url;
             publicId = res.publicId;
           } catch (uploadErr) {
-            console.warn("[TaskSubmissionModal] Direct upload fallback to inlined data:", uploadErr);
+            console.warn(
+              "[TaskSubmissionModal] Direct upload fallback to inlined data:",
+              uploadErr,
+            );
           }
           const dataUrl = await readFileAsDataUrl(file);
           return {
@@ -325,7 +335,7 @@ export function TaskSubmissionModal({
     const primaryProof = uploadedFiles[0];
     const mappedProofFiles = uploadedFiles.map((f) => ({
       url: f.url || "",
-      publicId: f.publicId || "",
+      publicId: f.publicId || (f.url ? extractCloudinaryPublicId(f.url) : "") || "",
       name: f.name,
       size: f.size,
       mimeType: f.type,
@@ -336,7 +346,9 @@ export function TaskSubmissionModal({
     submitMutation.mutate({
       id: taskId,
       notes: trimmed,
-      proof: primaryProof?.url ? { url: primaryProof.url, publicId: primaryProof.publicId || "" } : undefined,
+      proof: primaryProof?.url
+        ? { url: primaryProof.url, publicId: primaryProof.publicId || "" }
+        : undefined,
       proofUrl: primaryProof?.url,
       proofPublicId: primaryProof?.publicId,
       proofFiles: mappedProofFiles,
@@ -490,6 +502,17 @@ export function TaskSubmissionModal({
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handlePreviewLocalFile(file)}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-primary rounded-lg"
+                            title="Preview / open file"
+                            aria-label={`Preview ${file.name}`}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
                           <Button
                             type="button"
                             size="sm"
