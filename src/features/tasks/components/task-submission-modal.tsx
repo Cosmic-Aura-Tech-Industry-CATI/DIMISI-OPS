@@ -30,6 +30,7 @@ import type { Task } from "../types";
 import { useAuth } from "@/lib/auth";
 import { submitForReview } from "@/lib/submission-store";
 import { useFileDropPaste } from "@/hooks/use-file-drop-paste";
+import { uploadTaskProof } from "@/lib/cdn-upload";
 
 interface TaskSubmissionModalProps {
   task: Task | null;
@@ -212,9 +213,9 @@ export function TaskSubmissionModal({
   if (!task) return null;
 
   const trimmed = notes.trim();
-  const isNotesValid = trimmed.length >= 10 && trimmed.length <= 5000;
+  const isNotesValid = trimmed.length >= 10 && trimmed.length <= 500;
   const isTooShort = touched && trimmed.length > 0 && trimmed.length < 10;
-  const isTooLong = trimmed.length > 5000;
+  const isTooLong = trimmed.length > 500;
   const isNotesEmpty = touched && trimmed.length === 0;
 
   const handleTriggerReplace = (index: number) => {
@@ -258,9 +259,9 @@ export function TaskSubmissionModal({
       return;
     }
 
-    if (trimmed.length > 5000) {
+    if (trimmed.length > 500) {
       toast.error("Submission notes too long", {
-        description: "Character limit exceeded (maximum 5000 characters).",
+        description: "Character limit exceeded (maximum 500 characters).",
       });
       return;
     }
@@ -271,16 +272,40 @@ export function TaskSubmissionModal({
       return;
     }
 
-    // 3. Prepare fallback inlined payload for persistent preview & download
+    // 3. Upload proof files to CDN and prepare fallback inlined payload
+    let uploadedFiles: Array<{
+      id: string;
+      name: string;
+      size: number;
+      type: string;
+      url?: string;
+      publicId?: string;
+      dataUrl?: string;
+    }> = [];
+
     try {
-      const submissionFiles = await Promise.all(
-        proofFiles.map(async (file) => ({
-          id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`,
-          name: file.name,
-          size: file.size,
-          type: file.type || "application/octet-stream",
-          dataUrl: await readFileAsDataUrl(file),
-        })),
+      uploadedFiles = await Promise.all(
+        proofFiles.map(async (file) => {
+          let url: string | undefined;
+          let publicId: string | undefined;
+          try {
+            const res = await uploadTaskProof(file);
+            url = res.url;
+            publicId = res.publicId;
+          } catch (uploadErr) {
+            console.warn("[TaskSubmissionModal] Direct upload fallback to inlined data:", uploadErr);
+          }
+          const dataUrl = await readFileAsDataUrl(file);
+          return {
+            id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`,
+            name: file.name,
+            size: file.size,
+            type: file.type || "application/octet-stream",
+            url,
+            publicId,
+            dataUrl,
+          };
+        }),
       );
 
       submitForReview({
@@ -290,18 +315,31 @@ export function TaskSubmissionModal({
         employeeCode: auth.user?.empId || auth.user?.code || "",
         workSummary: trimmed,
         issues: "",
-        files: submissionFiles,
+        files: uploadedFiles,
         checklist: { completed: true, proof: true, verified: true },
       });
     } catch (storeErr) {
       console.warn("[TaskSubmissionModal] Local submission cache warning:", storeErr);
     }
 
-    // 4. Submit to Backend API (enforced with multipart file proof)
+    const primaryProof = uploadedFiles[0];
+    const mappedProofFiles = uploadedFiles.map((f) => ({
+      url: f.url || "",
+      publicId: f.publicId || "",
+      name: f.name,
+      size: f.size,
+      mimeType: f.type,
+      dataUrl: f.dataUrl,
+    }));
+
+    // 4. Submit to Backend API with clean JSON payload
     submitMutation.mutate({
       id: taskId,
       notes: trimmed,
-      files: proofFiles,
+      proof: primaryProof?.url ? { url: primaryProof.url, publicId: primaryProof.publicId || "" } : undefined,
+      proofUrl: primaryProof?.url,
+      proofPublicId: primaryProof?.publicId,
+      proofFiles: mappedProofFiles,
     });
   };
 
@@ -533,10 +571,10 @@ export function TaskSubmissionModal({
               </Label>
               <span
                 className={`text-xs ${
-                  trimmed.length > 5000 ? "text-destructive font-semibold" : "text-muted-foreground"
+                  trimmed.length > 500 ? "text-destructive font-semibold" : "text-muted-foreground"
                 }`}
               >
-                {trimmed.length} / 5000 chars
+                {trimmed.length} / 500 chars
               </span>
             </div>
 

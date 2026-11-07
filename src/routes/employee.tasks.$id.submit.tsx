@@ -283,6 +283,9 @@ function SubmitProofPage() {
       additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
     ].filter(Boolean).join("\n\n") || "Task completed and submitted for review.";
 
+    const apiNotes =
+      formattedNotes.length > 500 ? formattedNotes.slice(0, 497) + "..." : formattedNotes;
+
     const targetId = task.id || task._id || id;
     const normStatus = (task.rawStatus || task.status || "").toLowerCase();
 
@@ -304,7 +307,7 @@ function SubmitProofPage() {
       // Step 2: Submit task for review (IN_PROGRESS -> IN_REVIEW) with direct-to-CDN proof data
       await submitMutation.mutateAsync({
         id: targetId,
-        notes: formattedNotes,
+        notes: apiNotes,
         proof: primaryProof
           ? {
               url: primaryProof.url!,

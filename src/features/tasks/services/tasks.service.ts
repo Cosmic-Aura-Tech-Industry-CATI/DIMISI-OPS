@@ -227,7 +227,7 @@ export const tasksService = {
       | {
           notes?: string;
           files?: File[];
-          proofFiles?: any[];
+          proofFiles?: unknown[];
           proof?: { url: string; publicId: string };
           proofUrl?: string;
           proofPublicId?: string;
@@ -235,43 +235,35 @@ export const tasksService = {
         }
       | string,
   ): Promise<Task> {
-    let body: any;
+    let body: FormData | Record<string, unknown>;
     if (payload instanceof FormData) {
       body = payload;
     } else if (typeof payload === "string") {
-      body = { notes: payload };
-    } else if (typeof payload === "object" && payload !== null && "formData" in payload && (payload as any).formData) {
-      body = (payload as any).formData;
-    } else if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "files" in payload &&
-      Array.isArray((payload as any).files) &&
-      (payload as any).files.length > 0
-    ) {
-      const fd = new FormData();
-      if ((payload as any).notes) fd.append("notes", (payload as any).notes);
-      for (const file of (payload as any).files) {
-        if (file instanceof File) {
-          fd.append("proofFiles", file);
-        }
-      }
-      if ((payload as any).proofFiles && (payload as any).proofFiles.length > 0) {
-        fd.append("proofFiles", JSON.stringify((payload as any).proofFiles));
-      }
-      body = fd;
+      const clean = payload.trim();
+      body = { notes: clean.length > 500 ? clean.slice(0, 497) + "..." : clean };
+    } else if (typeof payload === "object" && payload !== null && "formData" in payload && payload.formData instanceof FormData) {
+      body = payload.formData;
     } else {
-      body = typeof payload === "string" ? { notes: payload } : { ...payload };
+      const p = payload as Record<string, unknown>;
+      const cleanNotes = typeof p.notes === "string" ? p.notes.trim() : "";
+      body = {
+        notes: cleanNotes.length > 500 ? cleanNotes.slice(0, 497) + "..." : cleanNotes,
+        ...(p.proof ? { proof: p.proof } : {}),
+        ...(p.proofUrl ? { proofUrl: p.proofUrl } : {}),
+        ...(p.proofPublicId ? { proofPublicId: p.proofPublicId } : {}),
+        ...(Array.isArray(p.proofFiles) && p.proofFiles.length > 0 ? { proofFiles: p.proofFiles } : {}),
+      };
     }
 
     try {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+      const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.submit(id), body);
       const raw = res?.task || res?.data?.task || res;
       return mapTaskResponse(raw);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If backend throws error stating task must be 'In Progress' first or not assigned, auto-start and retry
-      const errMsg = err?.message || err?.response?.data?.message || "";
-      const status = err?.status || err?.response?.status;
+      const errorObj = err as { message?: string; response?: { data?: { message?: string }; status?: number }; status?: number };
+      const errMsg = errorObj?.message || errorObj?.response?.data?.message || "";
+      const status = errorObj?.status || errorObj?.response?.status;
       if (
         typeof errMsg === "string" &&
         (errMsg.toLowerCase().includes("in progress") ||
@@ -281,8 +273,8 @@ export const tasksService = {
           status === 403)
       ) {
         try {
-          await http.patch<any>(API_ENDPOINTS.tasks.start(id));
-          const retryRes = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+          await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.start(id));
+          const retryRes = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.submit(id), body);
           const raw = retryRes?.task || retryRes?.data?.task || retryRes;
           return mapTaskResponse(raw);
         } catch {

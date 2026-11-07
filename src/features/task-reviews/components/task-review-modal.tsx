@@ -119,8 +119,9 @@ function formatDateTimeSafe(
 function cleanTextContent(text?: string): string {
   if (!text || typeof text !== "string") return "";
   return text
-    .replace(/Proof files attached[^\n]*\n[\s\S]*?(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/gi, "")
+    .replace(/Proof files attached[^\n]*\n?[\s\S]*?(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/gi, "")
     .replace(/Proof files attached:[^\n]*/gi, "")
+    .replace(/\n?-\s*[^:\n]+:\s*https?:\/\/[^\s)]+/gi, "")
     .replace(/https?:\/\/res\.cloudinary\.com[^\s)]+/gi, "")
     .replace(/\[\s*\{[\s\S]*?\}\s*\]/g, "")
     .replace(/\{\s*"[^"]+"\s*:[\s\S]*?\}/g, "")
@@ -435,9 +436,9 @@ function TaskReviewModalContent({
 
   // Fallback: parse proof files from task.notes if list is still empty
   if (proofList.length === 0 && typeof task.notes === "string" && task.notes.includes("Proof files attached")) {
-    const proofBlockMatch = task.notes.match(/Proof files attached[^\n]*\n([\s\S]*?)(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/i);
+    const proofBlockMatch = task.notes.match(/Proof files attached[^\n]*\n?([\s\S]*?)(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/i);
     if (proofBlockMatch && proofBlockMatch[1]) {
-      const lines = proofBlockMatch[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-"));
+      const lines = proofBlockMatch[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-") || l.includes("http"));
       for (const line of lines) {
         const clean = line.replace(/^-\s*/, "");
         const separatorIdx = clean.indexOf(":");
@@ -451,10 +452,27 @@ function TaskReviewModalContent({
               size: "File",
             });
           }
+        } else if (clean.startsWith("http")) {
+          proofList.push({
+            name: "Proof File",
+            url: clean,
+            size: "File",
+          });
         }
       }
     }
   }
+
+  // Ensure task creation attachments NEVER leak into employee proof files (Requirement 1)
+  const taskAttachmentUrls = new Set(
+    (Array.isArray(task.attachments) ? task.attachments : [])
+      .map((a: unknown) => (typeof a === "string" ? a : (a as { url?: string })?.url))
+      .filter((u): u is string => Boolean(u))
+  );
+
+  const safeProofList = proofList.filter(
+    (p) => !p.url || !taskAttachmentUrls.has(p.url)
+  );
 
   const submitterName = extractSafeString(
     task.submittedBy || localSub?.employeeName || task.assignee,
@@ -472,7 +490,7 @@ function TaskReviewModalContent({
   const taskRecord = task as unknown as Record<string, unknown>;
 
   const workSummary = extractSafeString(
-    taskRecord.workSummary || localSub?.workSummary || parsedNotes.workSummary,
+    cleanTextContent((taskRecord.workSummary || localSub?.workSummary || parsedNotes.workSummary) as string),
     ""
   );
 
@@ -499,16 +517,22 @@ function TaskReviewModalContent({
       : [];
 
   const submissionNotes = extractSafeString(
-    taskRecord.issues ||
-      localSub?.issues ||
-      parsedNotes.issues ||
-      parsedNotes.generalNotes ||
-      (!workSummary && deliverableLinksList.length === 0 ? task.notes : undefined),
+    cleanTextContent(
+      (taskRecord.issues ||
+        localSub?.issues ||
+        parsedNotes.issues ||
+        parsedNotes.generalNotes) as string
+    ) ||
+      (!workSummary && deliverableLinksList.length === 0 ? cleanTextContent(task.notes as string) : undefined),
     ""
   );
 
   const additionalRemarks = extractSafeString(
-    taskRecord.additionalRemarks || localSub?.additionalRemarks || parsedNotes.additionalRemarks,
+    cleanTextContent(
+      (taskRecord.additionalRemarks ||
+        localSub?.additionalRemarks ||
+        parsedNotes.additionalRemarks) as string
+    ),
     ""
   );
 
@@ -791,12 +815,12 @@ function TaskReviewModalContent({
 
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${
-                      proofList.length > 0
+                      safeProofList.length > 0
                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         : "bg-destructive/15 text-destructive border border-destructive/30"
                     }`}
                   >
-                    {proofList.length} proof file{proofList.length === 1 ? "" : "s"} attached
+                    {safeProofList.length} proof file{safeProofList.length === 1 ? "" : "s"} attached
                   </span>
                 </div>
 
@@ -820,9 +844,9 @@ function TaskReviewModalContent({
                 </div>
 
                 {/* Proof Files List */}
-                {proofList.length > 0 ? (
+                {safeProofList.length > 0 ? (
                   <div className="space-y-2 pt-1 min-w-0">
-                    {proofList.map((file, i) => {
+                    {safeProofList.map((file, i) => {
                       const isImg = isImageProof(file.mimeType, file.name);
 
                       return (
