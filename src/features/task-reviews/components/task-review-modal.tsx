@@ -116,6 +116,19 @@ function formatDateTimeSafe(
   }
 }
 
+function cleanTextContent(text?: string): string {
+  if (!text || typeof text !== "string") return "";
+  return text
+    .replace(/Proof files attached[^\n]*\n?[\s\S]*?(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/gi, "")
+    .replace(/Proof files attached:[^\n]*/gi, "")
+    .replace(/\n?-\s*[^:\n]+:\s*https?:\/\/[^\s)]+/gi, "")
+    .replace(/https?:\/\/res\.cloudinary\.com[^\s)]+/gi, "")
+    .replace(/\[\s*\{[\s\S]*?\}\s*\]/g, "")
+    .replace(/\{\s*"[^"]+"\s*:[\s\S]*?\}/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function parseSubmissionNotes(notes?: unknown) {
   if (!notes || typeof notes !== "string") return {};
   const sections: {
@@ -128,13 +141,13 @@ function parseSubmissionNotes(notes?: unknown) {
 
   const hasHeaders = /Work Summary:|Deliverables & Links:|Issues & Blockers:|Additional Remarks:/i.test(notes);
   if (!hasHeaders) {
-    sections.generalNotes = notes;
+    sections.generalNotes = cleanTextContent(notes);
     return sections;
   }
 
   const workSummaryMatch = notes.match(/Work Summary:\s*([\s\S]*?)(?=(?:Deliverables & Links:|Proof files attached|Issues & Blockers:|Additional Remarks:|$))/i);
   if (workSummaryMatch && workSummaryMatch[1].trim()) {
-    sections.workSummary = workSummaryMatch[1].trim();
+    sections.workSummary = cleanTextContent(workSummaryMatch[1]);
   }
 
   const linksMatch = notes.match(/Deliverables & Links:\s*([\s\S]*?)(?=(?:Proof files attached|Issues & Blockers:|Additional Remarks:|$))/i);
@@ -144,12 +157,12 @@ function parseSubmissionNotes(notes?: unknown) {
 
   const issuesMatch = notes.match(/Issues & Blockers:\s*([\s\S]*?)(?=(?:Additional Remarks:|$))/i);
   if (issuesMatch && issuesMatch[1].trim()) {
-    sections.issues = issuesMatch[1].trim();
+    sections.issues = cleanTextContent(issuesMatch[1]);
   }
 
   const remarksMatch = notes.match(/Additional Remarks:\s*([\s\S]*?)$/i);
   if (remarksMatch && remarksMatch[1].trim()) {
-    sections.additionalRemarks = remarksMatch[1].trim();
+    sections.additionalRemarks = cleanTextContent(remarksMatch[1]);
   }
 
   return sections;
@@ -418,35 +431,14 @@ function TaskReviewModalContent({
         mimeType: typeof f.type === "string" ? f.type : undefined,
       });
     }
-  } else if (Array.isArray(task.attachments) && task.attachments.length > 0) {
-    for (const a of (task.attachments as unknown[])) {
-      if (!a) continue;
-      if (typeof a === "string") {
-        let name = "Attachment";
-        try {
-          const parts = a.split("/");
-          const last = parts[parts.length - 1];
-          if (last) name = decodeURIComponent(last.split("?")[0]);
-        } catch (_err) {
-          // ignore
-        }
-        proofList.push({ name, url: a, size: "File" });
-      } else if (typeof a === "object" && a !== null) {
-        const aObj = a as Record<string, unknown>;
-        proofList.push({
-          name: typeof aObj.name === "string" ? aObj.name : "Attachment",
-          size: typeof aObj.size === "string" || typeof aObj.size === "number" ? aObj.size : undefined,
-          url: typeof aObj.url === "string" ? aObj.url : undefined,
-        });
-      }
-    }
   }
+
 
   // Fallback: parse proof files from task.notes if list is still empty
   if (proofList.length === 0 && typeof task.notes === "string" && task.notes.includes("Proof files attached")) {
-    const proofBlockMatch = task.notes.match(/Proof files attached[^\n]*\n([\s\S]*?)(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/i);
+    const proofBlockMatch = task.notes.match(/Proof files attached[^\n]*\n?([\s\S]*?)(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/i);
     if (proofBlockMatch && proofBlockMatch[1]) {
-      const lines = proofBlockMatch[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-"));
+      const lines = proofBlockMatch[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-") || l.includes("http"));
       for (const line of lines) {
         const clean = line.replace(/^-\s*/, "");
         const separatorIdx = clean.indexOf(":");
@@ -460,10 +452,27 @@ function TaskReviewModalContent({
               size: "File",
             });
           }
+        } else if (clean.startsWith("http")) {
+          proofList.push({
+            name: "Proof File",
+            url: clean,
+            size: "File",
+          });
         }
       }
     }
   }
+
+  // Ensure task creation attachments NEVER leak into employee proof files (Requirement 1)
+  const taskAttachmentUrls = new Set(
+    (Array.isArray(task.attachments) ? task.attachments : [])
+      .map((a: unknown) => (typeof a === "string" ? a : (a as { url?: string })?.url))
+      .filter((u): u is string => Boolean(u))
+  );
+
+  const safeProofList = proofList.filter(
+    (p) => !p.url || !taskAttachmentUrls.has(p.url)
+  );
 
   const submitterName = extractSafeString(
     task.submittedBy || localSub?.employeeName || task.assignee,
@@ -481,7 +490,7 @@ function TaskReviewModalContent({
   const taskRecord = task as unknown as Record<string, unknown>;
 
   const workSummary = extractSafeString(
-    taskRecord.workSummary || localSub?.workSummary || parsedNotes.workSummary,
+    cleanTextContent((taskRecord.workSummary || localSub?.workSummary || parsedNotes.workSummary) as string),
     ""
   );
 
@@ -508,16 +517,22 @@ function TaskReviewModalContent({
       : [];
 
   const submissionNotes = extractSafeString(
-    taskRecord.issues ||
-      localSub?.issues ||
-      parsedNotes.issues ||
-      parsedNotes.generalNotes ||
-      (!workSummary && deliverableLinksList.length === 0 ? task.notes : undefined),
+    cleanTextContent(
+      (taskRecord.issues ||
+        localSub?.issues ||
+        parsedNotes.issues ||
+        parsedNotes.generalNotes) as string
+    ) ||
+      (!workSummary && deliverableLinksList.length === 0 ? cleanTextContent(task.notes as string) : undefined),
     ""
   );
 
   const additionalRemarks = extractSafeString(
-    taskRecord.additionalRemarks || localSub?.additionalRemarks || parsedNotes.additionalRemarks,
+    cleanTextContent(
+      (taskRecord.additionalRemarks ||
+        localSub?.additionalRemarks ||
+        parsedNotes.additionalRemarks) as string
+    ),
     ""
   );
 
@@ -741,6 +756,44 @@ function TaskReviewModalContent({
                     </div>
                   </div>
                 </div>
+
+                {/* Task Creation Attachments (provided by Admin upon creation) */}
+                {Array.isArray(task.attachments) && task.attachments.length > 0 && (
+                  <div className="pt-3 border-t border-border/40 space-y-2 min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                      <Paperclip className="h-3.5 w-3.5 text-primary" /> Task Attachments ({task.attachments.length})
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {task.attachments.map((att, idx) => {
+                        const attUrl = typeof att === "string" ? att : att?.url;
+                        const attName = (typeof att === "object" && att?.name) || "Attachment";
+                        const attSize = (typeof att === "object" && att?.size) || "File";
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-xs min-w-0"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="truncate font-medium text-foreground">{attName}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">{attSize}</span>
+                            </div>
+                            {attUrl && (
+                              <a
+                                href={attUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium text-[11px] shrink-0"
+                              >
+                                View
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* MANDATORY SUBMITTED PROOF SECTION */}
@@ -762,12 +815,12 @@ function TaskReviewModalContent({
 
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${
-                      proofList.length > 0
+                      safeProofList.length > 0
                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         : "bg-destructive/15 text-destructive border border-destructive/30"
                     }`}
                   >
-                    {proofList.length} proof file{proofList.length === 1 ? "" : "s"} attached
+                    {safeProofList.length} proof file{safeProofList.length === 1 ? "" : "s"} attached
                   </span>
                 </div>
 
@@ -791,9 +844,9 @@ function TaskReviewModalContent({
                 </div>
 
                 {/* Proof Files List */}
-                {proofList.length > 0 ? (
+                {safeProofList.length > 0 ? (
                   <div className="space-y-2 pt-1 min-w-0">
-                    {proofList.map((file, i) => {
+                    {safeProofList.map((file, i) => {
                       const isImg = isImageProof(file.mimeType, file.name);
 
                       return (

@@ -802,7 +802,8 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
           if (Array.isArray(sub.files)) {
             for (const sf of sub.files) {
               proofFiles.push({
-                url: sf.dataUrl || "",
+                url: sf.url || sf.dataUrl || "",
+                publicId: sf.publicId,
                 name: sf.name,
                 size: typeof sf.size === "number" ? `${Math.round(sf.size / 1024)} KB` : String(sf.size),
                 mimeType: sf.type,
@@ -813,6 +814,63 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
         }
       }
     } catch {}
+  }
+
+  // Parse direct proof object from API response if proofFiles is still empty
+  if (proofFiles.length === 0) {
+    const docRecord = doc as Record<string, unknown>;
+    const rawProof = docRecord.proof || (raw as Record<string, unknown>)?.proof;
+    if (rawProof && typeof rawProof === "object") {
+      const pObj = rawProof as Record<string, unknown>;
+      const pUrl = typeof pObj.url === "string" ? pObj.url : typeof pObj.secure_url === "string" ? pObj.secure_url : "";
+      if (pUrl) {
+        let pName = typeof pObj.name === "string" ? pObj.name : "Proof File";
+        if (pName === "Proof File") {
+          try {
+            const parts = pUrl.split("/");
+            const last = parts[parts.length - 1];
+            if (last) pName = decodeURIComponent(last.split("?")[0]);
+          } catch {
+            // ignore
+          }
+        }
+        proofFiles.push({
+          url: pUrl,
+          name: pName,
+          publicId: typeof pObj.publicId === "string" ? pObj.publicId : undefined,
+          size: "File",
+        });
+      }
+    } else if (typeof docRecord.proofUrl === "string" && docRecord.proofUrl) {
+      proofFiles.push({
+        url: docRecord.proofUrl,
+        name: "Proof File",
+        size: "File",
+      });
+    }
+  }
+
+  // Parse legacy proof files from doc.notes if still empty
+  if (proofFiles.length === 0 && typeof doc.notes === "string" && doc.notes.includes("Proof files attached")) {
+    const proofBlockMatch = doc.notes.match(/Proof files attached[^\n]*\n([\s\S]*?)(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/i);
+    if (proofBlockMatch && proofBlockMatch[1]) {
+      const lines = proofBlockMatch[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-"));
+      for (const line of lines) {
+        const clean = line.replace(/^-\s*/, "");
+        const separatorIdx = clean.indexOf(":");
+        if (separatorIdx !== -1) {
+          const name = clean.slice(0, separatorIdx).trim();
+          const url = clean.slice(separatorIdx + 1).trim();
+          if (url) {
+            proofFiles.push({
+              name: name || "Proof File",
+              url,
+              size: "File",
+            });
+          }
+        }
+      }
+    }
   }
 
   // Parse review & feedback info

@@ -355,7 +355,7 @@ function buildTimeline(task: Task, creator: string): TimelineItem[] {
     items.push({
       title: "Submitted for review",
       date: fmt(submitted),
-      note: task.attachments?.length ? `${task.attachments.length} attachment(s) included` : "Awaiting reviewer",
+      note: task.proofFiles?.length ? `${task.proofFiles.length} proof file(s) included` : "Awaiting reviewer",
       icon: Send,
       dotBg: "bg-primary/20",
       dotIcon: "text-primary",
