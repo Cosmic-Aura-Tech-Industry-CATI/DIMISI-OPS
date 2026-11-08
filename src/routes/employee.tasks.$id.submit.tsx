@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/status-badge";
 import { ProofUploader, type ProofFile } from "@/components/proof-uploader";
+import { extractCloudinaryPublicId } from "@/lib/cdn-upload";
 import {
   type Task,
   type TaskPriority,
@@ -41,16 +42,22 @@ import {
   getCategoryLabel,
 } from "@/features/tasks";
 import { useProjectsQuery } from "@/features/projects";
-import { saveDraft, submitForReview, useSubmission } from "@/lib/submission-store";
+import { saveDraft, submitForReview, useSubmission, getSubmission } from "@/lib/submission-store";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/employee/tasks/$id/submit")({
   head: () => ({
     meta: [
       { title: "Task Submission — Dimisi" },
-      { name: "description", content: "Complete your task submission before sending it for admin review." },
+      {
+        name: "description",
+        content: "Complete your task submission before sending it for admin review.",
+      },
       { property: "og:title", content: "Task Submission — Dimisi" },
-      { property: "og:description", content: "Attach proof, note issues, and send your task for admin review." },
+      {
+        property: "og:description",
+        content: "Attach proof, note issues, and send your task for admin review.",
+      },
     ],
   }),
   component: SubmitProofPage,
@@ -77,20 +84,39 @@ const statusLabel: Record<Task["status"], string> = {
 const fmtDate = (v?: string) => {
   if (!v) return "—";
   const d = new Date(v);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
 
-function SubmitProofError({ error, reset }: { error: Error | { message?: string }; reset: () => void }) {
+function SubmitProofError({
+  error,
+  reset,
+}: {
+  error: Error | { message?: string };
+  reset: () => void;
+}) {
   const router = useRouter();
   return (
     <div className="glass max-w-xl mx-auto rounded-3xl p-8 text-center my-10">
-      <h2 className="font-display text-lg font-semibold text-foreground">Unable to load submission form</h2>
+      <h2 className="font-display text-lg font-semibold text-foreground">
+        Unable to load submission form
+      </h2>
       <p className="mt-2 text-sm text-muted-foreground">
         {error?.message || "Something went wrong loading this task submission. Please try again."}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Button onClick={() => { router.invalidate(); reset(); }}>Try again</Button>
-        <Button variant="outline" asChild><Link to="/employee/tasks">Back to my tasks</Link></Button>
+        <Button
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+        >
+          Try again
+        </Button>
+        <Button variant="outline" asChild>
+          <Link to="/employee/tasks">Back to my tasks</Link>
+        </Button>
       </div>
     </div>
   );
@@ -126,9 +152,11 @@ function SubmitProofPage() {
       hasHydratedRef.current = true;
       if (existing.files?.length) setFiles(existing.files);
       if (existing.workSummary) setWorkSummary((curr) => curr || existing.workSummary || "");
-      if (existing.deliverableLinks) setDeliverableLinks((curr) => curr || existing.deliverableLinks || "");
+      if (existing.deliverableLinks)
+        setDeliverableLinks((curr) => curr || existing.deliverableLinks || "");
       if (existing.issues) setIssues((curr) => curr || existing.issues || "");
-      if (existing.additionalRemarks) setAdditionalRemarks((curr) => curr || existing.additionalRemarks || "");
+      if (existing.additionalRemarks)
+        setAdditionalRemarks((curr) => curr || existing.additionalRemarks || "");
       if (existing.checklist) {
         setChecks({
           completed: existing.checklist.completed ?? true,
@@ -157,7 +185,7 @@ function SubmitProofPage() {
           size: f.size,
           type: f.type,
           url: f.url,
-          publicId: f.publicId,
+          publicId: f.publicId || (f.url ? extractCloudinaryPublicId(f.url) : "") || "",
           dataUrl: f.dataUrl,
         })),
         checklist: checks,
@@ -186,7 +214,11 @@ function SubmitProofPage() {
         icon={FileQuestion}
         title="Task not found"
         description="This task may have been reassigned or removed."
-        action={<Button asChild><Link to="/employee/tasks">Back to my tasks</Link></Button>}
+        action={
+          <Button asChild>
+            <Link to="/employee/tasks">Back to my tasks</Link>
+          </Button>
+        }
       />
     );
   }
@@ -195,15 +227,20 @@ function SubmitProofPage() {
   const project = task.projectId
     ? safeProjects.find((p) => p.id === task.projectId || p._id === task.projectId)
     : undefined;
-  const assignedBy = (task as { assignedByName?: string }).assignedByName || task.createdBy || "Admin";
-  const normalizedStatus = ((typeof task.status === "string" ? task.status.toLowerCase() : "") as Task["status"]) || "in_progress";
+  const assignedBy =
+    (task as { assignedByName?: string }).assignedByName || task.createdBy || "Admin";
+  const normalizedStatus =
+    ((typeof task.status === "string" ? task.status.toLowerCase() : "") as Task["status"]) ||
+    "in_progress";
   const currentStatus =
     task.reviewState === "in_review"
       ? "Pending Review"
       : statusLabel[normalizedStatus] || task.status || "In Progress";
-  const taskType = (typeof task.taskType === "string" ? task.taskType.toLowerCase() : "direct");
+  const taskType = typeof task.taskType === "string" ? task.taskType.toLowerCase() : "direct";
   const typeLabel = taskTypeLabel[taskType] || task.taskType || "Direct";
-  const normalizedPriority = ((typeof task.priority === "string" ? task.priority.toLowerCase() : "") as TaskPriority) || "medium";
+  const normalizedPriority =
+    ((typeof task.priority === "string" ? task.priority.toLowerCase() : "") as TaskPriority) ||
+    "medium";
 
   const packageInput = () => ({
     taskId: task.id || task._id || id,
@@ -220,7 +257,7 @@ function SubmitProofPage() {
       size: f.size,
       type: f.type,
       url: f.url,
-      publicId: f.publicId,
+      publicId: f.publicId || (f.url ? extractCloudinaryPublicId(f.url) : "") || "",
       dataUrl: f.dataUrl,
     })),
     checklist: checks,
@@ -229,6 +266,35 @@ function SubmitProofPage() {
   const allChecked = checks.completed && checks.proof && checks.verified;
   const isAnyUploading = files.some((f) => f.isUploading);
   const isPending = submitMutation.isPending || startTaskMutation.isPending || isAnyUploading;
+
+  const handleFilesChange = (newFiles: ProofFile[]) => {
+    setFiles(newFiles);
+    // If a draft is already saved in local storage, sync the updated file list so removals/additions persist
+    if (getSubmission(id)) {
+      saveDraft({
+        taskId: task?.id || task?._id || id,
+        employeeId: currentUserId,
+        employeeName: currentUserName,
+        employeeCode: currentUserCode,
+        workSummary: workSummary.trim(),
+        deliverableLinks: deliverableLinks.trim(),
+        issues: issues.trim(),
+        additionalRemarks: additionalRemarks.trim(),
+        files: newFiles
+          .filter((f) => !f.error)
+          .map((f) => ({
+            id: f.id,
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            url: f.url,
+            publicId: f.publicId || (f.url ? extractCloudinaryPublicId(f.url) : "") || "",
+            dataUrl: f.dataUrl,
+          })),
+        checklist: checks,
+      });
+    }
+  };
 
   const handleOpenConfirm = () => {
     if (isAnyUploading) {
@@ -244,7 +310,8 @@ function SubmitProofPage() {
 
     if (!workSummary.trim() && !deliverableLinks.trim() && files.length === 0) {
       toast.error("Proof or Work Summary required", {
-        description: "Please enter a work summary, deliverable link, or attach proof files before submitting.",
+        description:
+          "Please enter a work summary, deliverable link, or attach proof files before submitting.",
       });
       return;
     }
@@ -253,7 +320,9 @@ function SubmitProofPage() {
 
   const handleSaveDraft = () => {
     saveDraft(packageInput());
-    toast.success("Draft saved", { description: "Your progress is stored — task remains In Progress." });
+    toast.success("Draft saved", {
+      description: "Your progress is stored — task remains In Progress.",
+    });
   };
 
   const handleSubmit = async () => {
@@ -264,24 +333,40 @@ function SubmitProofPage() {
       return;
     }
 
-    const uploadedProofFiles = files.filter((f) => f.url && f.publicId);
+    const uploadedProofFiles = files
+      .filter((f) => Boolean(f.url))
+      .map((f) => ({
+        ...f,
+        publicId: f.publicId || (f.url ? extractCloudinaryPublicId(f.url) : "") || "",
+      }));
+
+    if (files.length > 0 && uploadedProofFiles.length === 0) {
+      toast.error("Proof files are still uploading or failed. Please retry before submitting.");
+      return;
+    }
+
     const primaryProof = uploadedProofFiles[0];
+    const mappedProofFiles = uploadedProofFiles.map((f) => ({
+      url: f.url!,
+      publicId: f.publicId,
+      name: f.name,
+      size: f.size,
+      mimeType: f.type,
+      dataUrl: f.dataUrl,
+    }));
 
-    const fileSummary =
-      uploadedProofFiles.length > 0
-        ? `Proof files attached (${uploadedProofFiles.length}):\n` +
-          uploadedProofFiles.map((f) => `- ${f.name}: ${f.url}`).join("\n")
-        : files.length > 0
-          ? `Proof files attached (${files.length}): ${files.map((f) => f.name).join(", ")}`
-          : "";
+    const formattedNotes =
+      [
+        workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
+        deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
+        issues.trim() ? `Issues & Blockers:\n${issues.trim()}` : "",
+        additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n") || "Task completed and submitted for review.";
 
-    const formattedNotes = [
-      workSummary.trim() ? `Work Summary:\n${workSummary.trim()}` : "",
-      deliverableLinks.trim() ? `Deliverables & Links:\n${deliverableLinks.trim()}` : "",
-      fileSummary,
-      issues.trim() ? `Issues & Blockers:\n${issues.trim()}` : "",
-      additionalRemarks.trim() ? `Additional Remarks:\n${additionalRemarks.trim()}` : "",
-    ].filter(Boolean).join("\n\n") || "Task completed and submitted for review.";
+    const apiNotes =
+      formattedNotes.length > 500 ? formattedNotes.slice(0, 497) + "..." : formattedNotes;
 
     const targetId = task.id || task._id || id;
     const normStatus = (task.rawStatus || task.status || "").toLowerCase();
@@ -304,15 +389,16 @@ function SubmitProofPage() {
       // Step 2: Submit task for review (IN_PROGRESS -> IN_REVIEW) with direct-to-CDN proof data
       await submitMutation.mutateAsync({
         id: targetId,
-        notes: formattedNotes,
+        notes: apiNotes,
         proof: primaryProof
           ? {
               url: primaryProof.url!,
-              publicId: primaryProof.publicId!,
+              publicId: primaryProof.publicId,
             }
           : undefined,
         proofUrl: primaryProof?.url,
         proofPublicId: primaryProof?.publicId,
+        proofFiles: mappedProofFiles,
       });
     } catch (_err: unknown) {
       // Handled via submitMutation onError callback
@@ -321,7 +407,11 @@ function SubmitProofPage() {
 
   const info: { label: string; value: React.ReactNode; icon?: typeof Trophy }[] = [
     { label: "Task Name", value: task.title },
-    { label: "Project Name", value: project?.name ?? (task.taskType === "project" ? "—" : "General"), icon: FolderKanban },
+    {
+      label: "Project Name",
+      value: project?.name ?? (task.taskType === "project" ? "—" : "General"),
+      icon: FolderKanban,
+    },
     { label: "Task Category", value: `${getCategoryLabel(task.category)} · ${typeLabel}` },
     { label: "Priority", value: <PriorityBadge priority={normalizedPriority} /> },
     { label: "Reward Points", value: `${task.points ?? task.rewardPoints ?? 0} pts`, icon: Trophy },
@@ -351,13 +441,19 @@ function SubmitProofPage() {
       {task.rejectionReason && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 shadow-sm animate-in fade-in slide-in-from-top-1">
           <div className="flex items-center gap-2">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">!</span>
-            <p className="text-xs font-bold uppercase tracking-wider text-destructive">Revision Required</p>
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              !
+            </span>
+            <p className="text-xs font-bold uppercase tracking-wider text-destructive">
+              Revision Required
+            </p>
           </div>
           <p className="mt-2 text-sm font-medium text-destructive">
             <span className="font-semibold">Admin Feedback:</span> {task.rejectionReason}
           </p>
-          <p className="mt-1 text-xs text-destructive/80">Please review the feedback above, update your proof or notes, and resubmit.</p>
+          <p className="mt-1 text-xs text-destructive/80">
+            Please review the feedback above, update your proof or notes, and resubmit.
+          </p>
         </div>
       )}
 
@@ -400,7 +496,10 @@ function SubmitProofPage() {
           {/* Section 3 — Work Summary */}
           <section className="glass rounded-md p-5 sm:p-6">
             <Label htmlFor="workSummary" className="font-display text-base font-semibold">
-              Work Summary <span className="text-xs font-normal text-muted-foreground">(key deliverables & results)</span>
+              Work Summary{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                (key deliverables & results)
+              </span>
             </Label>
             <Textarea
               id="workSummary"
@@ -415,7 +514,10 @@ function SubmitProofPage() {
           {/* Section 4 — Deliverables & Links */}
           <section className="glass rounded-md p-5 sm:p-6">
             <Label htmlFor="deliverableLinks" className="font-display text-base font-semibold">
-              Deliverables & Links <span className="text-xs font-normal text-muted-foreground">(URLs, PRs, docs, live previews)</span>
+              Deliverables & Links{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                (URLs, PRs, docs, live previews)
+              </span>
             </Label>
             <Textarea
               id="deliverableLinks"
@@ -430,7 +532,10 @@ function SubmitProofPage() {
           {/* Section 5 — Issues Faced */}
           <section className="glass rounded-md p-5 sm:p-6">
             <Label htmlFor="issues" className="font-display text-base font-semibold">
-              Issues Faced <span className="text-xs font-normal text-muted-foreground">(optional challenges/blockers)</span>
+              Issues Faced{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                (optional challenges/blockers)
+              </span>
             </Label>
             <Textarea
               id="issues"
@@ -445,7 +550,10 @@ function SubmitProofPage() {
           {/* Section 6 — Additional Remarks */}
           <section className="glass rounded-md p-5 sm:p-6">
             <Label htmlFor="additionalRemarks" className="font-display text-base font-semibold">
-              Additional Remarks <span className="text-xs font-normal text-muted-foreground">(optional notes for reviewer)</span>
+              Additional Remarks{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                (optional notes for reviewer)
+              </span>
             </Label>
             <Textarea
               id="additionalRemarks"
@@ -466,8 +574,11 @@ function SubmitProofPage() {
                   Upload Proof Files <span className="text-destructive">*</span>
                 </h2>
               </div>
-              <span className={`rounded-sm px-2.5 py-0.5 text-[11px] font-medium ${files.length > 0 ? "bg-primary/15 text-primary" : "bg-destructive/15 text-destructive"}`}>
-                {files.length} file{files.length === 1 ? "" : "s"} attached {files.length === 0 ? "(Required)" : ""}
+              <span
+                className={`rounded-sm px-2.5 py-0.5 text-[11px] font-medium ${files.length > 0 ? "bg-primary/15 text-primary" : "bg-destructive/15 text-destructive"}`}
+              >
+                {files.length} file{files.length === 1 ? "" : "s"} attached{" "}
+                {files.length === 0 ? "(Required)" : ""}
               </span>
             </div>
             {files.length === 0 && (
@@ -475,7 +586,7 @@ function SubmitProofPage() {
                 Please upload proof of your completed task before submitting for review.
               </p>
             )}
-            <ProofUploader files={files} onChange={setFiles} />
+            <ProofUploader files={files} onChange={handleFilesChange} />
           </section>
 
           {/* Section 8 — Checklist */}
@@ -488,7 +599,10 @@ function SubmitProofPage() {
               {[
                 { key: "completed" as const, label: "Task completed according to requirements." },
                 { key: "proof" as const, label: "Proof files or deliverable links provided." },
-                { key: "verified" as const, label: "Deliverables tested and verified before submission." },
+                {
+                  key: "verified" as const,
+                  label: "Deliverables tested and verified before submission.",
+                },
               ].map((row) => (
                 <label
                   key={row.key}
@@ -515,7 +629,12 @@ function SubmitProofPage() {
             <Button asChild type="button" variant="outline" className="rounded-md">
               <Link to="/employee/tasks">Cancel</Link>
             </Button>
-            <Button type="button" variant="outline" className="rounded-md" onClick={handleSaveDraft}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-md"
+              onClick={handleSaveDraft}
+            >
               <Save className="mr-1.5 h-4 w-4" /> Save Draft
             </Button>
             <Button
@@ -569,7 +688,9 @@ function SubmitProofPage() {
             <ol className="mt-3 space-y-2 text-sm">
               {["Assigned", "In Progress", "Submitted", "Pending Review"].map((s, i) => (
                 <li key={s} className="flex items-center gap-2">
-                  <CheckCircle2 className={`h-3.5 w-3.5 ${i < 2 ? "text-success" : "text-muted-foreground"}`} />
+                  <CheckCircle2
+                    className={`h-3.5 w-3.5 ${i < 2 ? "text-success" : "text-muted-foreground"}`}
+                  />
                   <span className={i < 2 ? "" : "text-muted-foreground"}>{s}</span>
                 </li>
               ))}
@@ -590,8 +711,20 @@ function SubmitProofPage() {
             <Button variant="outline" className="rounded-md" onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button className="rounded-md shadow-glow" disabled={submitMutation.isPending || startTaskMutation.isPending} onClick={handleSubmit}>
-              {submitMutation.isPending || startTaskMutation.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…</> : <><Send className="mr-1.5 h-4 w-4" /> Submit for Review</>}
+            <Button
+              className="rounded-md shadow-glow"
+              disabled={submitMutation.isPending || startTaskMutation.isPending}
+              onClick={handleSubmit}
+            >
+              {submitMutation.isPending || startTaskMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Submitting…
+                </>
+              ) : (
+                <>
+                  <Send className="mr-1.5 h-4 w-4" /> Submit for Review
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

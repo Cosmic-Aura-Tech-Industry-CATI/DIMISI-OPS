@@ -156,41 +156,10 @@ export const tasksService = {
       return mapTaskResponse(raw);
     }
 
-    // Direct JSON payload for tasks created with client-side uploaded attachments
-    const jsonBody: Record<string, unknown> = {
-      title: input.title.trim(),
-      description: input.description.trim(),
-      category: input.category.trim(),
-      priority: toBackendTaskPriority(input.priority),
-      type: toBackendTaskType(input.taskType),
-      rewardPoints: input.points || 0,
-      deadline: input.dueDate ? new Date(input.dueDate).toISOString() : undefined,
-      notes: input.notes?.trim() || undefined,
-      estimatedTime: input.estimatedTime?.trim() || undefined,
-      projectId: input.taskType === "project" ? input.projectId : undefined,
-      assignedTo: input.taskType === "direct" ? input.assigneeId : undefined,
-      attachments: (input.uploadedAttachments || []).map((att) => ({
-        url: att.url,
-        publicId: att.publicId,
-        name: att.name,
-        size: att.size,
-      })),
-    };
-
-    try {
-      const res = await http.post<any>(API_ENDPOINTS.tasks.createV2, jsonBody);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    } catch (v2Err: any) {
-      // Graceful fallback to v1 multipart if v2 is not supported in environment
-      if (v2Err?.status === 404 || v2Err?.response?.status === 404) {
-        const body = buildCreateTaskFormData(input);
-        const res = await http.post<any>(API_ENDPOINTS.tasks.create, body);
-        const raw = res?.task || res?.data?.task || res;
-        return mapTaskResponse(raw);
-      }
-      throw v2Err;
-    }
+    const body = buildCreateTaskFormData(input);
+    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, body);
+    const raw = res?.task || res?.data?.task || res;
+    return mapTaskResponse(raw);
   },
 
   /**
@@ -204,42 +173,10 @@ export const tasksService = {
       return mapTaskResponse(raw);
     }
 
-    const jsonBody: Record<string, unknown> = {};
-    if (input.title !== undefined) jsonBody.title = input.title.trim();
-    if (input.description !== undefined) jsonBody.description = input.description.trim();
-    if (input.category !== undefined) jsonBody.category = input.category.trim();
-    if (input.priority !== undefined) jsonBody.priority = toBackendTaskPriority(input.priority);
-    if (input.taskType !== undefined) jsonBody.type = toBackendTaskType(input.taskType);
-    if (input.points !== undefined) jsonBody.rewardPoints = input.points;
-    if (input.dueDate !== undefined)
-      jsonBody.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
-    if (input.notes !== undefined) jsonBody.notes = input.notes.trim();
-    if (input.estimatedTime !== undefined) jsonBody.estimatedTime = input.estimatedTime.trim();
-    if (input.projectId !== undefined) jsonBody.projectId = input.projectId;
-    if (input.assigneeId !== undefined) jsonBody.assignedTo = input.assigneeId;
-
-    if (input.uploadedAttachments !== undefined) {
-      jsonBody.attachments = input.uploadedAttachments.map((att) => ({
-        url: att.url,
-        publicId: att.publicId,
-        name: att.name,
-        size: att.size,
-      }));
-    }
-
-    try {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.updateV2(id), jsonBody);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    } catch (v2Err: any) {
-      if (v2Err?.status === 404 || v2Err?.response?.status === 404) {
-        const body = buildUpdateTaskFormData(input);
-        const res = await http.patch<any>(API_ENDPOINTS.tasks.update(id), body);
-        const raw = res?.task || res?.data?.task || res;
-        return mapTaskResponse(raw);
-      }
-      throw v2Err;
-    }
+    const body = buildUpdateTaskFormData(input);
+    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), body);
+    const raw = res?.task || res?.data?.task || res;
+    return mapTaskResponse(raw);
   },
 
   /**
@@ -290,7 +227,7 @@ export const tasksService = {
       | {
           notes?: string;
           files?: File[];
-          proofFiles?: any[];
+          proofFiles?: unknown[];
           proof?: { url: string; publicId: string };
           proofUrl?: string;
           proofPublicId?: string;
@@ -298,43 +235,35 @@ export const tasksService = {
         }
       | string,
   ): Promise<Task> {
-    let body: any;
+    let body: FormData | Record<string, unknown>;
     if (payload instanceof FormData) {
       body = payload;
     } else if (typeof payload === "string") {
-      body = { notes: payload };
-    } else if (typeof payload === "object" && payload !== null && "formData" in payload && (payload as any).formData) {
-      body = (payload as any).formData;
-    } else if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "files" in payload &&
-      Array.isArray((payload as any).files) &&
-      (payload as any).files.length > 0
-    ) {
-      const fd = new FormData();
-      if ((payload as any).notes) fd.append("notes", (payload as any).notes);
-      for (const file of (payload as any).files) {
-        if (file instanceof File) {
-          fd.append("proofFiles", file);
-        }
-      }
-      if ((payload as any).proofFiles && (payload as any).proofFiles.length > 0) {
-        fd.append("proofFiles", JSON.stringify((payload as any).proofFiles));
-      }
-      body = fd;
+      const clean = payload.trim();
+      body = { notes: clean.length > 500 ? clean.slice(0, 497) + "..." : clean };
+    } else if (typeof payload === "object" && payload !== null && "formData" in payload && payload.formData instanceof FormData) {
+      body = payload.formData;
     } else {
-      body = typeof payload === "string" ? { notes: payload } : { ...payload };
+      const p = payload as Record<string, unknown>;
+      const cleanNotes = typeof p.notes === "string" ? p.notes.trim() : "";
+      body = {
+        notes: cleanNotes.length > 500 ? cleanNotes.slice(0, 497) + "..." : cleanNotes,
+        ...(p.proof ? { proof: p.proof } : {}),
+        ...(p.proofUrl ? { proofUrl: p.proofUrl } : {}),
+        ...(p.proofPublicId ? { proofPublicId: p.proofPublicId } : {}),
+        ...(Array.isArray(p.proofFiles) && p.proofFiles.length > 0 ? { proofFiles: p.proofFiles } : {}),
+      };
     }
 
     try {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+      const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.submit(id), body);
       const raw = res?.task || res?.data?.task || res;
       return mapTaskResponse(raw);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If backend throws error stating task must be 'In Progress' first or not assigned, auto-start and retry
-      const errMsg = err?.message || err?.response?.data?.message || "";
-      const status = err?.status || err?.response?.status;
+      const errorObj = err as { message?: string; response?: { data?: { message?: string }; status?: number }; status?: number };
+      const errMsg = errorObj?.message || errorObj?.response?.data?.message || "";
+      const status = errorObj?.status || errorObj?.response?.status;
       if (
         typeof errMsg === "string" &&
         (errMsg.toLowerCase().includes("in progress") ||
@@ -344,8 +273,8 @@ export const tasksService = {
           status === 403)
       ) {
         try {
-          await http.patch<any>(API_ENDPOINTS.tasks.start(id));
-          const retryRes = await http.patch<any>(API_ENDPOINTS.tasks.submit(id), body);
+          await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.start(id));
+          const retryRes = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.submit(id), body);
           const raw = retryRes?.task || retryRes?.data?.task || retryRes;
           return mapTaskResponse(raw);
         } catch {

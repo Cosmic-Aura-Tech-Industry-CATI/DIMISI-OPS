@@ -52,6 +52,18 @@ const fmt = (d?: string) =>
       })
     : "—";
 
+function stripLegacyProofAndUrls(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/Proof files attached[^\n]*\n?[\s\S]*?(?=(?:\n\n|\n[A-Z][a-zA-Z\s]+:|$))/gi, "")
+    .replace(/Proof files attached:[^\n]*/gi, "")
+    .replace(/\n?-\s*[^:\n]+:\s*https?:\/\/[^\s)]+/gi, "")
+    .replace(/https?:\/\/res\.cloudinary\.com[^\s)]+/gi, "")
+    .replace(/\[\s*\{[\s\S]*?\}\s*\]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function SubmissionDetailsPage() {
   const { id } = useParams({ from: "/employee/tasks/$id/submission" });
   const { data: task, isLoading } = useTaskQuery(id);
@@ -111,10 +123,41 @@ function SubmissionDetailsPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold">Description you submitted</h2>
             </div>
-            <p className="mt-2 whitespace-pre-line rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
-              {submission?.issues?.trim() ||
-                "No description or notes were added with this submission."}
-            </p>
+            <div className="mt-2 space-y-2">
+              {submission?.workSummary?.trim() && (
+                <div className="rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                  <span className="block text-xs font-semibold text-foreground mb-1">Work Summary:</span>
+                  <p className="whitespace-pre-line break-words">{submission.workSummary.trim()}</p>
+                </div>
+              )}
+              {submission?.deliverableLinks?.trim() && (
+                <div className="rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                  <span className="block text-xs font-semibold text-foreground mb-1">Deliverables & Links:</span>
+                  <p className="whitespace-pre-line break-all">{submission.deliverableLinks.trim()}</p>
+                </div>
+              )}
+              {submission?.issues?.trim() && (
+                <div className="rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                  <span className="block text-xs font-semibold text-foreground mb-1">Issues & Blockers:</span>
+                  <p className="whitespace-pre-line break-words">{submission.issues.trim()}</p>
+                </div>
+              )}
+              {submission?.additionalRemarks?.trim() && (
+                <div className="rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                  <span className="block text-xs font-semibold text-foreground mb-1">Additional Remarks:</span>
+                  <p className="whitespace-pre-line break-words">{submission.additionalRemarks.trim()}</p>
+                </div>
+              )}
+              {!submission?.workSummary?.trim() &&
+                !submission?.deliverableLinks?.trim() &&
+                !submission?.issues?.trim() &&
+                !submission?.additionalRemarks?.trim() && (
+                  <p className="whitespace-pre-line rounded-xl border border-border/60 bg-card/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                    {stripLegacyProofAndUrls(task.notes || "") ||
+                      "No description or notes were added with this submission."}
+                  </p>
+                )}
+            </div>
 
             <div className="mt-6 flex items-center gap-2 text-sm">
               <FileText className="h-4 w-4 text-muted-foreground" />
@@ -146,14 +189,57 @@ function SubmissionDetailsPage() {
                         {formatFileSize(f.size)}
                       </span>
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 rounded-md"
-                      onClick={() => downloadSubmissionFile(f)}
-                    >
-                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {f.url && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0 rounded-md h-8 text-xs"
+                          asChild
+                        >
+                          <a href={f.url} target="_blank" rel="noopener noreferrer">
+                            View
+                          </a>
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-md h-8 text-xs"
+                        onClick={() => downloadSubmissionFile(f)}
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : task.proofFiles && task.proofFiles.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {task.proofFiles.map((p, i) => (
+                  <li
+                    key={i}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{p.name || "Proof File"}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {typeof p.size === "number" ? formatFileSize(p.size) : String(p.size || "File")}
+                      </span>
+                    </span>
+                    {p.url && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-md h-8 text-xs"
+                        asChild
+                      >
+                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                          View
+                        </a>
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -163,6 +249,48 @@ function SubmissionDetailsPage() {
               </p>
             )}
           </section>
+
+          {task.attachments && task.attachments.length > 0 && (
+            <section className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-display font-semibold">
+                  Task Attachments ({task.attachments.length})
+                </h2>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {task.attachments.map((a, i) => {
+                  const url = typeof a === "string" ? a : a.url;
+                  const name = typeof a === "string" ? "Attachment" : a.name || "Attachment";
+                  const size = typeof a === "string" ? "File" : a.size || "File";
+                  return (
+                    <li
+                      key={i}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{size}</span>
+                      </span>
+                      {url && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 rounded-md h-8 text-xs"
+                          asChild
+                        >
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            View
+                          </a>
+                        </Button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {task.rejectionReason && (
             <section className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
