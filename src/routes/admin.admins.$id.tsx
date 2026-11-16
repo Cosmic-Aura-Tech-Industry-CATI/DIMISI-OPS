@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +78,9 @@ function AdminDetailPage() {
       <EmptyState
         icon={UserX}
         title="Admin not found"
-        description={error?.message || "This administrator may have been revoked or does not exist."}
+        description={
+          error?.message || "This administrator may have been revoked or does not exist."
+        }
         action={
           <Button asChild>
             <Link to="/admin/admins">Back to list</Link>
@@ -151,9 +154,14 @@ function AdminDetailPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="glass rounded-2xl p-6 lg:col-span-1">
           <div className="flex flex-col items-center text-center">
-            <div className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-2xl font-bold text-primary-foreground shadow-glow">
-              {initials(user.name)}
-            </div>
+            <UserAvatar
+              user={user}
+              name={user.name}
+              image={getAvatarUrl(user)}
+              className="h-20 w-20 rounded-2xl shadow-glow text-2xl"
+              fallbackClassName="rounded-2xl text-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold"
+              shape="rounded"
+            />
             <p className="mt-4 font-display text-lg font-semibold">{user.name}</p>
             <div className="mt-1">
               <IdBadge id={empCode} />

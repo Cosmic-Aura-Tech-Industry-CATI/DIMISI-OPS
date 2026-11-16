@@ -7,7 +7,11 @@ import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
 import {
   buildCreateTaskFormData,
+  buildCreateTaskPayload,
   buildUpdateTaskFormData,
+  buildUpdateTaskPayload,
+  formDataToTaskPayload,
+  formDataToTaskUpdatePayload,
   mapTaskResponse,
   toBackendTaskPriority,
   toBackendTaskType,
@@ -147,34 +151,22 @@ export const tasksService = {
 
   /**
    * Admin creates a new task (Universal, Project, or Direct).
-   * Supports both client-uploaded CDN attachments (v2) and standard multipart FormData (v1).
+   * Direct task assignments are sent as JSON with assignedTo to the supported v2 task creation endpoint.
    */
   async createTask(input: CreateTaskInput | FormData): Promise<Task> {
-    if (input instanceof FormData) {
-      const res = await http.post<any>(API_ENDPOINTS.tasks.create, input);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    }
-
-    const body = buildCreateTaskFormData(input);
-    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, body);
+    const payload = input instanceof FormData ? formDataToTaskPayload(input) : buildCreateTaskPayload(input);
+    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, payload);
     const raw = res?.task || res?.data?.task || res;
     return mapTaskResponse(raw);
   },
 
   /**
    * Admin updates a task and syncs Cloudinary attachments.
-   * Supports both client-uploaded CDN attachments (v2) and standard multipart FormData (v1).
+   * Sends update payload to the supported v2 task update endpoint.
    */
   async updateTask(id: string, input: UpdateTaskInput | FormData): Promise<Task> {
-    if (input instanceof FormData) {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.update(id), input);
-      const raw = res?.task || res?.data?.task || res;
-      return mapTaskResponse(raw);
-    }
-
-    const body = buildUpdateTaskFormData(input);
-    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), body);
+    const payload = input instanceof FormData ? formDataToTaskUpdatePayload(input) : buildUpdateTaskPayload(input);
+    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), payload);
     const raw = res?.task || res?.data?.task || res;
     return mapTaskResponse(raw);
   },

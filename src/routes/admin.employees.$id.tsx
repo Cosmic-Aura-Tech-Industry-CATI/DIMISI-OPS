@@ -16,6 +16,7 @@ import {
   UserX,
 } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -29,9 +30,15 @@ export const Route = createFileRoute("/admin/employees/$id")({
   head: () => ({
     meta: [
       { title: "Employee Profile — Dimisi Technologies" },
-      { name: "description", content: "Detailed employee profile with tasks, activity, performance and points history." },
+      {
+        name: "description",
+        content: "Detailed employee profile with tasks, activity, performance and points history.",
+      },
       { property: "og:title", content: "Employee Profile — Dimisi Technologies" },
-      { property: "og:description", content: "Detailed employee profile with tasks, activity, performance and points history." },
+      {
+        property: "og:description",
+        content: "Detailed employee profile with tasks, activity, performance and points history.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -40,9 +47,12 @@ export const Route = createFileRoute("/admin/employees/$id")({
 });
 
 const fmt = (d?: string | Date) =>
-  d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d
+    ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "—";
 
-const card = "rounded-md border border-border/60 bg-card/40 p-5 transition-colors hover:border-primary/30";
+const card =
+  "rounded-md border border-border/60 bg-card/40 p-5 transition-colors hover:border-primary/30";
 
 function initials(name: string) {
   return (name || "")
@@ -101,9 +111,13 @@ function EmployeeProfilePage() {
 
   const completed = userTasks.filter((t) => (t.status || "").toLowerCase() === "completed");
   const active = userTasks.find(
-    (t) => (t.status || "").toLowerCase() === "in_progress" || (t.status || "").toLowerCase() === "assigned",
+    (t) =>
+      (t.status || "").toLowerCase() === "in_progress" ||
+      (t.status || "").toLowerCase() === "assigned",
   );
-  const successRate = userTasks.length ? Math.round((completed.length / userTasks.length) * 100) : 0;
+  const successRate = userTasks.length
+    ? Math.round((completed.length / userTasks.length) * 100)
+    : 0;
 
   return (
     <>
@@ -132,9 +146,14 @@ function EmployeeProfilePage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className={`${card} lg:col-span-1`}>
           <div className="flex flex-col items-center text-center">
-            <div className="grid h-24 w-24 place-items-center rounded-md border border-primary/25 bg-gradient-to-br from-primary/25 to-primary/5 text-3xl font-semibold text-primary">
-              {initials(user.name)}
-            </div>
+            <UserAvatar
+              user={user}
+              name={user.name}
+              image={getAvatarUrl(user)}
+              className="h-24 w-24 rounded-2xl border border-primary/25 shadow-glow text-3xl"
+              fallbackClassName="rounded-2xl text-3xl bg-gradient-to-br from-primary/25 to-primary/5 text-primary"
+              shape="rounded"
+            />
             <p className="mt-4 font-display text-2xl">{user.name}</p>
             <p className="mt-1 text-sm text-primary">{titleName}</p>
             <div className="mt-2">
@@ -153,7 +172,11 @@ function EmployeeProfilePage() {
             <Info icon={Building2} label="Department" value={deptName} />
             <Info icon={BadgeCheck} label="Role" value={titleName} />
             <Info icon={Mail} label="Email" value={user.email} />
-            <Info icon={CalendarDays} label="Joining Date" value={fmt(user.joinDate || user.createdAt)} />
+            <Info
+              icon={CalendarDays}
+              label="Joining Date"
+              value={fmt(user.joinDate || user.createdAt)}
+            />
             <Info
               icon={Target}
               label="Current Status"
@@ -225,13 +248,19 @@ function EmployeeProfilePage() {
                 <tbody>
                   {userTasks.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                      <td
+                        colSpan={4}
+                        className="px-4 py-8 text-center text-xs text-muted-foreground"
+                      >
                         No tasks assigned to this employee yet.
                       </td>
                     </tr>
                   )}
                   {userTasks.map((t) => (
-                    <tr key={t.id} className="border-t border-border/40 transition-colors hover:bg-secondary/20">
+                    <tr
+                      key={t.id}
+                      className="border-t border-border/40 transition-colors hover:bg-secondary/20"
+                    >
                       <td className="px-4 py-3 font-medium">{t.title}</td>
                       <td className="px-4 py-3">{t.status}</td>
                       <td className="px-4 py-3 text-muted-foreground">{t.taskType}</td>
@@ -264,7 +293,9 @@ function Info({
       <dt className="flex items-center gap-2 text-xs text-muted-foreground">
         {Icon && <Icon className="h-3.5 w-3.5" />} {label}
       </dt>
-      <dd className={`min-w-0 truncate text-right text-sm ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
+      <dd className={`min-w-0 truncate text-right text-sm ${mono ? "font-mono text-xs" : ""}`}>
+        {value}
+      </dd>
     </div>
   );
 }
@@ -282,7 +313,9 @@ function Stat({
     <div className="rounded-md border border-border/60 bg-card/40 p-4 transition-colors hover:border-primary/30">
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-primary" />
-        <p className="line-clamp-2 text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="line-clamp-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
       </div>
       <p className="mt-3 font-sans text-2xl font-semibold">{value}</p>
     </div>

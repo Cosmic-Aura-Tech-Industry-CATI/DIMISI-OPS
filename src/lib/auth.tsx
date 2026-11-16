@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { authService } from "@/auth/services/auth.service";
 import { setUnauthorizedHandler, resetRefreshState } from "@/api/client/client";
 import { clearTokens } from "@/api/client/token-store";
+import { getAvatarUrl } from "@/components/user-avatar";
 
 export type Role = "director" | "admin" | "employee" | "intern";
 
@@ -17,7 +18,12 @@ export interface AuthUser {
   designation?: string;
   department?: string;
   avatar: string;
+  avtar?: string;
+  avatarUrl?: string;
+  photo?: string;
+  profileImage?: string;
   isActive?: boolean;
+  status?: string;
   points?: number;
   phone?: string;
   joinDate?: string;
@@ -31,15 +37,16 @@ function getInitials(name?: string): string {
 }
 
 export function normalizeUser(raw: any): AuthUser {
+  const avatarUrl = getAvatarUrl(raw);
   const avatarValue = raw?.avatar || raw?.avtar || raw?.photo || raw?.profileImage || "";
-  const isImg =
-    typeof avatarValue === "string" &&
-    avatarValue.trim() !== "" &&
-    (avatarValue.startsWith("data:") ||
-      avatarValue.startsWith("http:") ||
-      avatarValue.startsWith("https:") ||
-      avatarValue.startsWith("/") ||
-      avatarValue.includes("/"));
+  const isImg = Boolean(avatarUrl);
+
+  const isActive =
+    typeof raw?.isActive === "boolean"
+      ? raw.isActive
+      : typeof raw?.status === "string"
+        ? raw.status.trim().toLowerCase() === "active"
+        : true;
 
   return {
     id: String(raw?._id || raw?.id || ""),
@@ -49,13 +56,28 @@ export function normalizeUser(raw: any): AuthUser {
     name: raw?.name || "User",
     email: raw?.email || "",
     role: (() => {
-      const r = String(raw?.role || "employee").trim().toLowerCase();
+      const r = String(raw?.role || "employee")
+        .trim()
+        .toLowerCase();
       return (["director", "admin", "employee", "intern"].includes(r) ? r : "employee") as Role;
     })(),
     department: raw?.department,
     designation: raw?.designation,
-    isActive: raw?.isActive ?? true,
-    avatar: isImg ? avatarValue : (avatarValue && avatarValue.length <= 4 ? avatarValue : getInitials(raw?.name)),
+    isActive,
+    status: isActive ? "active" : "inactive",
+    avatar: isImg
+      ? (avatarUrl as string)
+      : avatarValue && avatarValue.length <= 4
+        ? avatarValue
+        : getInitials(raw?.name),
+    avtar: typeof raw?.avtar === "string" ? raw.avtar : isImg ? avatarUrl : undefined,
+    avatarUrl: isImg ? avatarUrl : undefined,
+    photo: isImg ? avatarUrl : typeof raw?.photo === "string" ? raw.photo : undefined,
+    profileImage: isImg
+      ? avatarUrl
+      : typeof raw?.profileImage === "string"
+        ? raw.profileImage
+        : undefined,
     points: raw?.points ?? raw?.rewardPoints,
     phone: raw?.phone || "",
     joinDate: raw?.joinDate,
@@ -79,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) return normalizeUser(JSON.parse(raw));
-    } catch { }
+    } catch {}
     return null;
   });
   const [loading, setLoading] = useState(true);
@@ -89,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (u) localStorage.setItem(KEY, JSON.stringify(u));
       else localStorage.removeItem(KEY);
-    } catch { }
+    } catch {}
   };
 
   useEffect(() => {
@@ -120,7 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTokens();
       resetRefreshState();
       setUser(null);
-      if (!isRedirectingToLogin && typeof window !== "undefined" && window.location.pathname !== "/login") {
+      if (
+        !isRedirectingToLogin &&
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
         isRedirectingToLogin = true;
         window.location.href = "/login";
       }
@@ -139,7 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logAudit({
       category: "authentication",
       action: "Login",
-      target: normalized.role === "admin" || normalized.role === "director" ? "Admin portal" : "Employee portal",
+      target:
+        normalized.role === "admin" || normalized.role === "director"
+          ? "Admin portal"
+          : "Employee portal",
       details: "Signed in successfully.",
       actorName: normalized.name,
       actorId: normalized.code,
@@ -156,7 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logAudit({
           category: "authentication",
           action: "Logout",
-          target: user.role === "admin" || user.role === "director" ? "Admin portal" : "Employee portal",
+          target:
+            user.role === "admin" || user.role === "director" ? "Admin portal" : "Employee portal",
           details: "Session ended.",
           actorName: user.name,
           actorId: user.code,
@@ -179,9 +209,9 @@ export function useAuth() {
     ctx ?? {
       user: null,
       loading: true,
-      signInWith: () => { },
-      setUser: () => { },
-      logout: async () => { },
+      signInWith: () => {},
+      setUser: () => {},
+      logout: async () => {},
     }
   );
 }

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth, type Role } from "@/lib/auth";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 const adminNav = {
@@ -214,21 +215,12 @@ export function AppSidebar({ role }: { role: Role }) {
           </div>
         )}
         <div className="flex items-center gap-2 px-1 py-1">
-          <div className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/40 to-accent text-xs font-semibold">
-            {user?.avatar &&
-            (user.avatar.startsWith("data:") ||
-              user.avatar.startsWith("http") ||
-              user.avatar.startsWith("/") ||
-              user.avatar.includes("/")) ? (
-              <img
-                src={user.avatar}
-                alt={user.name || "User"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              user?.avatar || (user?.name ? user.name.slice(0, 2).toUpperCase() : "U")
-            )}
-          </div>
+          <UserAvatar
+            user={user}
+            name={user?.name}
+            className="h-8 w-8 text-xs shrink-0"
+            fallbackClassName="text-xs bg-gradient-to-br from-primary/40 to-accent font-semibold"
+          />
           <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <div className="truncate text-xs font-medium">{user?.name}</div>
             <div className="truncate font-mono text-[10px] tracking-wider text-muted-foreground">

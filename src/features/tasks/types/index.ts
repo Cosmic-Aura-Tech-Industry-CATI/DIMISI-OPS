@@ -1036,6 +1036,145 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
 }
 
 /**
+ * Builds JSON payload for task creation on the v2 API endpoint.
+ */
+export function buildCreateTaskPayload(input: CreateTaskInput): Record<string, unknown> {
+  const normalizedType = toBackendTaskType(input.taskType);
+  const payload: Record<string, unknown> = {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    priority: toBackendTaskPriority(input.priority),
+    type: normalizedType,
+    rewardPoints: Number(input.points || 0),
+  };
+
+  if (input.dueDate) {
+    payload.deadline = new Date(input.dueDate).toISOString();
+  }
+  if (input.notes) {
+    payload.notes = input.notes.trim();
+  }
+  if (input.estimatedTime) {
+    payload.estimatedTime = input.estimatedTime.trim();
+  }
+  if (normalizedType === "project" && input.projectId) {
+    payload.projectId = input.projectId;
+  }
+  if (normalizedType === "direct" && input.assigneeId) {
+    payload.assignedTo = input.assigneeId;
+  }
+  if (input.uploadedAttachments && input.uploadedAttachments.length > 0) {
+    payload.attachments = input.uploadedAttachments.map((att) => ({
+      url: att.url,
+      publicId: att.publicId,
+      name: att.name,
+      size: att.size,
+    }));
+  }
+
+  return payload;
+}
+
+/**
+ * Builds JSON payload for task updates on the v2 API endpoint.
+ */
+export function buildUpdateTaskPayload(input: UpdateTaskInput): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+
+  if (input.title !== undefined) payload.title = input.title.trim();
+  if (input.description !== undefined) payload.description = input.description.trim();
+  if (input.category !== undefined) payload.category = input.category.trim();
+  if (input.priority !== undefined) payload.priority = toBackendTaskPriority(input.priority);
+  if (input.taskType !== undefined) payload.type = toBackendTaskType(input.taskType);
+  if (input.points !== undefined) payload.rewardPoints = Number(input.points);
+  if (input.dueDate !== undefined)
+    payload.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
+  if (input.notes !== undefined) payload.notes = input.notes.trim();
+  if (input.estimatedTime !== undefined) payload.estimatedTime = input.estimatedTime.trim();
+  if (input.projectId !== undefined) payload.projectId = input.projectId;
+  if (input.assigneeId !== undefined) payload.assignedTo = input.assigneeId;
+
+  if (input.uploadedAttachments !== undefined) {
+    payload.attachments = input.uploadedAttachments.map((att) => ({
+      url: att.url,
+      publicId: att.publicId,
+      name: att.name,
+      size: att.size,
+    }));
+  }
+  if (input.existingAttachments !== undefined) {
+    payload.existingAttachments = input.existingAttachments;
+  }
+
+  return payload;
+}
+
+/**
+ * Parses FormData into a task creation payload object.
+ */
+export function formDataToTaskPayload(fd: FormData): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  const title = fd.get("title");
+  if (title) payload.title = String(title).trim();
+  const description = fd.get("description");
+  if (description) payload.description = String(description).trim();
+  const category = fd.get("category");
+  if (category) payload.category = String(category).trim();
+  const priority = fd.get("priority");
+  if (priority) payload.priority = toBackendTaskPriority(String(priority));
+  const type = fd.get("type");
+  if (type) payload.type = toBackendTaskType(String(type));
+  const rewardPoints = fd.get("rewardPoints");
+  if (rewardPoints !== null && rewardPoints !== undefined) payload.rewardPoints = Number(rewardPoints);
+  const deadline = fd.get("deadline");
+  if (deadline) payload.deadline = String(deadline);
+  const notes = fd.get("notes");
+  if (notes) payload.notes = String(notes).trim();
+  const estimatedTime = fd.get("estimatedTime");
+  if (estimatedTime) payload.estimatedTime = String(estimatedTime).trim();
+  const projectId = fd.get("projectId");
+  if (projectId) payload.projectId = String(projectId);
+  const assignedTo = fd.get("assignedTo");
+  if (assignedTo) payload.assignedTo = String(assignedTo);
+  const existingAttachments = fd.get("existingAttachments");
+  if (existingAttachments) {
+    try {
+      payload.attachments = JSON.parse(String(existingAttachments));
+    } catch {
+      // ignore
+    }
+  }
+  return payload;
+}
+
+/**
+ * Parses FormData into a task update payload object.
+ */
+export function formDataToTaskUpdatePayload(fd: FormData): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (fd.has("title")) payload.title = String(fd.get("title") || "").trim();
+  if (fd.has("description")) payload.description = String(fd.get("description") || "").trim();
+  if (fd.has("category")) payload.category = String(fd.get("category") || "").trim();
+  if (fd.has("priority")) payload.priority = toBackendTaskPriority(String(fd.get("priority") || ""));
+  if (fd.has("type")) payload.type = toBackendTaskType(String(fd.get("type") || ""));
+  if (fd.has("rewardPoints")) payload.rewardPoints = Number(fd.get("rewardPoints") || 0);
+  if (fd.has("deadline")) payload.deadline = String(fd.get("deadline") || "");
+  if (fd.has("notes")) payload.notes = String(fd.get("notes") || "").trim();
+  if (fd.has("estimatedTime")) payload.estimatedTime = String(fd.get("estimatedTime") || "").trim();
+  if (fd.has("projectId")) payload.projectId = String(fd.get("projectId") || "");
+  if (fd.has("assignedTo")) payload.assignedTo = String(fd.get("assignedTo") || "");
+  if (fd.has("existingAttachments")) {
+    try {
+      payload.existingAttachments = JSON.parse(String(fd.get("existingAttachments")));
+    } catch {
+      // ignore
+    }
+  }
+  return payload;
+}
+
+/**
  * Builds FormData for multipart/form-data task creation.
  */
 export function buildCreateTaskFormData(input: CreateTaskInput): FormData {

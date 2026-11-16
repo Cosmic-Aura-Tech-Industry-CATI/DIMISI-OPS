@@ -33,6 +33,10 @@ export const apiClient: AxiosInstance = axios.create({
 /* ------------------------------ request layer ------------------------------ */
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.url && config.url.startsWith("/api/v2")) {
+    config.baseURL = undefined;
+  }
+
   if (config.data instanceof FormData) {
     config.headers.delete("Content-Type");
   }

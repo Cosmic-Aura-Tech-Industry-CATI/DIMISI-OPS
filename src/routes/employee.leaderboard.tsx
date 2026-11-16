@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Trophy, Medal, Award, Flame, Star, Zap, Crown, Target, Search, AlertCircle } from "lucide-react";
+import {
+  Trophy,
+  Medal,
+  Award,
+  Flame,
+  Star,
+  Zap,
+  Crown,
+  Target,
+  Search,
+  AlertCircle,
+} from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -23,6 +34,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useLeaderboardQuery } from "@/features/leaderboard";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
+import { employees as seedEmployees } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +64,11 @@ export const Route = createFileRoute("/employee/leaderboard")({
 
 const podium = [
   { Icon: Crown, ring: "from-[oklch(0.85_0.16_85)] to-[oklch(0.75_0.19_65)]", label: "Champion" },
-  { Icon: Trophy, ring: "from-[oklch(0.85_0.03_260)] to-[oklch(0.7_0.04_260)]", label: "Runner-up" },
+  {
+    Icon: Trophy,
+    ring: "from-[oklch(0.85_0.03_260)] to-[oklch(0.7_0.04_260)]",
+    label: "Runner-up",
+  },
   { Icon: Medal, ring: "from-[oklch(0.7_0.13_45)] to-[oklch(0.55_0.14_35)]", label: "Third place" },
 ];
 
@@ -66,11 +83,36 @@ function initials(name: string) {
 
 function badgesFor(points: number, completionRate: number | null) {
   const badges: { label: string; Icon: typeof Star; tone: string }[] = [];
-  if (points >= 1500) badges.push({ label: "Elite", Icon: Crown, tone: "bg-primary/15 text-primary border-primary/30" });
-  if (completionRate !== null && completionRate >= 92) badges.push({ label: "Consistent", Icon: Target, tone: "bg-primary/10 text-primary border-primary/30" });
-  if (points >= 1200) badges.push({ label: "Top 10%", Icon: Star, tone: "bg-primary/10 text-primary border-primary/30" });
-  if (completionRate !== null && completionRate >= 88 && points >= 1000) badges.push({ label: "On Fire", Icon: Flame, tone: "bg-primary/10 text-primary border-primary/30" });
-  if (badges.length === 0) badges.push({ label: "Rising", Icon: Zap, tone: "bg-primary/10 text-primary border-primary/30" });
+  if (points >= 1500)
+    badges.push({
+      label: "Elite",
+      Icon: Crown,
+      tone: "bg-primary/15 text-primary border-primary/30",
+    });
+  if (completionRate !== null && completionRate >= 92)
+    badges.push({
+      label: "Consistent",
+      Icon: Target,
+      tone: "bg-primary/10 text-primary border-primary/30",
+    });
+  if (points >= 1200)
+    badges.push({
+      label: "Top 10%",
+      Icon: Star,
+      tone: "bg-primary/10 text-primary border-primary/30",
+    });
+  if (completionRate !== null && completionRate >= 88 && points >= 1000)
+    badges.push({
+      label: "On Fire",
+      Icon: Flame,
+      tone: "bg-primary/10 text-primary border-primary/30",
+    });
+  if (badges.length === 0)
+    badges.push({
+      label: "Rising",
+      Icon: Zap,
+      tone: "bg-primary/10 text-primary border-primary/30",
+    });
   return badges.slice(0, 3);
 }
 
@@ -82,7 +124,71 @@ function EmployeeLeaderboardPage() {
   const [search, setSearch] = useState("");
 
   const leaderboardEntries = useMemo(() => {
-    return (Array.isArray(rawLeaderboard) ? rawLeaderboard : [])
+    const items = Array.isArray(rawLeaderboard) ? rawLeaderboard : [];
+
+    // Strictly ensure only confirmed active employees appear in leaderboard rankings
+    const activeItems = items.filter((item) => {
+      // 1. Explicit negative checks on entry
+      if (item.isActive === false || (item as Record<string, unknown>).is_active === false) return false;
+      if (typeof item.status === "string" && item.status.trim().toLowerCase() !== "active")
+        return false;
+      if (item.user && item.user.isActive === false) return false;
+      if (
+        item.user &&
+        typeof item.user.status === "string" &&
+        item.user.status.trim().toLowerCase() !== "active"
+      )
+        return false;
+
+      // 2. Explicit positive checks on entry
+      if (item.isActive === true || (item as Record<string, unknown>).is_active === true) return true;
+      if (typeof item.status === "string" && item.status.trim().toLowerCase() === "active")
+        return true;
+      if (item.user && item.user.isActive === true) return true;
+      if (
+        item.user &&
+        typeof item.user.status === "string" &&
+        item.user.status.trim().toLowerCase() === "active"
+      )
+        return true;
+
+      // 3. Match against current logged-in employee if it is them
+      if (currentUser) {
+        const isMe =
+          (currentUser.id &&
+            (item._id === currentUser.id || (item as Record<string, unknown>).id === currentUser.id)) ||
+          (currentUser._id &&
+            (item._id === currentUser._id || (item as Record<string, unknown>).id === currentUser._id)) ||
+          (currentUser.empId &&
+            (item.empId === currentUser.empId || (item as Record<string, unknown>).code === currentUser.empId)) ||
+          (currentUser.code &&
+            (item.empId === currentUser.code || (item as Record<string, unknown>).code === currentUser.code)) ||
+          (currentUser.email &&
+            item.email &&
+            currentUser.email.toLowerCase() === item.email.toLowerCase());
+        if (isMe) {
+          return currentUser.isActive === true || currentUser.status?.toLowerCase() === "active";
+        }
+      }
+
+      // 4. Match against seed directory if present
+      const seedMatch = seedEmployees.find(
+        (e) =>
+          e.id === item._id ||
+          e.id === (item as Record<string, unknown>).id ||
+          e.code === item.empId ||
+          e.code === (item as Record<string, unknown>).code ||
+          (item.email && e.email.toLowerCase() === item.email.toLowerCase()),
+      );
+      if (seedMatch) {
+        return seedMatch.status === "active";
+      }
+
+      // Strictly: Do not assume an employee is active when their status is missing or unknown
+      return false;
+    });
+
+    return activeItems
       .map((item, index) => {
         const deptName =
           typeof item.department === "object" && item.department
@@ -121,8 +227,13 @@ function EmployeeLeaderboardPage() {
         if (rawRate !== undefined) {
           completionRate = Math.min(100, Math.max(0, Math.round(rawRate)));
         } else if (totalTasks !== undefined && totalTasks > 0) {
-          completionRate = Math.min(100, Math.max(0, Math.round((tasksCompleted / totalTasks) * 100)));
+          completionRate = Math.min(
+            100,
+            Math.max(0, Math.round((tasksCompleted / totalTasks) * 100)),
+          );
         }
+
+        const avatarUrl = getAvatarUrl(item) || getAvatarUrl(item.user);
 
         return {
           id: String(item._id || index),
@@ -131,9 +242,11 @@ function EmployeeLeaderboardPage() {
           email: item.email || "",
           department: deptName,
           avatar: initials(item.name || "Teammate"),
+          avatarUrl,
           points,
           tasksCompleted,
           completionRate,
+          raw: item,
         };
       })
       .sort((a, b) => b.points - a.points)
@@ -141,7 +254,7 @@ function EmployeeLeaderboardPage() {
         ...entry,
         rank: idx + 1,
       }));
-  }, [rawLeaderboard]);
+  }, [rawLeaderboard, currentUser]);
 
   const periodAdjusted = useMemo(() => {
     return leaderboardEntries;
@@ -232,10 +345,13 @@ function EmployeeLeaderboardPage() {
                 const { Icon, ring, label } = podium[i] || podium[0];
                 const isMe = Boolean(
                   currentUser &&
-                    ((currentUser.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
-                      (currentUser.id && (e.id === currentUser.id || e.code === currentUser.id)) ||
-                      (currentUser._id && (e.id === currentUser._id || e.code === currentUser._id)) ||
-                      (currentUser.empId && (e.code === currentUser.empId || e.id === currentUser.empId)))
+                  ((currentUser.email &&
+                    e.email &&
+                    currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
+                    (currentUser.id && (e.id === currentUser.id || e.code === currentUser.id)) ||
+                    (currentUser._id && (e.id === currentUser._id || e.code === currentUser._id)) ||
+                    (currentUser.empId &&
+                      (e.code === currentUser.empId || e.id === currentUser.empId))),
                 );
                 return (
                   <div
@@ -248,29 +364,58 @@ function EmployeeLeaderboardPage() {
                     )}
                     style={{ animationDelay: `${i * 80}ms` }}
                   >
-                    <div className={cn("absolute -top-10 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-gradient-to-br opacity-30 blur-2xl", ring)} />
+                    <div
+                      className={cn(
+                        "absolute -top-10 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-gradient-to-br opacity-30 blur-2xl",
+                        ring,
+                      )}
+                    />
                     <div className="relative flex items-center justify-center gap-2">
-                      <div className={cn("grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-glow", ring)}>
+                      <div
+                        className={cn(
+                          "grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-glow",
+                          ring,
+                        )}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
-                      <Badge variant="outline" className="border-border/60 text-[10px] uppercase tracking-widest">
+                      <Badge
+                        variant="outline"
+                        className="border-border/60 text-[10px] uppercase tracking-widest"
+                      >
                         {label}
                       </Badge>
                     </div>
-                    <div className="relative mx-auto mt-4 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-lg font-semibold">
-                      {e.avatar}
-                    </div>
+                    <UserAvatar
+                      user={e.raw}
+                      name={e.name}
+                      image={e.avatarUrl}
+                      className="relative mx-auto mt-4 h-16 w-16 text-lg"
+                      fallbackClassName="text-lg bg-gradient-to-br from-primary/30 to-accent text-foreground font-semibold"
+                    />
                     <h3 className="mt-3 font-display text-lg font-semibold">
                       {e.name}
                       {isMe && <span className="ml-2 text-xs text-primary">(you)</span>}
                     </h3>
                     <p className="text-xs text-muted-foreground">{e.department}</p>
-                    <p className="mt-3 font-display text-3xl font-semibold text-gradient">{e.points.toLocaleString()}</p>
-                    <p className="text-xs uppercase tracking-widest text-muted-foreground">points</p>
+                    <p className="mt-3 font-display text-3xl font-semibold text-gradient">
+                      {e.points.toLocaleString()}
+                    </p>
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                      points
+                    </p>
                     <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                      <span><span className="font-medium text-foreground">{e.tasksCompleted}</span> tasks</span>
+                      <span>
+                        <span className="font-medium text-foreground">{e.tasksCompleted}</span>{" "}
+                        tasks
+                      </span>
                       <span className="h-3 w-px bg-border/60" />
-                      <span><span className="font-medium text-foreground">{e.completionRate !== null ? `${e.completionRate}%` : "—"}</span> rate</span>
+                      <span>
+                        <span className="font-medium text-foreground">
+                          {e.completionRate !== null ? `${e.completionRate}%` : "—"}
+                        </span>{" "}
+                        rate
+                      </span>
                     </div>
                   </div>
                 );
@@ -309,10 +454,15 @@ function EmployeeLeaderboardPage() {
                   {table.map((e) => {
                     const isMe = Boolean(
                       currentUser &&
-                        ((currentUser.email && e.email && currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
-                          (currentUser.id && (e.id === currentUser.id || e.code === currentUser.id)) ||
-                          (currentUser._id && (e.id === currentUser._id || e.code === currentUser._id)) ||
-                          (currentUser.empId && (e.code === currentUser.empId || e.id === currentUser.empId)))
+                      ((currentUser.email &&
+                        e.email &&
+                        currentUser.email.toLowerCase() === e.email.toLowerCase()) ||
+                        (currentUser.id &&
+                          (e.id === currentUser.id || e.code === currentUser.id)) ||
+                        (currentUser._id &&
+                          (e.id === currentUser._id || e.code === currentUser._id)) ||
+                        (currentUser.empId &&
+                          (e.code === currentUser.empId || e.id === currentUser.empId))),
                     );
                     const badges = badgesFor(e.points, e.completionRate);
                     return (
@@ -327,9 +477,12 @@ function EmployeeLeaderboardPage() {
                           <div
                             className={cn(
                               "grid h-8 w-8 place-items-center rounded-lg text-xs font-semibold",
-                              e.rank === 1 && "bg-gradient-to-br from-primary/30 to-primary/20 text-primary",
-                              e.rank === 2 && "bg-gradient-to-br from-slate-400/30 to-slate-500/20 text-slate-200",
-                              e.rank === 3 && "bg-gradient-to-br from-primary/30 to-primary/15 text-primary",
+                              e.rank === 1 &&
+                                "bg-gradient-to-br from-primary/30 to-primary/20 text-primary",
+                              e.rank === 2 &&
+                                "bg-gradient-to-br from-slate-400/30 to-slate-500/20 text-slate-200",
+                              e.rank === 3 &&
+                                "bg-gradient-to-br from-primary/30 to-primary/15 text-primary",
                               e.rank > 3 && "bg-muted text-muted-foreground",
                             )}
                           >
@@ -338,9 +491,13 @@ function EmployeeLeaderboardPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-xs font-semibold">
-                              {e.avatar}
-                            </div>
+                            <UserAvatar
+                              user={e.raw}
+                              name={e.name}
+                              image={e.avatarUrl}
+                              className="h-9 w-9 text-xs"
+                              fallbackClassName="text-xs bg-gradient-to-br from-primary/30 to-accent text-foreground font-semibold"
+                            />
                             <div className="min-w-0">
                               <div className="truncate font-medium">
                                 {e.name}
@@ -350,7 +507,9 @@ function EmployeeLeaderboardPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{e.department}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {e.department}
+                        </TableCell>
                         <TableCell className="text-right font-display text-base font-semibold">
                           {e.points.toLocaleString()}
                         </TableCell>
@@ -364,7 +523,9 @@ function EmployeeLeaderboardPage() {
                                   style={{ width: `${e.completionRate}%` }}
                                 />
                               </div>
-                              <span className="w-10 text-right text-xs text-muted-foreground">{e.completionRate}%</span>
+                              <span className="w-10 text-right text-xs text-muted-foreground">
+                                {e.completionRate}%
+                              </span>
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
@@ -389,7 +550,10 @@ function EmployeeLeaderboardPage() {
                   })}
                   {table.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell
+                        colSpan={7}
+                        className="py-10 text-center text-sm text-muted-foreground"
+                      >
                         No teammates match your filters.
                       </TableCell>
                     </TableRow>

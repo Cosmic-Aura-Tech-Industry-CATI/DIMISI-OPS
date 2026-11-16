@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Archive,
@@ -42,6 +42,7 @@ import {
   CreateProjectDialog,
   EditProjectDialog,
 } from "@/components/project-dialogs";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import {
   validateTaskAttachmentFile,
@@ -143,7 +144,9 @@ export function taskToValues(t: Task): TaskFormValues {
     assigneeId:
       t.assigneeId ||
       (typeof t.assignedTo === "object" && t.assignedTo
-        ? (t.assignedTo as { _id?: string; id?: string })._id || (t.assignedTo as { _id?: string; id?: string }).id || ""
+        ? (t.assignedTo as { _id?: string; id?: string })._id ||
+          (t.assignedTo as { _id?: string; id?: string }).id ||
+          ""
         : typeof t.assignedTo === "string"
           ? t.assignedTo
           : ""),
@@ -235,11 +238,20 @@ export function TaskForm({
     {
       page: employeePage,
       limit: EMPLOYEE_PAGE_SIZE,
+      status: "active",
     },
     {
       enabled: isEmployeeQueryEnabled,
     },
   );
+
+  const assignableEmployeeList = useMemo(() => {
+    return employeeList.filter((e) => {
+      const id = e._id || e.id;
+      if (id && id === form.assigneeId) return true;
+      return e.isActive !== false && (e.status === undefined || e.status.toLowerCase() === "active");
+    });
+  }, [employeeList, form.assigneeId]);
 
   const { data: initialAssigneeData } = useEmployeeDetailsQuery(form.assigneeId, {
     enabled: Boolean(form.assigneeId),
@@ -501,9 +513,7 @@ export function TaskForm({
       if (targetId && cancelledAttachmentIdsRef.current.has(targetId)) return;
       setForm((prev) => ({
         ...prev,
-        attachments: prev.attachments.map((att) =>
-          att.id === targetId ? previousItem : att,
-        ),
+        attachments: prev.attachments.map((att) => (att.id === targetId ? previousItem : att)),
       }));
       const message =
         err instanceof Error
@@ -565,7 +575,9 @@ export function TaskForm({
 
     if (itemsToAdd.length === 0) return;
 
-    itemsToAdd.forEach((item) => { if (item.id) cancelledAttachmentIdsRef.current.delete(item.id); });
+    itemsToAdd.forEach((item) => {
+      if (item.id) cancelledAttachmentIdsRef.current.delete(item.id);
+    });
 
     // Add files to state
     setForm((prev) => ({
@@ -682,11 +694,13 @@ export function TaskForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from(new Set([form.category, ...taskCategories].filter(Boolean))).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
+                {Array.from(new Set([form.category, ...taskCategories].filter(Boolean))).map(
+                  (c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </Field>
@@ -1076,20 +1090,29 @@ export function TaskForm({
                 onScroll={handleScroll}
                 onWheelCapture={handleWheel}
               >
-                {employeeList.map((e) => {
+                {assignableEmployeeList.map((e) => {
                   const targetId = e._id || e.id || "";
                   const code = e.empId || e.code || "";
-                  const avatar = e.name ? e.name.slice(0, 2).toUpperCase() : "EM";
+                  const isInactive = Boolean(e.isActive === false || (e.status && e.status.toLowerCase() === "inactive"));
                   return (
-                    <SelectItem key={targetId} value={targetId}>
+                    <SelectItem key={targetId} value={targetId} disabled={Boolean(isInactive && targetId !== form.assigneeId)}>
                       <span className="inline-flex items-center gap-2">
-                        <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">
-                          {avatar}
-                        </span>
+                        <UserAvatar
+                          user={e}
+                          name={e.name}
+                          image={getAvatarUrl(e)}
+                          className="h-5 w-5 text-[10px]"
+                          fallbackClassName="text-[10px] bg-primary/20 text-primary font-semibold"
+                        />
                         {e.name}
                         {code && (
                           <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
                             {code}
+                          </span>
+                        )}
+                        {isInactive && (
+                          <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                            Inactive
                           </span>
                         )}
                       </span>
@@ -1119,12 +1142,14 @@ export function TaskForm({
                 )}
                 {employeeError && employeeList.length === 0 && (
                   <SelectItem disabled value="__employees-error">
-                    <span className="text-xs text-destructive">
-                      Failed to load employees.
-                    </span>
+                    <span className="text-xs text-destructive">Failed to load employees.</span>
                   </SelectItem>
                 )}
-                <div ref={sentinelCallback} className="h-px w-full pointer-events-none" aria-hidden="true" />
+                <div
+                  ref={sentinelCallback}
+                  className="h-px w-full pointer-events-none"
+                  aria-hidden="true"
+                />
               </SelectContent>
             </Select>
           </Field>
