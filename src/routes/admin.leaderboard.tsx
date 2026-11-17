@@ -59,6 +59,10 @@ function LeaderboardPage() {
     refetch,
   } = useLeaderboardQuery(50);
   const { data: employeesData, isLoading: isEmployeesLoading } = useEmployeesQuery({ limit: 100 });
+  const { data: page2Employees } = useEmployeesQuery(
+    { page: 2 },
+    { enabled: (employeesData?.pagination?.totalPages ?? 0) >= 2 },
+  );
 
   const isLoading = isLeaderboardLoading || isEmployeesLoading;
 
@@ -67,7 +71,11 @@ function LeaderboardPage() {
       string,
       { isActive: boolean; status?: string; avatarUrl?: string; raw: AuthUser }
     >();
-    (employeesData?.employees || []).forEach((emp) => {
+    const allEmployees = [
+      ...(employeesData?.employees || []),
+      ...(page2Employees?.employees || []),
+    ];
+    allEmployees.forEach((emp) => {
       const avatarUrl = getAvatarUrl(emp);
       const isActive = typeof emp.isActive === "boolean" ? emp.isActive : true;
       const info = {
@@ -83,7 +91,7 @@ function LeaderboardPage() {
       if (emp.email) map.set(emp.email.toLowerCase(), info);
     });
     return map;
-  }, [employeesData]);
+  }, [employeesData, page2Employees]);
 
   const leaderboard = useMemo(() => {
     const items = Array.isArray(rawLeaderboard) ? rawLeaderboard : [];
@@ -132,8 +140,11 @@ function LeaderboardPage() {
         }
       }
 
-      // Strictly: Do not assume an employee is active when their status is missing or unknown
-      return false;
+      // Default for entries from /api/v1/leaderboard:
+      // The backend query `User.find({ isActive: true, role: UserRoles.EMP })` already filters for active employees,
+      // but projects only `name empId points completedTasks department` without returning the `isActive` field.
+      // Therefore, unless explicitly flagged as inactive above, entries returned by the leaderboard API are active.
+      return true;
     });
 
     return activeItems

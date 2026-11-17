@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/table";
 import { useLeaderboardQuery } from "@/features/leaderboard";
 import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
-import { employees as seedEmployees } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +125,7 @@ function EmployeeLeaderboardPage() {
   const leaderboardEntries = useMemo(() => {
     const items = Array.isArray(rawLeaderboard) ? rawLeaderboard : [];
 
-    // Strictly ensure only confirmed active employees appear in leaderboard rankings
+    // Ensure active employees appear in leaderboard rankings
     const activeItems = items.filter((item) => {
       // 1. Explicit negative checks on entry
       if (item.isActive === false || (item as Record<string, unknown>).is_active === false) return false;
@@ -171,21 +170,11 @@ function EmployeeLeaderboardPage() {
         }
       }
 
-      // 4. Match against seed directory if present
-      const seedMatch = seedEmployees.find(
-        (e) =>
-          e.id === item._id ||
-          e.id === (item as Record<string, unknown>).id ||
-          e.code === item.empId ||
-          e.code === (item as Record<string, unknown>).code ||
-          (item.email && e.email.toLowerCase() === item.email.toLowerCase()),
-      );
-      if (seedMatch) {
-        return seedMatch.status === "active";
-      }
-
-      // Strictly: Do not assume an employee is active when their status is missing or unknown
-      return false;
+      // Default for entries from /api/v1/leaderboard:
+      // The backend query `User.find({ isActive: true, role: UserRoles.EMP })` already filters for eligible active employees,
+      // but projects only `name empId points completedTasks department` without returning the `isActive` field.
+      // Therefore, unless explicitly flagged as inactive above, entries returned by the leaderboard API are active.
+      return true;
     });
 
     return activeItems
