@@ -5,7 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-import { API_BASE_URL, API_TIMEOUT, API_WITH_CREDENTIALS } from "./config";
+import { API_BASE_URL, API_TIMEOUT, API_WITH_CREDENTIALS, getBackendOrigin } from "./config";
 import { API_ENDPOINTS } from "./endpoints";
 import { toApiError, type ApiError } from "./errors";
 import { clearTokens, getAccessToken, getResetToken, setAccessToken } from "./token-store";
@@ -34,7 +34,7 @@ export const apiClient: AxiosInstance = axios.create({
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.url && config.url.startsWith("/api/v2")) {
-    config.baseURL = undefined;
+    config.baseURL = getBackendOrigin();
   }
 
   if (config.data instanceof FormData) {

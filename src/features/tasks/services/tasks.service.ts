@@ -5,6 +5,7 @@
 
 import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
+import { getApiV2Endpoint } from "@/api/client/config";
 import {
   buildCreateTaskFormData,
   buildCreateTaskPayload,
@@ -155,9 +156,26 @@ export const tasksService = {
    */
   async createTask(input: CreateTaskInput | FormData): Promise<Task> {
     const payload = input instanceof FormData ? formDataToTaskPayload(input) : buildCreateTaskPayload(input);
-    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, payload);
-    const raw = res?.task || res?.data?.task || res;
-    return mapTaskResponse(raw);
+    const targetUrl = API_ENDPOINTS.tasks.create || getApiV2Endpoint("/tasks");
+    try {
+      const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(targetUrl, payload);
+      const raw = res?.task || res?.data?.task || res;
+      return mapTaskResponse(raw);
+    } catch (err: unknown) {
+      const is404 =
+        (typeof err === "object" && err !== null && "status" in err && (err as { status: unknown }).status === 404) ||
+        (typeof err === "object" && err !== null && "statusCode" in err && (err as { statusCode: unknown }).statusCode === 404) ||
+        (typeof err === "object" && err !== null && "response" in err && (err as { response?: { status?: unknown } }).response?.status === 404);
+      if (is404) {
+        const v2Url = getApiV2Endpoint("/tasks");
+        if (targetUrl !== v2Url) {
+          const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(v2Url, payload);
+          const raw = res?.task || res?.data?.task || res;
+          return mapTaskResponse(raw);
+        }
+      }
+      throw err;
+    }
   },
 
   /**
@@ -166,9 +184,26 @@ export const tasksService = {
    */
   async updateTask(id: string, input: UpdateTaskInput | FormData): Promise<Task> {
     const payload = input instanceof FormData ? formDataToTaskUpdatePayload(input) : buildUpdateTaskPayload(input);
-    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), payload);
-    const raw = res?.task || res?.data?.task || res;
-    return mapTaskResponse(raw);
+    const targetUrl = API_ENDPOINTS.tasks.update(id) || getApiV2Endpoint(`/tasks/${id}`);
+    try {
+      const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(targetUrl, payload);
+      const raw = res?.task || res?.data?.task || res;
+      return mapTaskResponse(raw);
+    } catch (err: unknown) {
+      const is404 =
+        (typeof err === "object" && err !== null && "status" in err && (err as { status: unknown }).status === 404) ||
+        (typeof err === "object" && err !== null && "statusCode" in err && (err as { statusCode: unknown }).statusCode === 404) ||
+        (typeof err === "object" && err !== null && "response" in err && (err as { response?: { status?: unknown } }).response?.status === 404);
+      if (is404) {
+        const v2Url = getApiV2Endpoint(`/tasks/${id}`);
+        if (targetUrl !== v2Url) {
+          const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(v2Url, payload);
+          const raw = res?.task || res?.data?.task || res;
+          return mapTaskResponse(raw);
+        }
+      }
+      throw err;
+    }
   },
 
   /**
