@@ -6,6 +6,9 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useEmployeesQuery } from "@/features/employees";
+import type { AuthUser } from "@/auth/types/auth";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 export interface AdminLeaderboardSearch {
@@ -48,10 +51,103 @@ function initials(name: string) {
 }
 
 function LeaderboardPage() {
-  const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
+  const {
+    data: rawLeaderboard = [],
+    isLoading: isLeaderboardLoading,
+    isError,
+    error,
+    refetch,
+  } = useLeaderboardQuery(50);
+  const { data: employeesData, isLoading: isEmployeesLoading } = useEmployeesQuery({ limit: 100 });
+  const { data: page2Employees } = useEmployeesQuery(
+    { page: 2 },
+    { enabled: (employeesData?.pagination?.totalPages ?? 0) >= 2 },
+  );
+
+  const isLoading = isLeaderboardLoading || isEmployeesLoading;
+
+  const employeeDirectoryMap = useMemo(() => {
+    const map = new Map<
+      string,
+      { isActive: boolean; status?: string; avatarUrl?: string; raw: AuthUser }
+    >();
+    const allEmployees = [
+      ...(employeesData?.employees || []),
+      ...(page2Employees?.employees || []),
+    ];
+    allEmployees.forEach((emp) => {
+      const avatarUrl = getAvatarUrl(emp);
+      const isActive = typeof emp.isActive === "boolean" ? emp.isActive : true;
+      const info = {
+        isActive,
+        status: isActive ? "active" : "inactive",
+        avatarUrl,
+        raw: emp,
+      };
+      if (emp._id) map.set(String(emp._id), info);
+      if (emp.id) map.set(String(emp.id), info);
+      if (emp.empId) map.set(String(emp.empId), info);
+      if (emp.code) map.set(String(emp.code), info);
+      if (emp.email) map.set(emp.email.toLowerCase(), info);
+    });
+    return map;
+  }, [employeesData, page2Employees]);
 
   const leaderboard = useMemo(() => {
-    return (Array.isArray(rawLeaderboard) ? rawLeaderboard : [])
+    const items = Array.isArray(rawLeaderboard) ? rawLeaderboard : [];
+
+    // Strictly ensure only confirmed active employees appear in leaderboard rankings
+    const activeItems = items.filter((item) => {
+      // 1. Explicit negative checks on entry
+      if (item.isActive === false || (item as Record<string, unknown>).is_active === false) return false;
+      if (typeof item.status === "string" && item.status.trim().toLowerCase() !== "active")
+        return false;
+      if (item.user && item.user.isActive === false) return false;
+      if (
+        item.user &&
+        typeof item.user.status === "string" &&
+        item.user.status.trim().toLowerCase() !== "active"
+      )
+        return false;
+
+      // 2. Explicit positive checks on entry
+      if (item.isActive === true || (item as Record<string, unknown>).is_active === true) return true;
+      if (typeof item.status === "string" && item.status.trim().toLowerCase() === "active")
+        return true;
+      if (item.user && item.user.isActive === true) return true;
+      if (
+        item.user &&
+        typeof item.user.status === "string" &&
+        item.user.status.trim().toLowerCase() === "active"
+      )
+        return true;
+
+      // 3. Match against employee directory
+      const keys = [
+        item._id,
+        (item as Record<string, unknown>).id,
+        item.empId,
+        item.code,
+        item.email?.toLowerCase(),
+      ].filter(Boolean);
+      for (const k of keys) {
+        const match = employeeDirectoryMap.get(String(k));
+        if (match) {
+          if (typeof match.isActive === "boolean") return match.isActive;
+          if (typeof match.status === "string" && match.status.trim() !== "") {
+            return match.status.trim().toLowerCase() === "active";
+          }
+        }
+      }
+
+      // Default for entries from /api/v1/leaderboard:
+      // The backend query `User.find({ isActive: true, role: UserRoles.EMP })` already filters for active employees,
+      // but projects only `name empId points completedTasks department` without returning the `isActive` field.
+      // Therefore, unless explicitly flagged as inactive above, entries returned by the leaderboard API are active.
+      return true;
+    });
+
+    return activeItems
       .map((item, index) => {
         const deptName =
           typeof item.department === "object" && item.department
@@ -60,6 +156,17 @@ function LeaderboardPage() {
 
         const codeStr = String(item.empId || item.code || "—");
         const points = typeof item.points === "number" ? item.points : 0;
+        const matched =
+          employeeDirectoryMap.get(String(item._id || "")) ||
+          employeeDirectoryMap.get(String((item as Record<string, unknown>).id || "")) ||
+          employeeDirectoryMap.get(codeStr) ||
+          (item.email ? employeeDirectoryMap.get(item.email.toLowerCase()) : undefined);
+
+        const avatarUrl =
+          getAvatarUrl(item) ||
+          getAvatarUrl(item.user) ||
+          matched?.avatarUrl ||
+          (matched?.raw ? getAvatarUrl(matched.raw) : undefined);
 
         return {
           id: String(item._id || index),
@@ -67,8 +174,11 @@ function LeaderboardPage() {
           code: codeStr,
           department: deptName,
           avatar: initials(item.name || "Employee"),
+          avatarUrl,
           points,
-          tasksCompleted: (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0,
+          tasksCompleted:
+            (item.completedTasks as number) ?? (item.completedTasksCount as number) ?? 0,
+          raw: matched?.raw || item,
         };
       })
       .sort((a, b) => b.points - a.points)
@@ -76,7 +186,7 @@ function LeaderboardPage() {
         ...entry,
         rank: idx + 1,
       }));
-  }, [rawLeaderboard]);
+  }, [rawLeaderboard, employeeDirectoryMap]);
 
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
@@ -143,9 +253,13 @@ function LeaderboardPage() {
                     >
                       <Icon className="h-6 w-6" />
                     </div>
-                    <div className="relative mx-auto mt-4 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-lg font-semibold">
-                      {e.avatar}
-                    </div>
+                    <UserAvatar
+                      user={e.raw}
+                      name={e.name}
+                      image={e.avatarUrl}
+                      className="relative mx-auto mt-4 h-16 w-16 text-lg"
+                      fallbackClassName="text-lg bg-gradient-to-br from-primary/30 to-accent text-foreground font-semibold"
+                    />
                     <h3 className="mt-3 font-display text-lg font-semibold">{e.name}</h3>
                     <div className="mt-1">
                       <IdBadge id={e.code} />
@@ -154,7 +268,9 @@ function LeaderboardPage() {
                     <p className="mt-3 font-display text-3xl font-semibold text-gradient">
                       {e.points.toLocaleString()}
                     </p>
-                    <p className="text-xs uppercase tracking-widest text-muted-foreground">points</p>
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                      points
+                    </p>
                   </div>
                 );
               })}
@@ -165,13 +281,20 @@ function LeaderboardPage() {
             <div className="glass overflow-hidden rounded-2xl">
               <ul className="divide-y divide-border/40">
                 {rest.map((e) => (
-                  <li key={e.id} className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/40">
+                  <li
+                    key={e.id}
+                    className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/40"
+                  >
                     <div className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-xs font-semibold">
                       #{e.rank}
                     </div>
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-sm font-semibold">
-                      {e.avatar}
-                    </div>
+                    <UserAvatar
+                      user={e.raw}
+                      name={e.name}
+                      image={e.avatarUrl}
+                      className="h-10 w-10 text-sm"
+                      fallbackClassName="text-sm bg-gradient-to-br from-primary/30 to-accent text-foreground font-semibold"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{e.name}</div>
                       <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
@@ -179,7 +302,9 @@ function LeaderboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-display text-lg font-semibold">{e.points.toLocaleString()}</div>
+                      <div className="font-display text-lg font-semibold">
+                        {e.points.toLocaleString()}
+                      </div>
                       <div className="text-xs text-muted-foreground">{e.tasksCompleted} tasks</div>
                     </div>
                   </li>

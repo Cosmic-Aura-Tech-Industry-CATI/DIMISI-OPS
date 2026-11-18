@@ -53,14 +53,17 @@ function AdminOverview() {
 
   // Derived metrics from live collections (used if dashboard aggregate is 0 or loading)
   const derivedActiveTasks = useMemo(
-    () => tasksList.filter((t) => {
-      const s = (t.status || "").toLowerCase();
-      return s !== "completed" && s !== "cancelled";
-    }).length,
+    () =>
+      tasksList.filter((t) => {
+        const s = (t.status || "").toLowerCase();
+        return s !== "completed" && s !== "cancelled";
+      }).length,
     [tasksList],
   );
   const derivedPendingReviews = useMemo(
-    () => tasksList.filter((t) => t.reviewState === "in_review" || (t as any).rawStatus === "In Review").length,
+    () =>
+      tasksList.filter((t) => t.reviewState === "in_review" || (t as any).rawStatus === "In Review")
+        .length,
     [tasksList],
   );
   const derivedCompletedTasks = useMemo(
@@ -117,10 +120,34 @@ function AdminOverview() {
     return employeesList.slice(0, 5);
   }, [employeesList]);
 
-  // Real top 5 leaderboard earners
+  // Real top 5 active leaderboard earners
   const topFiveLeaderboard = useMemo(() => {
-    return (leaderboardData || []).slice(0, 5);
-  }, [leaderboardData]);
+    const raw = leaderboardData || [];
+    const active = raw.filter((item) => {
+      if (typeof item.isActive === "boolean") return item.isActive;
+      if (typeof (item as Record<string, unknown>).is_active === "boolean") return (item as Record<string, unknown>).is_active;
+      if (typeof item.status === "string" && item.status.trim() !== "") {
+        return item.status.trim().toLowerCase() === "active";
+      }
+      if (item.user && typeof item.user.isActive === "boolean") return item.user.isActive;
+      if (item.user && typeof item.user.status === "string" && item.user.status.trim() !== "") {
+        return item.user.status.trim().toLowerCase() === "active";
+      }
+      const match = employeesList.find(
+        (e) =>
+          (e.id && (e.id === item._id || e.id === (item as Record<string, unknown>).id)) ||
+          (e._id && (e._id === item._id || e._id === (item as Record<string, unknown>).id)) ||
+          (e.code && (e.code === item.empId || e.code === (item as Record<string, unknown>).code)) ||
+          (e.empId && (e.empId === item.empId || e.empId === (item as Record<string, unknown>).code)),
+      );
+      if (match) {
+        if (typeof match.isActive === "boolean") return match.isActive;
+        if (typeof match.status === "string") return match.status.toLowerCase() === "active";
+      }
+      return false;
+    });
+    return active.slice(0, 5);
+  }, [leaderboardData, employeesList]);
 
   // Dynamic Task Completion Chart from live tasks if backend is empty
   const taskCompletionData = useMemo(() => {
@@ -197,7 +224,10 @@ function AdminOverview() {
 
   // Dynamic Department Performance
   const departmentPerformanceData = useMemo(() => {
-    if (Array.isArray(dashboard?.departmentPerformance) && dashboard.departmentPerformance.length > 0) {
+    if (
+      Array.isArray(dashboard?.departmentPerformance) &&
+      dashboard.departmentPerformance.length > 0
+    ) {
       return dashboard.departmentPerformance.map((d) => ({
         department: getCategoryLabel(d.department),
         tasks: Number(d.tasks || 0),
@@ -309,6 +339,3 @@ function AdminOverview() {
     </>
   );
 }
-
-
-

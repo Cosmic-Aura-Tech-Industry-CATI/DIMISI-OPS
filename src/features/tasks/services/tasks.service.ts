@@ -5,9 +5,14 @@
 
 import { apiClient, http } from "@/api/client/client";
 import { API_ENDPOINTS } from "@/api/client/endpoints";
+import { getApiV2Endpoint } from "@/api/client/config";
 import {
   buildCreateTaskFormData,
+  buildCreateTaskPayload,
   buildUpdateTaskFormData,
+  buildUpdateTaskPayload,
+  formDataToTaskPayload,
+  formDataToTaskUpdatePayload,
   mapTaskResponse,
   toBackendTaskPriority,
   toBackendTaskType,
@@ -147,36 +152,58 @@ export const tasksService = {
 
   /**
    * Admin creates a new task (Universal, Project, or Direct).
-   * Supports both client-uploaded CDN attachments (v2) and standard multipart FormData (v1).
+   * Direct task assignments are sent as JSON with assignedTo to the supported v2 task creation endpoint.
    */
   async createTask(input: CreateTaskInput | FormData): Promise<Task> {
-    if (input instanceof FormData) {
-      const res = await http.post<any>(API_ENDPOINTS.tasks.create, input);
+    const payload = input instanceof FormData ? formDataToTaskPayload(input) : buildCreateTaskPayload(input);
+    const targetUrl = API_ENDPOINTS.tasks.create || getApiV2Endpoint("/tasks");
+    try {
+      const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(targetUrl, payload);
       const raw = res?.task || res?.data?.task || res;
       return mapTaskResponse(raw);
+    } catch (err: unknown) {
+      const is404 =
+        (typeof err === "object" && err !== null && "status" in err && (err as { status: unknown }).status === 404) ||
+        (typeof err === "object" && err !== null && "statusCode" in err && (err as { statusCode: unknown }).statusCode === 404) ||
+        (typeof err === "object" && err !== null && "response" in err && (err as { response?: { status?: unknown } }).response?.status === 404);
+      if (is404) {
+        const v2Url = getApiV2Endpoint("/tasks");
+        if (targetUrl !== v2Url) {
+          const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(v2Url, payload);
+          const raw = res?.task || res?.data?.task || res;
+          return mapTaskResponse(raw);
+        }
+      }
+      throw err;
     }
-
-    const body = buildCreateTaskFormData(input);
-    const res = await http.post<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.create, body);
-    const raw = res?.task || res?.data?.task || res;
-    return mapTaskResponse(raw);
   },
 
   /**
    * Admin updates a task and syncs Cloudinary attachments.
-   * Supports both client-uploaded CDN attachments (v2) and standard multipart FormData (v1).
+   * Sends update payload to the supported v2 task update endpoint.
    */
   async updateTask(id: string, input: UpdateTaskInput | FormData): Promise<Task> {
-    if (input instanceof FormData) {
-      const res = await http.patch<any>(API_ENDPOINTS.tasks.update(id), input);
+    const payload = input instanceof FormData ? formDataToTaskUpdatePayload(input) : buildUpdateTaskPayload(input);
+    const targetUrl = API_ENDPOINTS.tasks.update(id) || getApiV2Endpoint(`/tasks/${id}`);
+    try {
+      const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(targetUrl, payload);
       const raw = res?.task || res?.data?.task || res;
       return mapTaskResponse(raw);
+    } catch (err: unknown) {
+      const is404 =
+        (typeof err === "object" && err !== null && "status" in err && (err as { status: unknown }).status === 404) ||
+        (typeof err === "object" && err !== null && "statusCode" in err && (err as { statusCode: unknown }).statusCode === 404) ||
+        (typeof err === "object" && err !== null && "response" in err && (err as { response?: { status?: unknown } }).response?.status === 404);
+      if (is404) {
+        const v2Url = getApiV2Endpoint(`/tasks/${id}`);
+        if (targetUrl !== v2Url) {
+          const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(v2Url, payload);
+          const raw = res?.task || res?.data?.task || res;
+          return mapTaskResponse(raw);
+        }
+      }
+      throw err;
     }
-
-    const body = buildUpdateTaskFormData(input);
-    const res = await http.patch<{ task?: unknown; data?: { task?: unknown } }>(API_ENDPOINTS.tasks.update(id), body);
-    const raw = res?.task || res?.data?.task || res;
-    return mapTaskResponse(raw);
   },
 
   /**

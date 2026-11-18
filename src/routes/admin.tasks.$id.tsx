@@ -1,4 +1,11 @@
-import { createFileRoute, Link, useNavigate, useParams, Outlet, useChildMatches } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useParams,
+  Outlet,
+  useChildMatches,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -18,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
@@ -33,7 +41,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { admins, employees } from "@/lib/mock-data";
-import { useTaskQuery, useDeleteTask, useAssignTask, type Task, getCategoryLabel, formatTaskSubtitle } from "@/features/tasks";
+import {
+  useTaskQuery,
+  useDeleteTask,
+  useAssignTask,
+  type Task,
+  getCategoryLabel,
+  formatTaskSubtitle,
+} from "@/features/tasks";
 
 export const Route = createFileRoute("/admin/tasks/$id")({
   head: () => ({ meta: [{ title: "Task details — Poll" }] }),
@@ -66,7 +81,6 @@ function formatRequestedAt(dateStr?: string) {
     return dateStr;
   }
 }
-
 
 function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });
@@ -117,7 +131,9 @@ function TaskDetailPage() {
 
   const assignee =
     employees.find((e) => e.id === task.assigneeId) ||
-    (task.assignee ? { name: task.assignee, avatar: task.assignee.slice(0, 2).toUpperCase() } : undefined);
+    (task.assignee
+      ? { name: task.assignee, avatar: task.assignee.slice(0, 2).toUpperCase() }
+      : undefined);
   const creator = task.createdBy || "Admin";
   const daysLeft = task.dueDate ? Math.ceil((+new Date(task.dueDate) - Date.now()) / 86400000) : 0;
 
@@ -126,15 +142,19 @@ function TaskDetailPage() {
 
   const pendingRequests = rawRequests
     .filter((r) => {
-      const empObj = typeof r.employeeId === "object" && r.employeeId !== null ? r.employeeId : null;
-      const empId = empObj?._id || (typeof r.employeeId === "string" ? r.employeeId : "") || r._id || "";
+      const empObj =
+        typeof r.employeeId === "object" && r.employeeId !== null ? r.employeeId : null;
+      const empId =
+        empObj?._id || (typeof r.employeeId === "string" ? r.employeeId : "") || r._id || "";
       return !rejectedIds.includes(empId) && !rejectedIds.includes(r._id || "");
     })
     .map((req) => {
-      const empObj = typeof req.employeeId === "object" && req.employeeId !== null ? req.employeeId : null;
+      const empObj =
+        typeof req.employeeId === "object" && req.employeeId !== null ? req.employeeId : null;
       const name = empObj?.name || req.employeeName || "Employee";
       const email = empObj?.email || req.employeeEmail || "—";
-      const employeeId = empObj?._id || (typeof req.employeeId === "string" ? req.employeeId : "") || req._id || "";
+      const employeeId =
+        empObj?._id || (typeof req.employeeId === "string" ? req.employeeId : "") || req._id || "";
       const avatar = name
         ? name
             .split(" ")
@@ -163,7 +183,9 @@ function TaskDetailPage() {
         id: task.id || task._id,
         employeeId: req.employeeId,
       });
-      setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+      setRejectedIds((prev) =>
+        [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean),
+      );
       toast.success(`Request accepted! Task assigned to ${req.name}.`);
     } catch (err: any) {
       toast.error("Failed to accept request", {
@@ -178,7 +200,9 @@ function TaskDetailPage() {
     const targetId = req.employeeId || req._id;
     if (!targetId) return;
     setProcessing({ id: targetId, action: "reject" });
-    setRejectedIds((prev) => [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean));
+    setRejectedIds((prev) =>
+      [...prev, targetId, req._id || "", req.employeeId || ""].filter(Boolean),
+    );
     setProcessing(null);
     toast.info(`Request from ${req.name} dismissed.`);
   };
@@ -186,7 +210,10 @@ function TaskDetailPage() {
   return (
     <>
       <div>
-        <Link to="/admin/tasks" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
+        <Link
+          to="/admin/tasks"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+        >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to tasks
         </Link>
       </div>
@@ -197,7 +224,9 @@ function TaskDetailPage() {
         actions={
           <>
             <Button asChild variant="outline" className="rounded-md">
-              <Link to="/admin/tasks/$id/edit" params={{ id: task.id || (task as any)._id }}><Pencil className="mr-1.5 h-4 w-4" /> Edit</Link>
+              <Link to="/admin/tasks/$id/edit" params={{ id: task.id || (task as any)._id }}>
+                <Pencil className="mr-1.5 h-4 w-4" /> Edit
+              </Link>
             </Button>
             <Button variant="destructive" className="rounded-md" onClick={() => setConfirm(true)}>
               <Trash2 className="mr-1.5 h-4 w-4" /> Delete
@@ -228,7 +257,9 @@ function TaskDetailPage() {
                   <StickyNote className="h-4 w-4 text-muted-foreground" />
                   <h3 className="font-display font-semibold">Notes</h3>
                 </div>
-                <p className="mt-2 rounded-xl border border-border/60 bg-card/40 p-3 text-sm text-muted-foreground">{task.notes}</p>
+                <p className="mt-2 rounded-xl border border-border/60 bg-card/40 p-3 text-sm text-muted-foreground">
+                  {task.notes}
+                </p>
               </>
             )}
           </div>
@@ -241,13 +272,23 @@ function TaskDetailPage() {
             {task.attachments && task.attachments.length > 0 ? (
               <ul className="mt-3 space-y-2">
                 {task.attachments.map((a, i) => (
-                  <li key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm">
+                  <li
+                    key={i}
+                    className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm"
+                  >
                     {a.url ? (
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 font-medium text-primary hover:underline">
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 font-medium text-primary hover:underline"
+                      >
                         <Paperclip className="h-3.5 w-3.5" /> {a.name}
                       </a>
                     ) : (
-                      <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> {a.name}</span>
+                      <span className="flex items-center gap-2">
+                        <Paperclip className="h-3.5 w-3.5" /> {a.name}
+                      </span>
                     )}
                     <span className="text-xs text-muted-foreground">{a.size}</span>
                   </li>
@@ -270,17 +311,25 @@ function TaskDetailPage() {
                 </div>
                 {task.submittedBy && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Submitted by {task.submittedBy} {task.submittedAt ? `on ${new Date(task.submittedAt).toLocaleDateString()}` : ""}
+                    Submitted by {task.submittedBy}{" "}
+                    {task.submittedAt
+                      ? `on ${new Date(task.submittedAt).toLocaleDateString()}`
+                      : ""}
                   </p>
                 )}
                 <ul className="mt-3 space-y-2">
                   {task.proofFiles.map((proof, i) => (
-                    <li key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm">
+                    <li
+                      key={i}
+                      className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-sm"
+                    >
                       <span className="flex items-center gap-2 font-medium">
                         <Paperclip className="h-3.5 w-3.5 text-primary" /> {proof.name}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{proof.size || "File"}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {proof.size || "File"}
+                        </span>
                         {proof.url && (
                           <a
                             href={proof.url}
@@ -346,15 +395,16 @@ function TaskDetailPage() {
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
-                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">
-                                {req.avatar}
-                              </span>
+                              <UserAvatar
+                                name={req.name}
+                                image={getAvatarUrl(req)}
+                                className="h-7 w-7 text-[10px]"
+                                fallbackClassName="text-[10px] bg-primary/20 text-primary"
+                              />
                               <span className="font-medium text-foreground">{req.name}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
-                            {req.email}
-                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{req.email}</td>
                           <td className="px-4 py-3 text-xs text-muted-foreground">
                             {formatRequestedAt(req.requestedAt)}
                           </td>
@@ -411,23 +461,46 @@ function TaskDetailPage() {
             <Row icon={User} label="Assignee">
               {assignee ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/20 text-[10px] font-semibold text-primary">{assignee.avatar}</span>
+                  <UserAvatar
+                    name={assignee.name}
+                    image={getAvatarUrl(assignee)}
+                    className="h-6 w-6 text-[10px]"
+                    fallbackClassName="text-[10px] bg-primary/20 text-primary"
+                  />
                   {assignee.name}
                 </span>
-              ) : "Unassigned"}
+              ) : (
+                "Unassigned"
+              )}
             </Row>
             <Row icon={CalendarDays} label="Deadline">
               <div className="text-right">
-                <div>{new Date(task.dueDate).toLocaleDateString(undefined, { dateStyle: "medium" })}</div>
-                <div className={`text-xs ${daysLeft < 0 ? "text-destructive" : daysLeft <= 3 ? "text-warning" : "text-muted-foreground"}`}>
-                  {daysLeft < 0 ? `${-daysLeft}d overdue` : daysLeft === 0 ? "Due today" : `${daysLeft}d left`}
+                <div>
+                  {new Date(task.dueDate).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                </div>
+                <div
+                  className={`text-xs ${daysLeft < 0 ? "text-destructive" : daysLeft <= 3 ? "text-warning" : "text-muted-foreground"}`}
+                >
+                  {daysLeft < 0
+                    ? `${-daysLeft}d overdue`
+                    : daysLeft === 0
+                      ? "Due today"
+                      : `${daysLeft}d left`}
                 </div>
               </div>
             </Row>
-            <Row icon={Trophy} label="Reward"><span className="font-medium">{task.points} pts</span></Row>
-            <Row icon={FileText} label="Category">{getCategoryLabel(task.category)}</Row>
-            <Row icon={User} label="Created by">{creator}</Row>
-            <Row icon={CalendarDays} label="Created">{new Date(task.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</Row>
+            <Row icon={Trophy} label="Reward">
+              <span className="font-medium">{task.points} pts</span>
+            </Row>
+            <Row icon={FileText} label="Category">
+              {getCategoryLabel(task.category)}
+            </Row>
+            <Row icon={User} label="Created by">
+              {creator}
+            </Row>
+            <Row icon={CalendarDays} label="Created">
+              {new Date(task.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}
+            </Row>
           </dl>
         </div>
       </div>
@@ -436,7 +509,9 @@ function TaskDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{task.title}"?</AlertDialogTitle>
-            <AlertDialogDescription>This task and its history will be removed. This action can't be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This task and its history will be removed. This action can't be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -456,10 +531,20 @@ function TaskDetailPage() {
   );
 }
 
-function Row({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
+function Row({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <dt className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</dt>
+      <dt className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </dt>
       <dd className="text-right text-sm">{children}</dd>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarClock, Star, Trophy, Users } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import type { AuthUser } from "@/auth/types/auth";
 import type { LeaderboardEntry } from "@/features/leaderboard/types";
 import type { Task } from "@/features/tasks/types";
@@ -55,7 +56,12 @@ export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
 
   return (
     <div className="glass rounded-2xl p-5">
-      <WidgetHeader icon={CalendarClock} title="Upcoming deadlines" linkTo="/admin/tasks" linkLabel="All tasks" />
+      <WidgetHeader
+        icon={CalendarClock}
+        title="Upcoming deadlines"
+        linkTo="/admin/tasks"
+        linkLabel="All tasks"
+      />
       {activeDeadlines.length === 0 ? (
         <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
           <CalendarClock className="mb-2 h-6 w-6 opacity-40" />
@@ -79,7 +85,10 @@ export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
             const categoryName = getDisplayName(t.category || t.taskType, "General");
 
             return (
-              <li key={t.id || (t as any)._id} className="rounded-xl border border-border/60 bg-card/40 p-3">
+              <li
+                key={t.id || (t as any)._id}
+                className="rounded-xl border border-border/60 bg-card/40 p-3"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
@@ -94,7 +103,9 @@ export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
                     </p>
                   </div>
                   {dueDate && (
-                    <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}>
+                    <span
+                      className={`shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-medium ${tone}`}
+                    >
                       {days === 0 ? "Today" : `${days}d`}
                     </span>
                   )}
@@ -111,7 +122,12 @@ export function UpcomingDeadlines({ tasks = [] }: { tasks?: Task[] }) {
 export function LeaderboardPreview({ entries = [] }: { entries?: LeaderboardEntry[] }) {
   return (
     <div className="glass rounded-2xl p-5">
-      <WidgetHeader icon={Trophy} title="Leaderboard" linkTo="/admin/leaderboard" linkLabel="Full board" />
+      <WidgetHeader
+        icon={Trophy}
+        title="Leaderboard"
+        linkTo="/admin/leaderboard"
+        linkLabel="Full board"
+      />
       {entries.length === 0 ? (
         <div className="mt-6 flex h-36 flex-col items-center justify-center text-center text-xs text-muted-foreground">
           <Trophy className="mb-2 h-6 w-6 opacity-40" />
@@ -124,22 +140,27 @@ export function LeaderboardPreview({ entries = [] }: { entries?: LeaderboardEntr
             const name = getDisplayName(e.name || e.user?.name || e.user, "User");
             const avatar = name.slice(0, 2).toUpperCase();
             const departmentName = getDisplayName(
-              e.user?.department || (e as any).department || (e as any).departmentId,
-              "General"
+              e.user?.department || (e as Record<string, unknown>).department || (e as Record<string, unknown>).departmentId,
+              "General",
             );
 
             return (
               <li key={e._id || index} className="flex items-center gap-3">
                 <div
                   className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                    rank === 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
+                    rank === 1
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-foreground"
                   }`}
                 >
                   {rank}
                 </div>
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-                  {avatar}
-                </div>
+                <UserAvatar
+                  user={e.user || e}
+                  name={name}
+                  image={getAvatarUrl(e.user) || getAvatarUrl(e)}
+                  className="h-8 w-8 text-[11px] shrink-0"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{name}</p>
                   <p className="text-xs text-muted-foreground">{departmentName}</p>
@@ -186,16 +207,22 @@ export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[
               employees.map((e) => {
                 const name = getDisplayName(e.name, "Employee");
                 const avatar = name.slice(0, 2).toUpperCase();
-                const departmentName = getDisplayName(e.department || (e as any).departmentId, "—");
+                const departmentName = getDisplayName(e.department || (e as unknown as Record<string, unknown>).departmentId, "—");
                 const joinedDate = e.joinDate || e.createdAt;
 
                 return (
-                  <tr key={e.id || e._id} className="border-t border-border/60 transition-colors hover:bg-secondary/30">
+                  <tr
+                    key={e.id || e._id}
+                    className="border-t border-border/60 transition-colors hover:bg-secondary/30"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-[11px] font-semibold">
-                          {avatar}
-                        </div>
+                        <UserAvatar
+                          user={e}
+                          name={name}
+                          image={getAvatarUrl(e)}
+                          className="h-8 w-8 text-[11px] shrink-0"
+                        />
                         <div>
                           <Link
                             to="/admin/employees/$id"
@@ -218,7 +245,9 @@ export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[
                           })
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold">{Number(e.points || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      {Number(e.points || 0).toLocaleString()}
+                    </td>
                   </tr>
                 );
               })
@@ -229,5 +258,3 @@ export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[
     </div>
   );
 }
-
-

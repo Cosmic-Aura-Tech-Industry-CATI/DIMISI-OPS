@@ -13,7 +13,12 @@ export interface AuthUser {
   designation?: string;
   department?: string;
   avatar?: string;
+  avtar?: string;
+  avatarUrl?: string;
+  photo?: string;
+  profileImage?: string;
   isActive?: boolean;
+  status?: string;
   points?: number;
   phone?: string;
   joinDate?: string;
@@ -138,5 +143,3 @@ export interface OAuthLoginResponse {
     refreshToken: string;
   };
 }
-
-

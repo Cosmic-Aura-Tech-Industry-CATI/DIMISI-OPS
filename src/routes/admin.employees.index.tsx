@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { RecordCard } from "@/components/record-card";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
-import { useEmployeesQuery, useRevokeEmployeeAccess, EditEmployeeDialog } from "@/features/employees";
+import {
+  useEmployeesQuery,
+  useRevokeEmployeeAccess,
+  EditEmployeeDialog,
+} from "@/features/employees";
 import { useDepartmentsQuery } from "@/features/departments";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/search";
@@ -125,10 +130,7 @@ function EmployeesPage() {
   const revokeMutation = useRevokeEmployeeAccess();
 
   // Integrate backend search API: GET /api/v1/search/users?q=...&role=employee
-  const {
-    data: searchResponse,
-    isFetching: isSearching,
-  } = useSearchUsers(
+  const { data: searchResponse, isFetching: isSearching } = useSearchUsers(
     debouncedQuery,
     {
       role: "employee",
@@ -152,7 +154,8 @@ function EmployeesPage() {
             name: u.name,
             email: u.email,
             role: u.role,
-            avatar: u.avatar,
+            avatar: getAvatarUrl(u) || u.avatar || (u as any).avtar,
+            avatarUrl: getAvatarUrl(u),
             department: typeof u.department === "object" ? u.department?.name : u.department,
             designation: typeof u.designation === "object" ? u.designation?.name : u.designation,
             isActive: true,
@@ -182,6 +185,7 @@ function EmployeesPage() {
         jobTitle: titleName,
         department: deptName,
         avatar: initials(e.name || "Employee"),
+        avatarUrl: getAvatarUrl(e),
         points: e.points ?? 0,
         status: e.isActive ? "active" : "inactive",
         joinedAt: e.joinDate || e.createdAt || new Date().toISOString(),
@@ -192,15 +196,14 @@ function EmployeesPage() {
 
   const departments = useMemo(() => {
     if (departmentsData.length > 0) {
-      return Array.from(new Set(departmentsData.map((d: any) => d.name))).filter(Boolean).sort();
+      return Array.from(new Set(departmentsData.map((d: any) => d.name)))
+        .filter(Boolean)
+        .sort();
     }
     return Array.from(new Set(all.map((e) => e.department))).sort();
   }, [departmentsData, all]);
 
-  const jobTitles = useMemo(
-    () => Array.from(new Set(all.map((e) => e.jobTitle))).sort(),
-    [all],
-  );
+  const jobTitles = useMemo(() => Array.from(new Set(all.map((e) => e.jobTitle))).sort(), [all]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -237,13 +240,13 @@ function EmployeesPage() {
     ? Boolean(searchResponse?.pagination)
     : Boolean(responseData?.pagination);
   const totalRecords = isSearchActive
-    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
-    : responseData?.pagination?.totalRecords ?? filtered.length;
+    ? (searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length)
+    : (responseData?.pagination?.totalRecords ?? filtered.length);
   const pages = Math.max(
     1,
     isSearchActive
-      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
-      : responseData?.pagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE),
+      ? (searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE))
+      : (responseData?.pagination?.totalPages ?? Math.ceil(filtered.length / PAGE_SIZE)),
   );
   const current = Math.min(page, pages);
 
@@ -398,7 +401,9 @@ function EmployeesPage() {
         <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
           <AlertCircle className="h-8 w-8 text-destructive" />
           <h3 className="font-semibold text-destructive">Failed to load employees</h3>
-          <p className="text-sm text-muted-foreground">{error?.message || "An unexpected error occurred."}</p>
+          <p className="text-sm text-muted-foreground">
+            {error?.message || "An unexpected error occurred."}
+          </p>
           <Button variant="outline" onClick={() => void refetch()}>
             Retry
           </Button>
@@ -430,12 +435,19 @@ function EmployeesPage() {
                 key={e.id}
                 index={i}
                 avatar={
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-xs font-semibold">
-                    {e.avatar}
-                  </div>
+                  <UserAvatar
+                    user={e.raw}
+                    name={e.name}
+                    image={e.avatarUrl}
+                    className="h-9 w-9 text-xs"
+                  />
                 }
                 title={
-                  <Link to="/admin/employees/$id" params={{ id: e.id }} className="hover:text-primary">
+                  <Link
+                    to="/admin/employees/$id"
+                    params={{ id: e.id }}
+                    className="hover:text-primary"
+                  >
                     {e.name}
                   </Link>
                 }
@@ -446,8 +458,11 @@ function EmployeesPage() {
                       {e.jobTitle}
                     </Badge>
                     <span
-                      className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
-                        }`}
+                      className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${
+                        e.status === "active"
+                          ? "bg-success/15 text-success"
+                          : "bg-muted text-muted-foreground"
+                      }`}
                     >
                       <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
                       {e.status}
@@ -476,7 +491,11 @@ function EmployeesPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem asChild>
-                        <Link to="/admin/employees/$id" params={{ id: e.id }} className="flex items-center">
+                        <Link
+                          to="/admin/employees/$id"
+                          params={{ id: e.id }}
+                          className="flex items-center"
+                        >
                           <Eye className="mr-2 h-4 w-4" /> View details
                         </Link>
                       </DropdownMenuItem>
@@ -505,19 +524,39 @@ function EmployeesPage() {
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3 font-medium">
-                    <SortButton label="Employee" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} />
+                    <SortButton
+                      label="Employee"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("name")}
+                    />
                   </th>
                   <th className="hidden px-5 py-3 font-medium xl:table-cell">ID</th>
                   <th className="px-5 py-3 font-medium">
-                    <SortButton label="Department" active={sortKey === "department"} dir={sortDir} onClick={() => toggleSort("department")} />
+                    <SortButton
+                      label="Department"
+                      active={sortKey === "department"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("department")}
+                    />
                   </th>
                   <th className="px-5 py-3 font-medium">Role</th>
                   <th className="px-5 py-3 font-medium">
-                    <SortButton label="Points" active={sortKey === "points"} dir={sortDir} onClick={() => toggleSort("points")} />
+                    <SortButton
+                      label="Points"
+                      active={sortKey === "points"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("points")}
+                    />
                   </th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">
-                    <SortButton label="Joined" active={sortKey === "joinedAt"} dir={sortDir} onClick={() => toggleSort("joinedAt")} />
+                    <SortButton
+                      label="Joined"
+                      active={sortKey === "joinedAt"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("joinedAt")}
+                    />
                   </th>
                   <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
@@ -531,9 +570,12 @@ function EmployeesPage() {
                   >
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-xs font-semibold">
-                          {e.avatar}
-                        </div>
+                        <UserAvatar
+                          user={e.raw}
+                          name={e.name}
+                          image={e.avatarUrl}
+                          className="h-9 w-9 text-xs"
+                        />
                         <div className="min-w-0">
                           <Link
                             to="/admin/employees/$id"
@@ -546,7 +588,9 @@ function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="hidden px-5 py-3.5 font-mono text-xs text-muted-foreground xl:table-cell">{e.code}</td>
+                    <td className="hidden px-5 py-3.5 font-mono text-xs text-muted-foreground xl:table-cell">
+                      {e.code}
+                    </td>
                     <td className="px-5 py-3.5">{e.department}</td>
                     <td className="px-5 py-3.5">
                       <Badge variant="secondary" className="whitespace-nowrap rounded-full">
@@ -556,8 +600,11 @@ function EmployeesPage() {
                     <td className="px-5 py-3.5 font-semibold">{e.points.toLocaleString()}</td>
                     <td className="px-5 py-3.5">
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${e.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
-                          }`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          e.status === "active"
+                            ? "bg-success/15 text-success"
+                            : "bg-muted text-muted-foreground"
+                        }`}
                       >
                         <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
                         {e.status}
@@ -579,7 +626,11 @@ function EmployeesPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem asChild>
-                            <Link to="/admin/employees/$id" params={{ id: e.id }} className="flex items-center">
+                            <Link
+                              to="/admin/employees/$id"
+                              params={{ id: e.id }}
+                              className="flex items-center"
+                            >
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </Link>
                           </DropdownMenuItem>
@@ -609,8 +660,8 @@ function EmployeesPage() {
           <div className="flex flex-col items-center justify-between gap-3 border-t border-border/60 px-5 py-3 sm:flex-row">
             <span className="text-xs text-muted-foreground">
               Showing {slice.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1}–
-              {Math.min((current - 1) * PAGE_SIZE + slice.length, totalRecords)} of {totalRecords} employees
-              (Page {current} of {pages})
+              {Math.min((current - 1) * PAGE_SIZE + slice.length, totalRecords)} of {totalRecords}{" "}
+              employees (Page {current} of {pages})
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -640,9 +691,7 @@ function EmployeesPage() {
                     </Button>
                   );
                 })}
-              {pages > 5 && (
-                <span className="px-1 text-xs text-muted-foreground">…</span>
-              )}
+              {pages > 5 && <span className="px-1 text-xs text-muted-foreground">…</span>}
               <Button
                 variant="outline"
                 size="icon"
@@ -713,13 +762,15 @@ function SortButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground ${active ? "text-foreground" : ""
-        }`}
+      className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground ${
+        active ? "text-foreground" : ""
+      }`}
     >
       {label}
       <ArrowUpDown
-        className={`h-3 w-3 transition-transform ${active && dir === "desc" ? "rotate-180" : ""
-          } ${active ? "text-primary" : "opacity-50"}`}
+        className={`h-3 w-3 transition-transform ${
+          active && dir === "desc" ? "rotate-180" : ""
+        } ${active ? "text-primary" : "opacity-50"}`}
       />
     </button>
   );

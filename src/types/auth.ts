@@ -11,7 +11,12 @@ export interface AuthUser {
   designation?: string;
   department?: string;
   avatar?: string;
+  avtar?: string;
+  avatarUrl?: string;
+  photo?: string;
+  profileImage?: string;
   isActive?: boolean;
+  status?: string;
   createdAt?: string;
 }
 

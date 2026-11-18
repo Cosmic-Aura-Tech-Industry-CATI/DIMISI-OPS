@@ -94,7 +94,7 @@ function EditTaskPage() {
       input.projectId = v.projectId;
       hasChanges = true;
     }
-    if (v.taskType === "direct" && v.assigneeId !== initialValues.assigneeId) {
+    if (v.taskType === "direct" && (v.assigneeId !== initialValues.assigneeId || v.taskType !== initialValues.taskType)) {
       input.assigneeId = v.assigneeId;
       hasChanges = true;
     }

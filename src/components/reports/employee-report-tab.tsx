@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CompletionMeter, TablePanel } from "./report-panels";
+import { UserAvatar } from "@/components/user-avatar";
 import type { EmployeeReportRow } from "./use-report-data";
 
 export function EmployeeReportTab({
@@ -43,9 +44,7 @@ export function EmployeeReportTab({
             <TableRow key={e.id} className="border-border/40">
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-accent text-xs font-semibold">
-                    {e.avatar}
-                  </div>
+                  <UserAvatar name={e.name} image={e.avatarUrl} className="h-9 w-9 text-xs" />
                   <div className="font-medium">{e.name}</div>
                 </div>
               </TableCell>
