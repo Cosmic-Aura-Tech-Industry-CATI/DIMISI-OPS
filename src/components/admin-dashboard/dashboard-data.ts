@@ -57,7 +57,7 @@ export function getOverviewData() {
     latestEmployees: [...employees]
       .sort((a, b) => +new Date(a.joinedAt) - +new Date(b.joinedAt))
       .slice(0, 5),
-    topFive: leaderboard.slice(0, 5),
+    topFive: leaderboard.filter((e) => e.status === "active").slice(0, 5),
     recentActivity: activityLogs.slice(0, 6),
   };
 }

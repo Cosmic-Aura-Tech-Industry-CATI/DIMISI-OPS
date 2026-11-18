@@ -47,9 +47,9 @@ export const API_ENDPOINTS = {
   tasks: {
     list: "/tasks",
     detail: (id: string) => `/tasks/${id}`,
-    create: "/tasks",
+    create: getApiV2Endpoint("/tasks"),
     createV2: getApiV2Endpoint("/tasks"),
-    update: (id: string) => `/tasks/${id}`,
+    update: (id: string) => getApiV2Endpoint(`/tasks/${id}`),
     updateV2: (id: string) => getApiV2Endpoint(`/tasks/${id}`),
     delete: (id: string) => `/tasks/${id}`,
     request: (id: string) => `/tasks/${id}/request`,

@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { useAuth } from "@/lib/auth";
 import { StatCard } from "@/components/stat-card";
 import { useMemo } from "react";
@@ -62,7 +63,11 @@ function AdminProfilePage() {
       try {
         const d = new Date(rawJoin);
         if (!isNaN(d.getTime())) {
-          joinDate = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+          joinDate = d.toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
         }
       } catch {
         joinDate = "—";
@@ -100,13 +105,13 @@ function AdminProfilePage() {
         {/* Profile Card */}
         <div className="glass flex flex-col items-center rounded-2xl p-6 text-center">
           <div className="relative mb-4">
-            <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full bg-linear-to-br from-primary to-accent font-display text-4xl font-bold shadow-glow ring-4 ring-background">
-              {details.isImageAvatar ? (
-                <img src={details.avatar} alt={details.name} className="h-full w-full object-cover" />
-              ) : (
-                <span>{details.avatar}</span>
-              )}
-            </div>
+            <UserAvatar
+              user={user}
+              name={details.name}
+              image={getAvatarUrl(user) || (details.isImageAvatar ? details.avatar : undefined)}
+              className="h-28 w-28 text-4xl shadow-glow ring-4 ring-background"
+              fallbackClassName="text-4xl bg-gradient-to-br from-primary to-accent font-display font-bold text-primary-foreground"
+            />
             <span className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-success text-success-foreground ring-2 ring-background">
               <ShieldCheck className="h-3.5 w-3.5" />
             </span>
@@ -147,15 +152,23 @@ function AdminProfilePage() {
         {/* Info & Quick Actions */}
         <div className="space-y-6 lg:col-span-2">
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard label="Role privileges" value="Full Access" icon={ShieldCheck} accent="primary" />
+            <StatCard
+              label="Role privileges"
+              value="Full Access"
+              icon={ShieldCheck}
+              accent="primary"
+            />
             <StatCard label="Security tier" value="2FA Active" icon={Key} accent="success" />
             <StatCard label="System status" value="Active" icon={Activity} accent="info" />
           </div>
 
           <div className="glass rounded-2xl p-6">
-            <h3 className="font-display text-base font-semibold">Administrator Access & Controls</h3>
+            <h3 className="font-display text-base font-semibold">
+              Administrator Access & Controls
+            </h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              As an administrator, your account is granted full workspace management privileges including user access, audit logs, task approvals, and system reporting.
+              As an administrator, your account is granted full workspace management privileges
+              including user access, audit logs, task approvals, and system reporting.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -164,7 +177,9 @@ function AdminProfilePage() {
                   <Edit className="mr-3 h-4 w-4 text-primary" />
                   <div className="text-left">
                     <div className="text-sm font-medium">Update Profile</div>
-                    <div className="text-[11px] text-muted-foreground">Change photo & phone number</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      Change photo & phone number
+                    </div>
                   </div>
                 </Link>
               </Button>
@@ -173,7 +188,9 @@ function AdminProfilePage() {
                   <Key className="mr-3 h-4 w-4 text-primary" />
                   <div className="text-left">
                     <div className="text-sm font-medium">Security & Password</div>
-                    <div className="text-[11px] text-muted-foreground">Password, 2FA & sessions</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      Password, 2FA & sessions
+                    </div>
                   </div>
                 </Link>
               </Button>

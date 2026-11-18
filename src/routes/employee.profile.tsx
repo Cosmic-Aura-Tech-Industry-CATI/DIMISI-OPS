@@ -28,6 +28,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +130,10 @@ const formatDateSafe = (
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return fallback;
-    return d.toLocaleDateString(undefined, options || { day: "numeric", month: "long", year: "numeric" });
+    return d.toLocaleDateString(
+      undefined,
+      options || { day: "numeric", month: "long", year: "numeric" },
+    );
   } catch {
     return fallback;
   }
@@ -196,9 +200,15 @@ export const Route = createFileRoute("/employee/profile")({
   head: () => ({
     meta: [
       { title: "Profile — Dimisi Operations" },
-      { name: "description", content: "Your performance, achievements, and verified profile data." },
+      {
+        name: "description",
+        content: "Your performance, achievements, and verified profile data.",
+      },
       { property: "og:title", content: "Profile — Dimisi Operations" },
-      { property: "og:description", content: "Your performance, achievements, and verified profile data." },
+      {
+        property: "og:description",
+        content: "Your performance, achievements, and verified profile data.",
+      },
     ],
   }),
   component: ProfilePage,
@@ -214,10 +224,7 @@ function ProfilePage() {
   const [editOpen, setEditOpen] = useState<boolean>(false);
 
   // Queries with real database fetching
-  const {
-    data: departmentsData = [],
-    isLoading: isDeptsLoading,
-  } = useDepartmentsQuery();
+  const { data: departmentsData = [], isLoading: isDeptsLoading } = useDepartmentsQuery();
 
   const {
     data: liveTasks = [],
@@ -258,7 +265,9 @@ function ProfilePage() {
   }, [assignedTasks, pendingTasks, completedTasks, liveTasks, user]);
 
   const completed = useMemo(
-    () => myTasks.filter((t) => t.status === "completed" || (t.status as string) === "Completed").length,
+    () =>
+      myTasks.filter((t) => t.status === "completed" || (t.status as string) === "Completed")
+        .length,
     [myTasks],
   );
 
@@ -445,7 +454,11 @@ function ProfilePage() {
     }
 
     // If analytics API provided weekly progress, merge
-    if (analytics?.weeklyProgress && analytics.weeklyProgress.length > 0 && weeks.every((w) => w.points === 0)) {
+    if (
+      analytics?.weeklyProgress &&
+      analytics.weeklyProgress.length > 0 &&
+      weeks.every((w) => w.points === 0)
+    ) {
       return analytics.weeklyProgress.map((wp) => ({
         week: wp.day,
         points: wp.completed * 25,
@@ -490,7 +503,12 @@ function ProfilePage() {
 
   const stats: StatItem[] = useMemo(
     () => [
-      { label: "Total points", value: e.points.toLocaleString(), Icon: Sparkles, tone: "text-primary" },
+      {
+        label: "Total points",
+        value: e.points.toLocaleString(),
+        Icon: Sparkles,
+        tone: "text-primary",
+      },
       { label: "Completed", value: completed, Icon: CheckCircle2, tone: "text-primary" },
       { label: "Active", value: active, Icon: Clock, tone: "text-primary" },
       { label: "Completion", value: `${completionRate}%`, Icon: TrendingUp, tone: "text-primary" },
@@ -539,17 +557,14 @@ function ProfilePage() {
           <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:32px_32px]" />
         </div>
         <div className="-mt-12 flex flex-col gap-5 p-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
-          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border/60 bg-muted font-display text-2xl font-bold text-foreground shadow-lg ring-4 ring-background sm:h-24 sm:w-24 sm:text-3xl">
-            {isImageAvatar ? (
-              <img
-                src={avatarSrc}
-                alt={`${e.name} profile photo`}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span>{avatarSrc || e.name.slice(0, 2).toUpperCase()}</span>
-            )}
-          </div>
+          <UserAvatar
+            user={user}
+            name={e.name}
+            image={avatarSrc}
+            className="h-20 w-20 shrink-0 rounded-2xl border border-border/60 shadow-lg ring-4 ring-background sm:h-24 sm:w-24 text-2xl sm:text-3xl"
+            fallbackClassName="rounded-2xl text-2xl sm:text-3xl bg-muted font-display font-bold text-foreground"
+            shape="rounded"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-xl font-semibold sm:text-2xl">{e.name}</h2>
@@ -594,7 +609,10 @@ function ProfilePage() {
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button className="w-full rounded-md shadow-glow sm:w-auto" onClick={() => setEditOpen(true)}>
+            <Button
+              className="w-full rounded-md shadow-glow sm:w-auto"
+              onClick={() => setEditOpen(true)}
+            >
               Edit profile
             </Button>
           </div>
@@ -629,11 +647,17 @@ function ProfilePage() {
               { Icon: Layers, label: "Designation", value: e.jobTitle },
               { Icon: Mail, label: "Email", value: e.email },
               { Icon: Phone, label: "Phone", value: editable.phone || e.phone || "—" },
-              { Icon: Shield, label: "Account Status", value: e.status === "active" ? "Active" : "Inactive" },
+              {
+                Icon: Shield,
+                label: "Account Status",
+                value: e.status === "active" ? "Active" : "Inactive",
+              },
               {
                 Icon: Calendar,
                 label: "Joined",
-                value: e.joinedAt ? formatDateSafe(e.joinedAt, { day: "numeric", month: "long", year: "numeric" }) : "—",
+                value: e.joinedAt
+                  ? formatDateSafe(e.joinedAt, { day: "numeric", month: "long", year: "numeric" })
+                  : "—",
               },
             ].map(({ Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3">
@@ -641,7 +665,9 @@ function ProfilePage() {
                   <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                    {label}
+                  </dt>
                   <dd className="mt-0.5 truncate font-medium">{value}</dd>
                 </div>
               </div>
@@ -654,7 +680,9 @@ function ProfilePage() {
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-display text-lg font-semibold">Performance</h3>
-              <p className="text-xs text-muted-foreground">Weekly points and completed tasks trend</p>
+              <p className="text-xs text-muted-foreground">
+                Weekly points and completed tasks trend
+              </p>
             </div>
             {performanceTrendDelta && (
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
@@ -672,9 +700,24 @@ function ProfilePage() {
                       <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeDasharray="3 3"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="week"
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip
                     contentStyle={{
                       background: "#141414",
@@ -728,9 +771,24 @@ function ProfilePage() {
                       <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeDasharray="3 3"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="week"
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip
                     contentStyle={{
                       background: "#141414",
@@ -764,15 +822,32 @@ function ProfilePage() {
               <h3 className="font-display text-lg font-semibold">Weekly tasks</h3>
               <p className="text-xs text-muted-foreground">Tasks completed per week</p>
             </div>
-            <Badge variant="outline" className="border-border/60">Last 8 weeks</Badge>
+            <Badge variant="outline" className="border-border/60">
+              Last 8 weeks
+            </Badge>
           </div>
           <div className="mt-4 h-56">
             {weeklyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyTrend}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="week" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeDasharray="3 3"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="week"
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.4)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip
                     contentStyle={{
                       background: "#141414",
@@ -782,7 +857,12 @@ function ProfilePage() {
                       color: "#fff",
                     }}
                   />
-                  <Bar dataKey="tasks" name="Tasks Completed" fill="#C9A961" radius={[6, 6, 0, 0]} />
+                  <Bar
+                    dataKey="tasks"
+                    name="Tasks Completed"
+                    fill="#C9A961"
+                    radius={[6, 6, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -823,7 +903,8 @@ function ProfilePage() {
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                     <div className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading task history...
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading task
+                      history...
                     </div>
                   </TableCell>
                 </TableRow>
@@ -839,8 +920,12 @@ function ProfilePage() {
                         {t.title}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{getCategoryLabel(t.category)}</TableCell>
-                    <TableCell><TaskStatusBadge status={t.status} reviewState={t.reviewState} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {getCategoryLabel(t.category)}
+                    </TableCell>
+                    <TableCell>
+                      <TaskStatusBadge status={t.status} reviewState={t.reviewState} />
+                    </TableCell>
                     <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {formatDateSafe(t.dueDate, { day: "numeric", month: "short" })}

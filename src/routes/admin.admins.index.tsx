@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { RecordCard } from "@/components/record-card";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { AuthUser } from "@/auth/types/auth";
-import { useAdminsQuery, useAdminStatsQuery, useRevokeAdminAccess, EditAdminDialog } from "@/features/admins";
+import {
+  useAdminsQuery,
+  useAdminStatsQuery,
+  useRevokeAdminAccess,
+  EditAdminDialog,
+} from "@/features/admins";
 import { useDepartmentsQuery } from "@/features/departments";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/features/search";
@@ -111,15 +117,19 @@ function AdminsPage() {
     [page, status, departmentId, sortKey, sortDir],
   );
 
-  const { data: responseData, isLoading: isBaseLoading, isError, error, refetch, isRefetching } = useAdminsQuery(queryFilters);
+  const {
+    data: responseData,
+    isLoading: isBaseLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useAdminsQuery(queryFilters);
   const { data: statsData } = useAdminStatsQuery();
   const revokeMutation = useRevokeAdminAccess();
 
   // Integrate backend search API: GET /api/v1/search/users?q=...&role=admin
-  const {
-    data: searchResponse,
-    isFetching: isSearching,
-  } = useSearchUsers(
+  const { data: searchResponse, isFetching: isSearching } = useSearchUsers(
     debouncedQuery,
     {
       role: "admin",
@@ -143,7 +153,8 @@ function AdminsPage() {
             name: u.name,
             email: u.email,
             role: u.role,
-            avatar: u.avatar,
+            avatar: getAvatarUrl(u) || u.avatar || (u as any).avtar,
+            avatarUrl: getAvatarUrl(u),
             department: typeof u.department === "object" ? u.department?.name : u.department,
             designation: typeof u.designation === "object" ? u.designation?.name : u.designation,
             isActive: true,
@@ -176,6 +187,7 @@ function AdminsPage() {
         jobTitle: titleName,
         department: deptName,
         avatar: initials(a.name || "Admin"),
+        avatarUrl: getAvatarUrl(a),
         status: a.isActive ? "active" : "inactive",
         joinedAt: a.joinDate || a.createdAt || new Date().toISOString(),
         permanent: isDirector,
@@ -187,7 +199,9 @@ function AdminsPage() {
 
   const departments = useMemo(() => {
     if (departmentsData.length > 0) {
-      return Array.from(new Set(departmentsData.map((d: any) => d.name))).filter(Boolean).sort();
+      return Array.from(new Set(departmentsData.map((d: any) => d.name)))
+        .filter(Boolean)
+        .sort();
     }
     return Array.from(new Set(admins.map((a) => a.department))).sort();
   }, [departmentsData, admins]);
@@ -249,13 +263,13 @@ function AdminsPage() {
     : Boolean(responseData?.pagination);
 
   const totalRecords = isSearchActive
-    ? searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length
-    : responseData?.pagination?.totalRecords ?? filtered.length;
+    ? (searchResponse?.pagination?.totalItems ?? searchResponse?.total ?? filtered.length)
+    : (responseData?.pagination?.totalRecords ?? filtered.length);
   const pages = Math.max(
     1,
     isSearchActive
-      ? searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)
-      : responseData?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE),
+      ? (searchResponse?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE))
+      : (responseData?.pagination?.totalPages ?? Math.ceil(totalRecords / PAGE_SIZE)),
   );
   const current = Math.min(page, pages);
   const slice = isServerPaginated
@@ -278,9 +292,16 @@ function AdminsPage() {
     setPage(1);
   };
 
-  const totalCount = typeof statsData?.totalAdmins === "number" ? statsData.totalAdmins : admins.length;
-  const activeCount = typeof statsData?.activeAdmins === "number" ? statsData.activeAdmins : admins.filter((a) => a.status === "active").length;
-  const deptCount = typeof statsData?.departmentsCount === "number" ? statsData.departmentsCount : departments.length;
+  const totalCount =
+    typeof statsData?.totalAdmins === "number" ? statsData.totalAdmins : admins.length;
+  const activeCount =
+    typeof statsData?.activeAdmins === "number"
+      ? statsData.activeAdmins
+      : admins.filter((a) => a.status === "active").length;
+  const deptCount =
+    typeof statsData?.departmentsCount === "number"
+      ? statsData.departmentsCount
+      : departments.length;
 
   return (
     <>
@@ -385,7 +406,9 @@ function AdminsPage() {
         <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
           <AlertCircle className="h-8 w-8 text-destructive" />
           <h3 className="font-semibold text-destructive">Failed to load admins</h3>
-          <p className="text-sm text-muted-foreground">{error?.message || "An unexpected error occurred."}</p>
+          <p className="text-sm text-muted-foreground">
+            {error?.message || "An unexpected error occurred."}
+          </p>
           <Button variant="outline" onClick={() => void refetch()}>
             Retry
           </Button>
@@ -434,7 +457,9 @@ function AdminsPage() {
                     </Badge>
                     <span
                       className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${
-                        a.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                        a.status === "active"
+                          ? "bg-success/15 text-success"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" /> {a.status}
@@ -462,7 +487,11 @@ function AdminsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem asChild>
-                        <Link to="/admin/admins/$id" params={{ id: a.id }} className="flex items-center">
+                        <Link
+                          to="/admin/admins/$id"
+                          params={{ id: a.id }}
+                          className="flex items-center"
+                        >
                           <Eye className="mr-2 h-4 w-4" /> View details
                         </Link>
                       </DropdownMenuItem>
@@ -493,16 +522,31 @@ function AdminsPage() {
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3 font-medium">
-                    <SortBtn label="Admin" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} />
+                    <SortBtn
+                      label="Admin"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("name")}
+                    />
                   </th>
                   <th className="hidden px-5 py-3 font-medium xl:table-cell">ID</th>
                   <th className="px-5 py-3 font-medium">
-                    <SortBtn label="Department" active={sortKey === "department"} dir={sortDir} onClick={() => toggleSort("department")} />
+                    <SortBtn
+                      label="Department"
+                      active={sortKey === "department"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("department")}
+                    />
                   </th>
                   <th className="px-5 py-3 font-medium">Role</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">
-                    <SortBtn label="Added" active={sortKey === "joinedAt"} dir={sortDir} onClick={() => toggleSort("joinedAt")} />
+                    <SortBtn
+                      label="Added"
+                      active={sortKey === "joinedAt"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("joinedAt")}
+                    />
                   </th>
                   <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
@@ -531,17 +575,25 @@ function AdminsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="hidden px-5 py-3.5 font-mono text-xs text-muted-foreground xl:table-cell">{a.code}</td>
+                    <td className="hidden px-5 py-3.5 font-mono text-xs text-muted-foreground xl:table-cell">
+                      {a.code}
+                    </td>
                     <td className="px-5 py-3.5">{a.department}</td>
                     <td className="px-5 py-3.5">
-                      <Badge variant="secondary" className="rounded-full bg-primary/15 text-primary">
-                        <ShieldCheck className="mr-1 h-3 w-3" /> {a.permanent ? "Director" : "Admin"}
+                      <Badge
+                        variant="secondary"
+                        className="rounded-full bg-primary/15 text-primary"
+                      >
+                        <ShieldCheck className="mr-1 h-3 w-3" />{" "}
+                        {a.permanent ? "Director" : "Admin"}
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5">
                       <span
                         className={`inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs font-medium ${
-                          a.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                          a.status === "active"
+                            ? "bg-success/15 text-success"
+                            : "bg-muted text-muted-foreground"
                         }`}
                       >
                         <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" /> {a.status}
@@ -563,7 +615,11 @@ function AdminsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem asChild>
-                            <Link to="/admin/admins/$id" params={{ id: a.id }} className="flex items-center">
+                            <Link
+                              to="/admin/admins/$id"
+                              params={{ id: a.id }}
+                              className="flex items-center"
+                            >
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </Link>
                           </DropdownMenuItem>

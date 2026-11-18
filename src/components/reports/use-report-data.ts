@@ -11,11 +11,13 @@ import {
   type TimeframeFilter,
 } from "@/features/reports";
 import { projectStats } from "@/lib/projects";
+import { getAvatarUrl } from "@/components/user-avatar";
 
 export type EmployeeReportRow = {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string;
   department: string;
   points: number;
   assigned: number;
@@ -65,7 +67,9 @@ export function safeExtractString(val: any, fallback = "—"): string {
   return fallback;
 }
 
-export function normalizeTaskStatus(status?: string): "pending" | "in_progress" | "completed" | "overdue" {
+export function normalizeTaskStatus(
+  status?: string,
+): "pending" | "in_progress" | "completed" | "overdue" {
   const s = (status || "").toLowerCase().replace(/\s+/g, "_");
   if (s === "completed") return "completed";
   if (s === "overdue") return "overdue";
@@ -90,7 +94,9 @@ export function useProjectReport(timeframe: TimeframeFilter = "weekly") {
         const completed = rp.completedTasks || s?.completed || 0;
 
         return {
-          id: String(rp.projectId || rp._id || fullProject?._id || fullProject?.id || Math.random()),
+          id: String(
+            rp.projectId || rp._id || fullProject?._id || fullProject?.id || Math.random(),
+          ),
           code: fullProject?.code || "PRJ",
           name: safeExtractString(rp.name, "Project"),
           manager: safeExtractString(rp.manager || fullProject?.manager, "—"),
@@ -146,27 +152,30 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
   // Employee report rows
   const employeeReport = useMemo<EmployeeReportRow[]>(() => {
     if (Array.isArray(rawEmployeeReports) && rawEmployeeReports.length > 0) {
-      return rawEmployeeReports.map((e) => {
-        const name = safeExtractString(e.name, "Employee");
-        const dept = safeExtractString(e.department, "—");
-        const assigned = Number(e.assigned || 0);
-        const completed = Number(e.completed || 0);
-        const overdue = Number(e.overdue || 0);
-        const points = Number(e.points || 0);
-        const rate = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
+      return rawEmployeeReports
+        .map((e) => {
+          const name = safeExtractString(e.name, "Employee");
+          const dept = safeExtractString(e.department, "—");
+          const assigned = Number(e.assigned || 0);
+          const completed = Number(e.completed || 0);
+          const overdue = Number(e.overdue || 0);
+          const points = Number(e.points || 0);
+          const rate = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
 
-        return {
-          id: String(e.empId || e._id || name),
-          name,
-          avatar: name.slice(0, 2).toUpperCase(),
-          department: dept,
-          points,
-          assigned,
-          completed,
-          overdue,
-          rate,
-        };
-      }).sort((a, b) => b.points - a.points);
+          return {
+            id: String(e.empId || e._id || name),
+            name,
+            avatar: name.slice(0, 2).toUpperCase(),
+            avatarUrl: getAvatarUrl(e),
+            department: dept,
+            points,
+            assigned,
+            completed,
+            overdue,
+            rate,
+          };
+        })
+        .sort((a, b) => b.points - a.points);
     }
 
     // Fallback: derive from live employees collection and live tasks
@@ -179,7 +188,8 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
           (t) =>
             t.assigneeId === targetId ||
             (t as any).assignedTo === targetId ||
-            (typeof (t as any).assignedTo === "object" && (t as any).assignedTo?._id === targetId) ||
+            (typeof (t as any).assignedTo === "object" &&
+              (t as any).assignedTo?._id === targetId) ||
             (typeof t.assignee === "string" && t.assignee.toLowerCase() === name.toLowerCase()),
         );
         const completed = mine.filter((t) => normalizeTaskStatus(t.status) === "completed").length;
@@ -192,6 +202,7 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
           id: targetId,
           name,
           avatar: name.slice(0, 2).toUpperCase(),
+          avatarUrl: getAvatarUrl(e),
           department: dept,
           points,
           assigned,
@@ -214,10 +225,30 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
 
     if (hasOverviewStatus && overview?.taskStatusMix) {
       return [
-        { label: "Pending", key: "pending", value: overview.taskStatusMix.pending, tone: "text-primary" },
-        { label: "In Progress", key: "in_progress", value: overview.taskStatusMix.inProgress, tone: "text-primary" },
-        { label: "Completed", key: "completed", value: overview.taskStatusMix.completed, tone: "text-primary" },
-        { label: "Overdue", key: "overdue", value: overview.taskStatusMix.overdue, tone: "text-primary" },
+        {
+          label: "Pending",
+          key: "pending",
+          value: overview.taskStatusMix.pending,
+          tone: "text-primary",
+        },
+        {
+          label: "In Progress",
+          key: "in_progress",
+          value: overview.taskStatusMix.inProgress,
+          tone: "text-primary",
+        },
+        {
+          label: "Completed",
+          key: "completed",
+          value: overview.taskStatusMix.completed,
+          tone: "text-primary",
+        },
+        {
+          label: "Overdue",
+          key: "overdue",
+          value: overview.taskStatusMix.overdue,
+          tone: "text-primary",
+        },
       ];
     }
 
@@ -233,7 +264,12 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
     }
     return [
       { label: "Pending", key: "pending", value: buckets.pending, tone: "text-primary" },
-      { label: "In Progress", key: "in_progress", value: buckets.in_progress, tone: "text-primary" },
+      {
+        label: "In Progress",
+        key: "in_progress",
+        value: buckets.in_progress,
+        tone: "text-primary",
+      },
       { label: "Completed", key: "completed", value: buckets.completed, tone: "text-primary" },
       { label: "Overdue", key: "overdue", value: buckets.overdue, tone: "text-primary" },
     ];
@@ -243,7 +279,9 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
   const priorityMix = useMemo(() => {
     const hasPriorityData =
       overview?.priorityMix &&
-      (overview.priorityMix.high > 0 || overview.priorityMix.medium > 0 || overview.priorityMix.low > 0);
+      (overview.priorityMix.high > 0 ||
+        overview.priorityMix.medium > 0 ||
+        overview.priorityMix.low > 0);
 
     if (hasPriorityData && overview?.priorityMix) {
       return [
@@ -270,23 +308,25 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
   // Department report rows
   const departmentReport = useMemo<DepartmentReportRow[]>(() => {
     if (Array.isArray(rawDepartmentReports) && rawDepartmentReports.length > 0) {
-      return rawDepartmentReports.map((d) => {
-        const dept = safeExtractString(d.department || d._id, "General");
-        const employeesCount = Number(d.headcount || 0);
-        const assigned = Number(d.totalAssigned || 0);
-        const completed = Number(d.totalCompleted || 0);
-        const points = Number(d.totalPoints || 0);
-        const rate = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
+      return rawDepartmentReports
+        .map((d) => {
+          const dept = safeExtractString(d.department || d._id, "General");
+          const employeesCount = Number(d.headcount || 0);
+          const assigned = Number(d.totalAssigned || 0);
+          const completed = Number(d.totalCompleted || 0);
+          const points = Number(d.totalPoints || 0);
+          const rate = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
 
-        return {
-          department: dept,
-          employees: employeesCount,
-          points,
-          completed,
-          assigned,
-          rate,
-        };
-      }).sort((a, b) => b.points - a.points);
+          return {
+            department: dept,
+            employees: employeesCount,
+            points,
+            completed,
+            assigned,
+            rate,
+          };
+        })
+        .sort((a, b) => b.points - a.points);
     }
 
     // Fallback: aggregate from live employees and tasks
@@ -299,11 +339,17 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
         (t) =>
           t.assigneeId === targetId ||
           (t as any).assignedTo === targetId ||
-          (name && typeof t.assignee === "string" && t.assignee.toLowerCase() === name.toLowerCase()),
+          (name &&
+            typeof t.assignee === "string" &&
+            t.assignee.toLowerCase() === name.toLowerCase()),
       );
-      const cur =
-        map.get(dept) ??
-        { department: dept, employees: 0, points: 0, completed: 0, assigned: 0 };
+      const cur = map.get(dept) ?? {
+        department: dept,
+        employees: 0,
+        points: 0,
+        completed: 0,
+        assigned: 0,
+      };
       cur.employees += 1;
       cur.points += Number(e.points || 0);
       cur.assigned += mine.length;
@@ -327,8 +373,7 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
 
   // KPIs
   const kpis = useMemo(() => {
-    const totalEmployees =
-      overview?.kpis?.totalEmployees?.current || liveEmployees.length;
+    const totalEmployees = overview?.kpis?.totalEmployees?.current || liveEmployees.length;
     const employeesTrend = overview?.kpis?.totalEmployees?.trend ?? 0;
 
     const totalCompleted =
@@ -387,8 +432,7 @@ export function useReportData(timeframe: TimeframeFilter = "weekly") {
   // Points velocity chart data
   const pointsVelocityData = useMemo(() => {
     const hasVelocityData =
-      overview?.pointsVelocity &&
-      overview.pointsVelocity.some((pv) => (pv.points || 0) > 0);
+      overview?.pointsVelocity && overview.pointsVelocity.some((pv) => (pv.points || 0) > 0);
 
     if (hasVelocityData && overview?.pointsVelocity) {
       return overview.pointsVelocity.map((pv) => ({

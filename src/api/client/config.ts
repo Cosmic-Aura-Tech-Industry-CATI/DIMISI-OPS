@@ -11,6 +11,27 @@ const rawBaseUrl = (typeof import.meta !== "undefined" && import.meta?.env?.VITE
 /** Base URL of the backend, without a trailing slash. */
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
 
+/** Known backend origin fallback */
+export const DEFAULT_BACKEND_ORIGIN = "https://api.dimisi.tech";
+
+/**
+ * Returns the backend root origin (e.g. "https://api.dimisi.tech").
+ * Resolves from API_BASE_URL if set, or local proxy when running on localhost,
+ * or falls back to the live backend server.
+ */
+export function getBackendOrigin(): string {
+  if (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")) {
+    return API_BASE_URL.replace(/\/api\/v[0-9]+$/i, "");
+  }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return window.location.origin;
+    }
+  }
+  return DEFAULT_BACKEND_ORIGIN;
+}
+
 /** Default timeout for every request (ms). */
 export const API_TIMEOUT = 20_000;
 
@@ -22,14 +43,8 @@ export const API_WITH_CREDENTIALS = true;
  */
 export function getApiV2Endpoint(path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  if (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")) {
-    const root = API_BASE_URL.replace(/\/api\/v[0-9]+$/i, "");
-    return `${root}/api/v2${cleanPath}`;
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/api/v2${cleanPath}`;
-  }
-  return `/api/v2${cleanPath}`;
+  const origin = getBackendOrigin();
+  return `${origin}/api/v2${cleanPath}`;
 }
 
 if (!API_BASE_URL && typeof import.meta !== "undefined" && import.meta?.env?.DEV) {

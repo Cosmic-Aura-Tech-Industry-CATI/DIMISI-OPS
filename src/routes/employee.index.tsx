@@ -29,12 +29,18 @@ import {
   YAxis,
 } from "recharts";
 import { IdBadge } from "@/components/id-badge";
+import { UserAvatar } from "@/components/user-avatar";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useTasksQuery, useCompletedTasks, useAssignedTasks, getCategoryLabel } from "@/features/tasks";
+import {
+  useTasksQuery,
+  useCompletedTasks,
+  useAssignedTasks,
+  getCategoryLabel,
+} from "@/features/tasks";
 import { AvailableTasks } from "@/components/available-tasks";
 import { useAuth } from "@/lib/auth";
 import {
@@ -104,7 +110,7 @@ function EmployeeOverview() {
     const activeFromAssigned = assignedTasks.filter(
       (t) =>
         (t.status || "").toLowerCase() !== "completed" &&
-        (t.status || "").toLowerCase() !== "overdue"
+        (t.status || "").toLowerCase() !== "overdue",
     );
     if (activeFromAssigned.length > 0) return activeFromAssigned;
 
@@ -122,7 +128,7 @@ function EmployeeOverview() {
         t.status === "pending" ||
         t.status === "in_progress" ||
         (t.status as string) === "In Progress" ||
-        (t.status as string) === "Assigned"
+        (t.status as string) === "Assigned",
     );
   }, [assignedTasks, tasksDeadlines?.todayTasks, tasksDeadlines?.upcomingDeadlines, mine]);
 
@@ -189,7 +195,13 @@ function EmployeeOverview() {
       const dayDone = mine.filter((t) => {
         const isDone = t.status === "completed" || (t.status as string) === "Completed";
         if (!isDone) return false;
-        const d = t.updatedAt ? new Date(t.updatedAt) : t.dueDate ? new Date(t.dueDate) : t.createdAt ? new Date(t.createdAt) : null;
+        const d = t.updatedAt
+          ? new Date(t.updatedAt)
+          : t.dueDate
+            ? new Date(t.dueDate)
+            : t.createdAt
+              ? new Date(t.createdAt)
+              : null;
         return d ? d >= dayStart && d <= dayEnd : false;
       }).length;
 
@@ -216,17 +228,21 @@ function EmployeeOverview() {
 
   const monthlyGoal = analytics?.monthlyPerformance?.pointsGoal ?? 600;
   const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
-  const monthlyProgress = monthlyGoal > 0 ? Math.min(100, Math.round((monthlyPoints / monthlyGoal) * 100)) : 0;
+  const monthlyProgress =
+    monthlyGoal > 0 ? Math.min(100, Math.round((monthlyPoints / monthlyGoal) * 100)) : 0;
 
-  const avgPointsPerDay = analytics?.monthlyPerformance?.avgPointsPerDay !== undefined
-    ? `${analytics.monthlyPerformance.avgPointsPerDay} pts`
-    : "0 pts";
-  const bestDayPoints = analytics?.monthlyPerformance?.bestDayPoints !== undefined
-    ? `${analytics.monthlyPerformance.bestDayPoints} pts`
-    : "0 pts";
-  const tasksPerWeekAvg = analytics?.monthlyPerformance?.tasksPerWeekAvg !== undefined
-    ? `${analytics.monthlyPerformance.tasksPerWeekAvg}`
-    : "0";
+  const avgPointsPerDay =
+    analytics?.monthlyPerformance?.avgPointsPerDay !== undefined
+      ? `${analytics.monthlyPerformance.avgPointsPerDay} pts`
+      : "0 pts";
+  const bestDayPoints =
+    analytics?.monthlyPerformance?.bestDayPoints !== undefined
+      ? `${analytics.monthlyPerformance.bestDayPoints} pts`
+      : "0 pts";
+  const tasksPerWeekAvg =
+    analytics?.monthlyPerformance?.tasksPerWeekAvg !== undefined
+      ? `${analytics.monthlyPerformance.tasksPerWeekAvg}`
+      : "0";
 
   const currentMonthName = new Date().toLocaleDateString(undefined, { month: "short" });
 
@@ -251,17 +267,27 @@ function EmployeeOverview() {
   const completedTasksPoints = useMemo(() => {
     return completed.reduce((sum, t) => {
       const rec = t as unknown as Record<string, unknown>;
-      const pt = typeof t.points === "number" ? t.points : typeof rec.rewardPoints === "number" ? (rec.rewardPoints as number) : 0;
+      const pt =
+        typeof t.points === "number"
+          ? t.points
+          : typeof rec.rewardPoints === "number"
+            ? (rec.rewardPoints as number)
+            : 0;
       return sum + pt;
     }, 0);
   }, [completed]);
 
   const userPoints = useMemo(() => {
     const userRec = auth.user as unknown as Record<string, unknown> | null;
-    const fromAuth = typeof userRec?.points === "number" ? (userRec.points as number) : typeof userRec?.rewardPoints === "number" ? (userRec.rewardPoints as number) : undefined;
+    const fromAuth =
+      typeof userRec?.points === "number"
+        ? (userRec.points as number)
+        : typeof userRec?.rewardPoints === "number"
+          ? (userRec.rewardPoints as number)
+          : undefined;
     const fromLeaderboard = myLeaderboardEntry?.points;
     const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, monthlyPoints].filter(
-      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0
+      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0,
     );
     if (candidates.length > 0) {
       return Math.max(...candidates);
@@ -287,7 +313,13 @@ function EmployeeOverview() {
       const weekLabel = `W${Math.max(1, Math.ceil(target.getDate() / 7))} ${target.toLocaleDateString(undefined, { month: "short" })}`;
       const weekTasks = mine.filter((t) => {
         if (t.status !== "completed" && (t.status as string) !== "Completed") return false;
-        const d = t.updatedAt ? new Date(t.updatedAt) : t.dueDate ? new Date(t.dueDate) : t.createdAt ? new Date(t.createdAt) : null;
+        const d = t.updatedAt
+          ? new Date(t.updatedAt)
+          : t.dueDate
+            ? new Date(t.dueDate)
+            : t.createdAt
+              ? new Date(t.createdAt)
+              : null;
         return d ? d >= start && d <= end : false;
       });
 
@@ -317,9 +349,13 @@ function EmployeeOverview() {
         />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-lg font-bold text-primary-foreground shadow-glow">
-              {userAvatar}
-            </div>
+            <UserAvatar
+              user={auth.user}
+              name={userName}
+              className="h-14 w-14 shrink-0 rounded-2xl shadow-glow text-lg"
+              fallbackClassName="rounded-2xl text-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold"
+              shape="rounded"
+            />
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-primary">
                 Welcome back
@@ -355,10 +391,20 @@ function EmployeeOverview() {
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's tasks" value={displayToday.length} icon={Target} accent="primary" />
+        <StatCard
+          label="Today's tasks"
+          value={displayToday.length}
+          icon={Target}
+          accent="primary"
+        />
         <StatCard label="Pending" value={pending.length} icon={Timer} accent="info" />
         <StatCard label="Completed" value={completed.length} icon={CheckCircle2} accent="success" />
-        <StatCard label="Current points" value={userPoints.toLocaleString()} icon={Sparkles} accent="warning" />
+        <StatCard
+          label="Current points"
+          value={userPoints.toLocaleString()}
+          icon={Sparkles}
+          accent="warning"
+        />
       </div>
 
       {/* Today's Tasks + Upcoming Deadlines */}
@@ -396,16 +442,25 @@ function EmployeeOverview() {
                     >
                       {t.title}
                     </Link>
-                    <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${statusTone[t.status] ?? ""}`}>
+                    <span
+                      className={`shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${statusTone[t.status] ?? ""}`}
+                    >
                       {t.status.replace("_", " ")}
                     </span>
                   </div>
-                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{t.description}</p>
+                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                    {t.description}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Due</p>
                   <p className="text-xs font-semibold">
-                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "-"}
+                    {t.dueDate
+                      ? new Date(t.dueDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "-"}
                   </p>
                 </div>
               </li>
@@ -427,10 +482,23 @@ function EmployeeOverview() {
               </li>
             )}
             {displayDeadlines.map((t) => {
-              const days = t.dueDate ? Math.max(0, Math.ceil((+new Date(t.dueDate) - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
-              const tone = days <= 2 ? "bg-destructive/15 text-destructive" : days <= 5 ? "bg-warning/15 text-warning" : "bg-success/15 text-success";
+              const days = t.dueDate
+                ? Math.max(
+                    0,
+                    Math.ceil((+new Date(t.dueDate) - Date.now()) / (1000 * 60 * 60 * 24)),
+                  )
+                : 0;
+              const tone =
+                days <= 2
+                  ? "bg-destructive/15 text-destructive"
+                  : days <= 5
+                    ? "bg-warning/15 text-warning"
+                    : "bg-success/15 text-success";
               return (
-                <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
+                <li
+                  key={t.id}
+                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-3"
+                >
                   <div className="min-w-0 flex-1">
                     <Link
                       to="/employee/tasks/$id"
@@ -451,7 +519,6 @@ function EmployeeOverview() {
         </div>
       </div>
 
-
       {/* Monthly Performance + Weekly Progress */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="glass rounded-2xl p-5">
@@ -460,7 +527,9 @@ function EmployeeOverview() {
               <Award className="h-4 w-4 text-primary" />
               <h3 className="font-display text-lg font-semibold">Monthly performance</h3>
             </div>
-            <Badge variant="secondary" className="rounded-full">{currentMonthName}</Badge>
+            <Badge variant="secondary" className="rounded-full">
+              {currentMonthName}
+            </Badge>
           </div>
           <div className="mt-6 flex items-center gap-5">
             <CircularProgress value={monthlyProgress} />
@@ -491,9 +560,24 @@ function EmployeeOverview() {
           <div className="mt-4 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekProgress} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--color-border)"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="day"
+                  stroke="var(--color-muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--color-muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Bar dataKey="planned" fill="var(--color-chart-2)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="done" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
@@ -511,8 +595,12 @@ function EmployeeOverview() {
             <p className="text-xs text-muted-foreground">Points and tasks over the last 8 weeks</p>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" /> Points</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--color-chart-3)]" /> Tasks</span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary" /> Points
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[var(--color-chart-3)]" /> Tasks
+            </span>
           </div>
         </div>
         <div className="mt-4 h-72">
@@ -525,11 +613,34 @@ function EmployeeOverview() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis dataKey="week" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="week"
+                stroke="var(--color-muted-foreground)"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke="var(--color-muted-foreground)"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
               <Tooltip contentStyle={tooltipStyle} />
-              <Area type="monotone" dataKey="points" stroke="var(--color-primary)" fill="url(#pts)" strokeWidth={2.5} />
-              <Area type="monotone" dataKey="tasks" stroke="var(--color-chart-3)" fill="transparent" strokeWidth={2} />
+              <Area
+                type="monotone"
+                dataKey="points"
+                stroke="var(--color-primary)"
+                fill="url(#pts)"
+                strokeWidth={2.5}
+              />
+              <Area
+                type="monotone"
+                dataKey="tasks"
+                stroke="var(--color-chart-3)"
+                fill="transparent"
+                strokeWidth={2}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -542,29 +653,43 @@ function EmployeeOverview() {
             <Activity className="h-4 w-4 text-primary" />
             <h3 className="font-display text-lg font-semibold">Activity timeline</h3>
           </div>
-          <Link to="/employee/history" className="text-xs text-primary hover:underline">Full history</Link>
+          <Link to="/employee/history" className="text-xs text-primary hover:underline">
+            Full history
+          </Link>
         </div>
         <ol className="mt-6 relative space-y-6 border-l border-border/60 pl-6">
           {activityLogs.length === 0 && (
             <li className="text-xs text-muted-foreground">No recent activity logs found.</li>
           )}
           {activityLogs.map((a) => {
-            const actorName = typeof a.actorId === "object" && a.actorId?.name ? a.actorId.name : userName;
+            const actorName =
+              typeof a.actorId === "object" && a.actorId?.name ? a.actorId.name : userName;
             const actorCode = typeof a.actorId === "object" ? a.actorId?.empId : undefined;
             const actionText = (a.action || "").replace(/_/g, " ");
-            const targetText = (a.metadata?.title as string) || (a.metadata?.name as string) || a.entityType || "";
+            const targetText =
+              (a.metadata?.title as string) || (a.metadata?.name as string) || a.entityType || "";
             return (
               <li key={a._id || a.id} className="relative">
                 <span className="absolute -left-[29px] top-1 grid h-4 w-4 place-items-center rounded-full border-2 border-background bg-primary shadow-glow" />
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm">
                     <span className="font-medium">{actorName}</span>
-                    {actorCode && <> <IdBadge id={actorCode} /></>}{" "}
+                    {actorCode && (
+                      <>
+                        {" "}
+                        <IdBadge id={actorCode} />
+                      </>
+                    )}{" "}
                     <span className="text-muted-foreground">{actionText}</span>{" "}
                     <span className="font-medium">{targetText}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {a.createdAt ? new Date(a.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : ""}
+                    {a.createdAt
+                      ? new Date(a.createdAt).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      : ""}
                   </p>
                 </div>
               </li>
@@ -579,7 +704,9 @@ function EmployeeOverview() {
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   );
@@ -594,7 +721,14 @@ function CircularProgress({ value }: { value: number }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--color-border)" strokeWidth={stroke} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="var(--color-border)"
+          strokeWidth={stroke}
+          fill="none"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
