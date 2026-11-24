@@ -20,6 +20,7 @@ import {
   Trash2,
   Trophy,
   User,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
+import { ReassignTaskDialog } from "@/components/reassign-task-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +88,7 @@ function TaskDetailPage() {
   const { id } = useParams({ from: "/admin/tasks/$id" });
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
+  const [showReassign, setShowReassign] = useState(false);
   const [rejectedIds, setRejectedIds] = useState<string[]>([]);
   const [processing, setProcessing] = useState<{ id: string; action: "accept" | "reject" } | null>(
     null,
@@ -218,22 +221,48 @@ function TaskDetailPage() {
         </Link>
       </div>
 
-      <PageHeader
-        title={task.title}
-        subtitle={formatTaskSubtitle(task.category, task.id)}
-        actions={
-          <>
-            <Button asChild variant="outline" className="rounded-md">
-              <Link to="/admin/tasks/$id/edit" params={{ id: task.id || (task as any)._id }}>
-                <Pencil className="mr-1.5 h-4 w-4" /> Edit
-              </Link>
-            </Button>
-            <Button variant="destructive" className="rounded-md" onClick={() => setConfirm(true)}>
-              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-            </Button>
-          </>
-        }
-      />
+      {(() => {
+        const isOverdue =
+          task.status === "overdue" ||
+          (task as any).rawStatus === "overdue" ||
+          (task.dueDate && new Date(task.dueDate).getTime() < Date.now() && task.status !== "completed");
+        const isCompleted =
+          task.status === "completed" ||
+          (task as any).rawStatus === "completed" ||
+          task.status === "Completed";
+
+        return (
+          <PageHeader
+            title={task.title}
+            subtitle={formatTaskSubtitle(task.category, task.id)}
+            actions={
+              <>
+                {!isCompleted && (
+                  <Button asChild variant="outline" className="rounded-md">
+                    <Link to="/admin/tasks/$id/edit" params={{ id: task.id || (task as any)._id }}>
+                      <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                    </Link>
+                  </Button>
+                )}
+                {isOverdue && (
+                  <Button
+                    variant="outline"
+                    className="rounded-md border-warning/40 text-warning hover:bg-warning/10"
+                    onClick={() => setShowReassign(true)}
+                  >
+                    <UserCheck className="mr-1.5 h-4 w-4" /> Reassign
+                  </Button>
+                )}
+                {isOverdue && (
+                  <Button variant="destructive" className="rounded-md" onClick={() => setConfirm(true)}>
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                  </Button>
+                )}
+              </>
+            }
+          />
+        );
+      })()}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -527,6 +556,12 @@ function TaskDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ReassignTaskDialog
+        task={task}
+        open={showReassign}
+        onOpenChange={setShowReassign}
+      />
     </>
   );
 }

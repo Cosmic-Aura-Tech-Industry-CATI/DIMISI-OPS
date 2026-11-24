@@ -72,6 +72,8 @@ function cleanTaskFilters(filters?: TaskQueryFilters): Record<string, unknown> {
     cleaned.assignedTo = filters.assignedTo;
   }
 
+  cleaned.isActive = true;
+
   if (filters) {
     for (const [key, val] of Object.entries(filters)) {
       if (!(key in cleaned) && val !== undefined && val !== null && val !== "" && val !== "all") {
@@ -98,7 +100,10 @@ export const tasksService = {
       ? res
       : res?.tasks || res?.data?.tasks || (res?.data && Array.isArray(res.data) ? res.data : []);
 
-    const tasks: TasksResult = (Array.isArray(rawList) ? rawList : []).map(mapTaskResponse);
+    const activeRawList = (Array.isArray(rawList) ? rawList : []).filter(
+      (item: any) => item && item.isActive !== false && item.is_active !== false,
+    );
+    const tasks: TasksResult = activeRawList.map(mapTaskResponse);
 
     const rawPagination = res?.pagination || res?.data?.pagination || res?.meta;
     if (rawPagination) {
@@ -231,6 +236,30 @@ export const tasksService = {
     });
     const raw = res?.task || res?.data?.task || res;
     return mapTaskResponse(raw);
+  },
+
+  /**
+   * Admin reassigns an overdue or active task to an employee, updating assignee and resetting status/deadline.
+   * Utilizes v2 task update endpoint to avoid status=open precondition conflicts.
+   */
+  async reassignTask(
+    id: string,
+    data: {
+      employeeId: string;
+      deadline?: string;
+      status?: string;
+    },
+  ): Promise<Task> {
+    const updatePayload: Record<string, unknown> = {
+      assignedTo: data.employeeId,
+      assigneeId: data.employeeId,
+      status: data.status || "assigned",
+    };
+    if (data.deadline) {
+      updatePayload.deadline = data.deadline;
+      updatePayload.dueDate = data.deadline;
+    }
+    return this.updateTask(id, updatePayload as any);
   },
 
   /**

@@ -47,6 +47,28 @@ function EditTaskPage() {
     );
   }
 
+  // Editing is only for overdue task or on process task, not for completed task
+  if (
+    task.status === "completed" ||
+    (task as any).rawStatus === "completed" ||
+    (task.status as string) === "Completed"
+  ) {
+    return (
+      <EmptyState
+        icon={AlertCircle}
+        title="Completed Task Cannot Be Edited"
+        description="This task is already completed and closed. Editing is strictly restricted to overdue or on-process tasks."
+        action={
+          <Button asChild>
+            <Link to="/admin/tasks/$id" params={{ id: task.id || (task as { _id?: string })._id || id }}>
+              View Task Details
+            </Link>
+          </Button>
+        }
+      />
+    );
+  }
+
   const initialValues = taskToValues(task);
 
   const handleSubmit = (v: TaskFormValues) => {
@@ -97,6 +119,20 @@ function EditTaskPage() {
     if (v.taskType === "direct" && (v.assigneeId !== initialValues.assigneeId || v.taskType !== initialValues.taskType)) {
       input.assigneeId = v.assigneeId;
       hasChanges = true;
+    }
+
+    // If an overdue task's deadline is extended to the future, reset status to assigned or open
+    const isOverdue =
+      task.status === "overdue" ||
+      (task as any).rawStatus === "overdue" ||
+      (task.dueDate && new Date(task.dueDate).getTime() < Date.now());
+
+    if (isOverdue && v.dueDate) {
+      const newDueMs = new Date(v.dueDate).getTime();
+      if (!isNaN(newDueMs) && newDueMs > Date.now()) {
+        input.status = (v.assigneeId || initialValues.assigneeId) ? "assigned" : "open";
+        hasChanges = true;
+      }
     }
 
     // Attachments tracking

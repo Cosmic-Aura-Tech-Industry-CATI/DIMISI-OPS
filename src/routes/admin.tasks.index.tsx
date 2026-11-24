@@ -16,6 +16,7 @@ import {
   Search,
   Trash2,
   Trophy,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RecordCard } from "@/components/record-card";
@@ -64,6 +65,7 @@ import {
   formatTaskSubtitle,
 } from "@/features/tasks";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ReassignTaskDialog } from "@/components/reassign-task-dialog";
 import { TaskTypeBadge } from "@/components/status-badge";
 import { projectName } from "@/lib/projects";
 import { IdBadge } from "@/components/id-badge";
@@ -107,6 +109,24 @@ function getVisiblePages(current: number, total: number) {
   return [current - 2, current - 1, current, current + 1, current + 2];
 }
 
+export function isTaskOverdue(t: Task): boolean {
+  if (t.status === "overdue" || (t as any).rawStatus === "overdue") return true;
+  if (t.status === "completed" || (t as any).rawStatus === "completed") return false;
+  if (t.dueDate) {
+    const dueTime = new Date(t.dueDate).getTime();
+    if (!isNaN(dueTime) && dueTime < Date.now()) return true;
+  }
+  return false;
+}
+
+export function isTaskCompleted(t: Task): boolean {
+  return (
+    t.status === "completed" ||
+    (t as any).rawStatus === "completed" ||
+    (t.status as string) === "Completed"
+  );
+}
+
 function TasksPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -123,6 +143,8 @@ function TasksPage() {
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+  const [pendingReassign, setPendingReassign] = useState<Task | null>(null);
+  const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
 
   // Derive backend-compatible filter values:
   // "available" -> "open", "submitted" -> "in_review", "rejected" -> handled client-side
@@ -157,7 +179,12 @@ function TasksPage() {
   const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useTaskStatsQuery();
   const deleteTask = useDeleteTask({
     onSuccess: () => {
-      toast.success("Task deleted");
+      toast.success("Overdue task deleted successfully.");
+      if (pendingDelete) {
+        const id1 = pendingDelete.id;
+        const id2 = (pendingDelete as any)._id;
+        setDeletedTaskIds((prev) => new Set([...prev, id1, id2].filter(Boolean)));
+      }
       setPendingDelete(null);
     },
     onError: (err) => {
@@ -183,7 +210,16 @@ function TasksPage() {
     return searchResponse.tasks.map((t) => mapTaskResponse(t));
   }, [searchResponse]);
 
-  const activeTaskPool = isSearchActive ? searchTasksList : tasks;
+  const rawTaskPool = isSearchActive ? searchTasksList : tasks;
+  const activeTaskPool = useMemo(() => {
+    return rawTaskPool.filter(
+      (t: any) =>
+        t &&
+        t.isActive !== false &&
+        !deletedTaskIds.has(t.id) &&
+        !deletedTaskIds.has(t._id),
+    );
+  }, [rawTaskPool, deletedTaskIds]);
   const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
 
   const categories = useMemo(
@@ -521,42 +557,66 @@ function TasksPage() {
                   { label: "Created by", value: createdByFor(t) },
                 ]}
                 actions={
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          navigate({
-                            to: "/admin/tasks/$id",
-                            params: { id: t.id || (t as any)._id },
-                          })
-                        }
-                      >
-                        <Eye className="mr-2 h-4 w-4" /> View
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          navigate({
-                            to: "/admin/tasks/$id/edit",
-                            params: { id: t.id || (t as any)._id },
-                          })
-                        }
-                      >
-                        <Pencil className="mr-2 h-4 w-4" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setPendingDelete(t)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  (() => {
+                    const isOverdue = isTaskOverdue(t);
+                    const isCompleted = isTaskCompleted(t);
+
+                    return (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              navigate({
+                                to: "/admin/tasks/$id",
+                                params: { id: t.id || (t as any)._id },
+                              })
+                            }
+                          >
+                            <Eye className="mr-2 h-4 w-4" /> View
+                          </DropdownMenuItem>
+
+                          {/* Editing is only for overdue task or on process task, not for completed task */}
+                          {!isCompleted && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                navigate({
+                                  to: "/admin/tasks/$id/edit",
+                                  params: { id: t.id || (t as any)._id },
+                                })
+                              }
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Reassign is available when task is overdue */}
+                          {isOverdue && (
+                            <DropdownMenuItem onClick={() => setPendingReassign(t)}>
+                              <UserCheck className="mr-2 h-4 w-4 text-warning" /> Reassign
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Delete is ONLY available for overdue tasks */}
+                          {isOverdue && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setPendingDelete(t)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  })()
                 }
               />
             ))}
@@ -708,42 +768,66 @@ function TasksPage() {
                       {createdByFor(t)}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigate({
-                                to: "/admin/tasks/$id",
-                                params: { id: t.id || (t as any)._id },
-                              })
-                            }
-                          >
-                            <Eye className="mr-2 h-4 w-4" /> View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigate({
-                                to: "/admin/tasks/$id/edit",
-                                params: { id: t.id || (t as any)._id },
-                              })
-                            }
-                          >
-                            <Pencil className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setPendingDelete(t)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {(() => {
+                        const isOverdue = isTaskOverdue(t);
+                        const isCompleted = isTaskCompleted(t);
+
+                        return (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  navigate({
+                                    to: "/admin/tasks/$id",
+                                    params: { id: t.id || (t as any)._id },
+                                  })
+                                }
+                              >
+                                <Eye className="mr-2 h-4 w-4" /> View
+                              </DropdownMenuItem>
+
+                              {/* Editing is only for overdue task or on process task, not for completed task */}
+                              {!isCompleted && (
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    navigate({
+                                      to: "/admin/tasks/$id/edit",
+                                      params: { id: t.id || (t as any)._id },
+                                    })
+                                  }
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Reassign is available when task is overdue */}
+                              {isOverdue && (
+                                <DropdownMenuItem onClick={() => setPendingReassign(t)}>
+                                  <UserCheck className="mr-2 h-4 w-4 text-warning" /> Reassign
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Delete is ONLY available for overdue tasks */}
+                              {isOverdue && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => setPendingDelete(t)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -812,7 +896,12 @@ function TasksPage() {
               disabled={deleteTask.isPending}
               onClick={() => {
                 if (pendingDelete) {
-                  deleteTask.mutate(pendingDelete.id || pendingDelete._id || "");
+                  const idToDelete = pendingDelete.id || (pendingDelete as any)._id || "";
+                  setDeletedTaskIds(
+                    (prev) =>
+                      new Set([...prev, idToDelete, pendingDelete.id, (pendingDelete as any)._id].filter(Boolean) as string[]),
+                  );
+                  deleteTask.mutate(idToDelete);
                 }
               }}
             >
@@ -821,6 +910,12 @@ function TasksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ReassignTaskDialog
+        task={pendingReassign}
+        open={Boolean(pendingReassign)}
+        onOpenChange={(o) => !o && setPendingReassign(null)}
+      />
     </>
   );
 }
