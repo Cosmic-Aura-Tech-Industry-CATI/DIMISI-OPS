@@ -323,6 +323,9 @@ function ProfilePage() {
   }, [myTasks]);
 
   const canonicalPoints = useMemo(() => {
+    if (typeof myLeaderboardEntry?.points === "number") {
+      return myLeaderboardEntry.points;
+    }
     const userRec = user as unknown as Record<string, unknown> | null;
     const fromAuth =
       typeof userRec?.points === "number"
@@ -330,15 +333,15 @@ function ProfilePage() {
         : typeof userRec?.rewardPoints === "number"
           ? (userRec.rewardPoints as number)
           : undefined;
-    const fromLeaderboard = myLeaderboardEntry?.points;
-    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints].filter(
-      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0,
-    );
-    if (candidates.length > 0) {
-      return Math.max(...candidates);
-    }
     return Number(fromAuth ?? 0);
-  }, [user, myLeaderboardEntry, completedTasksPoints]);
+  }, [user, myLeaderboardEntry?.points]);
+
+  const completedCount = useMemo(() => {
+    if (typeof myLeaderboardEntry?.completedTasks === "number") {
+      return myLeaderboardEntry.completedTasks;
+    }
+    return completed;
+  }, [myLeaderboardEntry?.completedTasks, completed]);
 
   // Derived Real Employee Profile Data from backend
   const e: EmployeeProfileData = useMemo(() => {
@@ -411,12 +414,12 @@ function ProfilePage() {
       department: deptName,
       avatar,
       points: canonicalPoints,
-      tasksCompleted: completed,
+      tasksCompleted: completedCount,
       status: user?.isActive === false ? "inactive" : "active",
       joinedAt,
       phone,
     };
-  }, [user, departmentsData, canonicalPoints, completed, editable]);
+  }, [user, departmentsData, canonicalPoints, completedCount, editable]);
 
   // Real Weekly Performance & Points Trend calculated from live tasks
   const weeklyTrend: { week: string; points: number; tasks: number }[] = useMemo(() => {
@@ -509,11 +512,11 @@ function ProfilePage() {
         Icon: Sparkles,
         tone: "text-primary",
       },
-      { label: "Completed", value: completed, Icon: CheckCircle2, tone: "text-primary" },
+      { label: "Completed", value: completedCount, Icon: CheckCircle2, tone: "text-primary" },
       { label: "Active", value: active, Icon: Clock, tone: "text-primary" },
       { label: "Completion", value: `${completionRate}%`, Icon: TrendingUp, tone: "text-primary" },
     ],
-    [e.points, completed, active, completionRate],
+    [e.points, completedCount, active, completionRate],
   );
 
   // Image Avatar Detector

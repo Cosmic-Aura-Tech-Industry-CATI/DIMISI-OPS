@@ -71,17 +71,25 @@ function PointsPage() {
   const leaderboardUser = userRankIndex >= 0 ? leaderboard[userRankIndex] : null;
 
   const points = useMemo(() => {
-    const userRec = auth.user as unknown as Record<string, unknown> | null;
-    const fromAuth = typeof userRec?.points === "number" ? (userRec.points as number) : typeof userRec?.rewardPoints === "number" ? (userRec.rewardPoints as number) : undefined;
-    const fromLeaderboard = leaderboardUser?.points;
-    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints].filter(
-      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0
-    );
-    if (candidates.length > 0) {
-      return Math.max(...candidates);
+    if (typeof leaderboardUser?.points === "number") {
+      return leaderboardUser.points;
     }
-    return fromAuth ?? (analytics?.monthlyPerformance?.totalPoints || 0);
-  }, [auth.user, leaderboardUser, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints]);
+    const userRec = auth.user as unknown as Record<string, unknown> | null;
+    const fromAuth =
+      typeof userRec?.points === "number"
+        ? (userRec.points as number)
+        : typeof userRec?.rewardPoints === "number"
+          ? (userRec.rewardPoints as number)
+          : undefined;
+    return typeof fromAuth === "number" ? fromAuth : (analytics?.monthlyPerformance?.totalPoints || 0);
+  }, [leaderboardUser?.points, auth.user, analytics?.monthlyPerformance?.totalPoints]);
+
+  const completedCount = useMemo(() => {
+    if (typeof leaderboardUser?.completedTasks === "number") {
+      return leaderboardUser.completedTasks;
+    }
+    return recent.length;
+  }, [leaderboardUser?.completedTasks, recent.length]);
 
   const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
 
@@ -96,7 +104,7 @@ function PointsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total points" value={points.toLocaleString()} icon={Sparkles} accent="primary" />
         <StatCard label="Current rank" value={`#${rank}`} icon={Trophy} accent="warning" />
-        <StatCard label="Completed tasks" value={`${recent.length}`} icon={Zap} hint="Verified closes" accent="info" />
+        <StatCard label="Completed tasks" value={`${completedCount}`} icon={Zap} hint="Verified closes" accent="info" />
         <StatCard label="This month" value={`+${monthlyPoints}`} icon={Star} accent="success" />
       </div>
 

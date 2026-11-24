@@ -278,6 +278,9 @@ function EmployeeOverview() {
   }, [completed]);
 
   const userPoints = useMemo(() => {
+    if (typeof myLeaderboardEntry?.points === "number") {
+      return myLeaderboardEntry.points;
+    }
     const userRec = auth.user as unknown as Record<string, unknown> | null;
     const fromAuth =
       typeof userRec?.points === "number"
@@ -285,15 +288,15 @@ function EmployeeOverview() {
         : typeof userRec?.rewardPoints === "number"
           ? (userRec.rewardPoints as number)
           : undefined;
-    const fromLeaderboard = myLeaderboardEntry?.points;
-    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, monthlyPoints].filter(
-      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0,
-    );
-    if (candidates.length > 0) {
-      return Math.max(...candidates);
+    return typeof fromAuth === "number" ? fromAuth : (monthlyPoints ?? 0);
+  }, [myLeaderboardEntry?.points, auth.user, monthlyPoints]);
+
+  const completedCount = useMemo(() => {
+    if (typeof myLeaderboardEntry?.completedTasks === "number") {
+      return myLeaderboardEntry.completedTasks;
     }
-    return fromAuth ?? monthlyPoints;
-  }, [auth.user, myLeaderboardEntry, completedTasksPoints, monthlyPoints]);
+    return completed.length;
+  }, [myLeaderboardEntry?.completedTasks, completed.length]);
 
   const performanceTrend = useMemo(() => {
     const weeks: { week: string; points: number; tasks: number }[] = [];
@@ -398,7 +401,7 @@ function EmployeeOverview() {
           accent="primary"
         />
         <StatCard label="Pending" value={pending.length} icon={Timer} accent="info" />
-        <StatCard label="Completed" value={completed.length} icon={CheckCircle2} accent="success" />
+        <StatCard label="Completed" value={completedCount} icon={CheckCircle2} accent="success" />
         <StatCard
           label="Current points"
           value={userPoints.toLocaleString()}
@@ -545,7 +548,7 @@ function EmployeeOverview() {
             <MiniStat label="Avg / day" value={avgPointsPerDay} />
             <MiniStat label="Best day" value={bestDayPoints} />
             <MiniStat label="Tasks / wk" value={tasksPerWeekAvg} />
-            <MiniStat label="Completed" value={`${completed.length} tasks`} />
+            <MiniStat label="Completed" value={`${completedCount} tasks`} />
           </div>
         </div>
 
