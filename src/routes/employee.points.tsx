@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
-import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useLeaderboardQuery, getEmployeePeriodicMetric } from "@/features/leaderboard";
 import { useTasksQuery, useCompletedTasks, getCategoryLabel } from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
@@ -91,7 +91,9 @@ function PointsPage() {
     return recent.length;
   }, [leaderboardUser?.completedTasks, recent.length]);
 
-  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const periodicMetric = getEmployeePeriodicMetric(currentUserId || auth.user?.empId);
+  const rawMonthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const monthlyPoints = periodicMetric?.monthlyPoints ?? Math.min(points, rawMonthlyPoints);
 
   const nextTier = tiers.find((t) => t.min > points) ?? tiers[tiers.length - 1];
   const currentTier = [...tiers].reverse().find((t) => points >= t.min) || tiers[0];

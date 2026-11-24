@@ -47,7 +47,7 @@ import {
   useEmployeeTasksDeadlinesQuery,
   useEmployeeProgressAnalyticsQuery,
 } from "@/features/employee-dashboard";
-import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useLeaderboardQuery, getEmployeePeriodicMetric } from "@/features/leaderboard";
 import { usePersonalActivityQuery, type ActivityLog } from "@/features/activity";
 
 export const Route = createFileRoute("/employee/")({
@@ -227,7 +227,9 @@ function EmployeeOverview() {
   }, [mine, analytics?.weeklyProgress]);
 
   const monthlyGoal = analytics?.monthlyPerformance?.pointsGoal ?? 600;
-  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const periodicMetric = getEmployeePeriodicMetric(currentUserId || auth.user?.empId);
+  const rawMonthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const monthlyPoints = periodicMetric?.monthlyPoints ?? rawMonthlyPoints;
   const monthlyProgress =
     monthlyGoal > 0 ? Math.min(100, Math.round((monthlyPoints / monthlyGoal) * 100)) : 0;
 
