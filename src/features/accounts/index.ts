@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./types/accounts.types";
 export * from "./services/accounts.api";
 export * from "./services/accounts.service";
+export * from "./services/account-pdf.service";
 export * from "./hooks/accounts.hooks";
 export * from "./hooks/use-accounts";
 export * from "./utils/accounts.utils";
