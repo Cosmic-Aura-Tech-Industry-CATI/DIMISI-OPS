@@ -290,7 +290,7 @@ function AccountsPage() {
               variant="outline"
               className="rounded-md gap-1.5"
               onClick={() => setExportOpen(true)}
-              disabled={isLoading || pagination.totalRecords === 0}
+              disabled={isLoading}
               title="Export ledger entries to PDF"
             >
               <FileDown className="h-4 w-4 text-primary" />
@@ -748,6 +748,8 @@ function AccountsPage() {
       <ExportAccountDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
+        transactions={transactions}
+        totalRecords={totalCount}
       />
     </>
   );

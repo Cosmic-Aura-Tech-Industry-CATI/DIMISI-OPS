@@ -1,27 +1,38 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Trophy, Medal, Award, AlertCircle } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useLeaderboardQuery } from "@/features/leaderboard";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  useLeaderboardQuery,
+  adjustLeaderboardByPeriod,
+  type LeaderboardPeriod,
+} from "@/features/leaderboard";
 import { useEmployeesQuery } from "@/features/employees";
 import type { AuthUser } from "@/auth/types/auth";
 import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 export interface AdminLeaderboardSearch {
-  period?: "weekly" | "monthly" | "yearly";
+  period?: LeaderboardPeriod;
 }
 
 export const Route = createFileRoute("/admin/leaderboard")({
   validateSearch: (search: Record<string, unknown>): AdminLeaderboardSearch => {
     const p = search.period as string;
-    if (p === "weekly" || p === "yearly") {
+    if (p === "monthly" || p === "weekly") {
       return { period: p };
     }
-    return { period: "monthly" };
+    return { period: "lifetime" };
   },
   head: () => ({
     meta: [
@@ -51,6 +62,8 @@ function initials(name: string) {
 }
 
 function LeaderboardPage() {
+  const searchParams = Route.useSearch();
+  const [period, setPeriod] = useState<LeaderboardPeriod>(searchParams.period || "lifetime");
   const {
     data: rawLeaderboard = [],
     isLoading: isLeaderboardLoading,
@@ -188,12 +201,36 @@ function LeaderboardPage() {
       }));
   }, [rawLeaderboard, employeeDirectoryMap]);
 
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
+  const periodAdjustedLeaderboard = useMemo(() => {
+    return adjustLeaderboardByPeriod(leaderboard, period);
+  }, [leaderboard, period]);
+
+  const top3 = periodAdjustedLeaderboard.slice(0, 3);
+  const rest = periodAdjustedLeaderboard.slice(3);
 
   return (
     <>
-      <PageHeader title="Leaderboard" subtitle="The top performers, powered by points." />
+      <PageHeader
+        title="Leaderboard"
+        subtitle="The top performers, powered by points."
+        actions={
+          <div className="flex items-center gap-2">
+            <Select
+              value={period}
+              onValueChange={(val: LeaderboardPeriod) => setPeriod(val)}
+            >
+              <SelectTrigger className="w-48 bg-card/60 border-border/60">
+                <SelectValue placeholder="Timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lifetime">Lifetime (Default)</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-6">
@@ -216,7 +253,7 @@ function LeaderboardPage() {
             Retry
           </button>
         </div>
-      ) : leaderboard.length === 0 ? (
+      ) : periodAdjustedLeaderboard.length === 0 ? (
         <EmptyState
           icon={Trophy}
           title="No Leaderboard Data Yet"

@@ -33,22 +33,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLeaderboardQuery } from "@/features/leaderboard";
+import {
+  useLeaderboardQuery,
+  adjustLeaderboardByPeriod,
+  type LeaderboardPeriod,
+} from "@/features/leaderboard";
 import { UserAvatar, getAvatarUrl } from "@/components/user-avatar";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export interface LeaderboardSearch {
-  period?: "weekly" | "monthly" | "yearly";
+  period?: LeaderboardPeriod;
 }
 
 export const Route = createFileRoute("/employee/leaderboard")({
   validateSearch: (search: Record<string, unknown>): LeaderboardSearch => {
     const p = search.period as string;
-    if (p === "weekly" || p === "yearly") {
+    if (p === "monthly" || p === "weekly") {
       return { period: p };
     }
-    return { period: "monthly" };
+    return { period: "lifetime" };
   },
   head: () => ({
     meta: [
@@ -119,6 +123,8 @@ function EmployeeLeaderboardPage() {
   const { user: currentUser } = useAuth();
   const { data: rawLeaderboard = [], isLoading, isError, error, refetch } = useLeaderboardQuery(50);
 
+  const searchParams = Route.useSearch();
+  const [period, setPeriod] = useState<LeaderboardPeriod>(searchParams.period || "lifetime");
   const [department, setDepartment] = useState<string>("all");
   const [search, setSearch] = useState("");
 
@@ -246,8 +252,8 @@ function EmployeeLeaderboardPage() {
   }, [rawLeaderboard, currentUser]);
 
   const periodAdjusted = useMemo(() => {
-    return leaderboardEntries;
-  }, [leaderboardEntries]);
+    return adjustLeaderboardByPeriod(leaderboardEntries, period);
+  }, [leaderboardEntries, period]);
 
   const departments = useMemo(
     () => Array.from(new Set(periodAdjusted.map((e) => e.department).filter(Boolean))) as string[],
@@ -294,6 +300,16 @@ function EmployeeLeaderboardPage() {
                 {d}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={period} onValueChange={(val: LeaderboardPeriod) => setPeriod(val)}>
+          <SelectTrigger className="sm:w-48">
+            <SelectValue placeholder="Timeframe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lifetime">Lifetime (Default)</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+            <SelectItem value="weekly">Weekly</SelectItem>
           </SelectContent>
         </Select>
       </div>

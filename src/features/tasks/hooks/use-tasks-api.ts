@@ -408,8 +408,30 @@ export function useDeleteTask(options?: UseMutationOptions<void, ApiError, strin
     mutationFn: (id) => tasksService.deleteTask(id),
     onSuccess: (...args) => {
       const [, id] = args;
+      // Optimistically remove from all cached task queries
+      queryClient.setQueriesData<any>({ queryKey: taskKeys.all }, (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          const filtered = old.filter((t: any) => (t.id || t._id) !== id);
+          if (old.pagination) {
+            (filtered as any).pagination = {
+              ...old.pagination,
+              totalRecords: Math.max(0, (old.pagination.totalRecords || 1) - 1),
+            };
+          }
+          return filtered;
+        }
+        if (old.tasks && Array.isArray(old.tasks)) {
+          return {
+            ...old,
+            tasks: old.tasks.filter((t: any) => (t.id || t._id) !== id),
+            total: Math.max(0, (old.total || 1) - 1),
+          };
+        }
+        return old;
+      });
       invalidateAllTaskQueries(queryClient, id);
-      toast.success("Task deleted successfully.");
+      toast.success("Overdue task deleted successfully.");
       options?.onSuccess?.(...args);
     },
     onError: (...args) => {
@@ -440,6 +462,40 @@ export function useAssignTask(
     onError: (...args) => {
       const [error] = args;
       toast.error(error?.message || "Failed to assign task.");
+      options?.onError?.(...args);
+    },
+    ...options,
+  });
+}
+
+/**
+ * Mutation hook for admin to reassign an overdue task to an employee.
+ */
+export function useReassignTask(
+  options?: UseMutationOptions<
+    Task,
+    ApiError,
+    { id: string; employeeId: string; deadline?: string; status?: string }
+  >,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Task,
+    ApiError,
+    { id: string; employeeId: string; deadline?: string; status?: string }
+  >({
+    mutationFn: ({ id, employeeId, deadline, status }) =>
+      tasksService.reassignTask(id, { employeeId, deadline, status }),
+    onSuccess: (...args) => {
+      const [, variables] = args;
+      invalidateAllTaskQueries(queryClient, variables.id);
+      toast.success("Task reassigned successfully!");
+      options?.onSuccess?.(...args);
+    },
+    onError: (...args) => {
+      const [error] = args;
+      toast.error(error?.message || "Failed to reassign task.");
       options?.onError?.(...args);
     },
     ...options,

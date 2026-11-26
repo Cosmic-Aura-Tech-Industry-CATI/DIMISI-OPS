@@ -255,9 +255,10 @@ export async function exportSyncPdf(params?: {
 
   const contentType = String(response.headers?.["content-type"] || "");
   if (
-    !contentType.includes("application/pdf") &&
-    !contentType.includes("application/octet-stream") &&
-    !(response.data instanceof Blob)
+    (!contentType.includes("application/pdf") &&
+      !contentType.includes("application/octet-stream") &&
+      !(response.data instanceof Blob)) ||
+    (response.data instanceof Blob && response.data.size < 50)
   ) {
     throw new Error("Invalid response format: expected PDF stream.");
   }

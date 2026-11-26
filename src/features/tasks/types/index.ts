@@ -1032,6 +1032,7 @@ export function mapTaskResponse(raw: RawTaskResponse | any): Task {
     isRequestedByMe,
     requestsCount: requests.length,
     requests,
+    isActive: (doc as any).isActive !== false,
   };
 }
 
@@ -1088,12 +1089,24 @@ export function buildUpdateTaskPayload(input: UpdateTaskInput): Record<string, u
   if (input.priority !== undefined) payload.priority = toBackendTaskPriority(input.priority);
   if (input.taskType !== undefined) payload.type = toBackendTaskType(input.taskType);
   if (input.points !== undefined) payload.rewardPoints = Number(input.points);
-  if (input.dueDate !== undefined)
-    payload.deadline = input.dueDate ? new Date(input.dueDate).toISOString() : "";
+  if (input.dueDate) {
+    const d = new Date(input.dueDate);
+    if (!isNaN(d.getTime())) payload.deadline = d.toISOString();
+  } else if ((input as any).deadline) {
+    const d = new Date((input as any).deadline);
+    if (!isNaN(d.getTime())) payload.deadline = d.toISOString();
+  }
   if (input.notes !== undefined) payload.notes = input.notes.trim();
   if (input.estimatedTime !== undefined) payload.estimatedTime = input.estimatedTime.trim();
   if (input.projectId !== undefined) payload.projectId = input.projectId;
-  if (input.assigneeId !== undefined) payload.assignedTo = input.assigneeId;
+  if (input.assigneeId !== undefined) {
+    payload.assignedTo = input.assigneeId;
+  } else if ((input as any).assignedTo !== undefined) {
+    payload.assignedTo = (input as any).assignedTo;
+  }
+  if (input.status !== undefined) {
+    payload.status = String(input.status).toLowerCase();
+  }
 
   if (input.uploadedAttachments !== undefined) {
     payload.attachments = input.uploadedAttachments.map((att) => ({
