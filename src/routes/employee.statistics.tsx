@@ -157,6 +157,9 @@ function StatisticsPage() {
   }, [leaderboard, currentUserId, auth.user?.email, auth.user?.name]);
 
   const totalPoints = useMemo(() => {
+    if (typeof myLeaderboardEntry?.points === "number") {
+      return myLeaderboardEntry.points;
+    }
     const userRec = auth.user as unknown as Record<string, unknown> | null;
     const fromAuth =
       typeof userRec?.points === "number"
@@ -164,19 +167,16 @@ function StatisticsPage() {
         : typeof userRec?.rewardPoints === "number"
           ? (userRec.rewardPoints as number)
           : undefined;
-    const fromLeaderboard = myLeaderboardEntry?.points;
     const fromAnalytics = analytics?.monthlyPerformance?.totalPoints;
-    const candidates = [
-      fromAnalytics,
-      fromAuth,
-      fromLeaderboard,
-      completedTasksPoints,
-    ].filter((v): v is number => typeof v === "number" && !isNaN(v) && v > 0);
-    if (candidates.length > 0) {
-      return Math.max(...candidates);
+    return typeof fromAuth === "number" ? fromAuth : (fromAnalytics ?? 0);
+  }, [myLeaderboardEntry?.points, auth.user, analytics?.monthlyPerformance?.totalPoints]);
+
+  const completedCount = useMemo(() => {
+    if (typeof myLeaderboardEntry?.completedTasks === "number") {
+      return myLeaderboardEntry.completedTasks;
     }
-    return fromAnalytics ?? fromAuth ?? 0;
-  }, [auth.user, myLeaderboardEntry, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints]);
+    return completed.length;
+  }, [myLeaderboardEntry?.completedTasks, completed.length]);
 
   // Monthly Analytics derived metrics from employeeDashboard.analytics
   const monthlyStats = useMemo(() => {
@@ -647,7 +647,7 @@ function StatisticsPage() {
         />
         <StatCard
           label="Tasks completed"
-          value={`${completed.length}`}
+          value={`${completedCount}`}
           icon={CheckCircle2}
           accent="success"
           hint={inReview.length > 0 ? `${inReview.length} in review right now` : `${mine.length - completed.length} remaining`}

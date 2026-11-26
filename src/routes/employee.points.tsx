@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
-import { useLeaderboardQuery } from "@/features/leaderboard";
+import { useLeaderboardQuery, getEmployeePeriodicMetric } from "@/features/leaderboard";
 import { useTasksQuery, useCompletedTasks, getCategoryLabel } from "@/features/tasks";
 import { useEmployeeProgressAnalyticsQuery } from "@/features/employee-dashboard";
 
@@ -71,19 +71,29 @@ function PointsPage() {
   const leaderboardUser = userRankIndex >= 0 ? leaderboard[userRankIndex] : null;
 
   const points = useMemo(() => {
-    const userRec = auth.user as unknown as Record<string, unknown> | null;
-    const fromAuth = typeof userRec?.points === "number" ? (userRec.points as number) : typeof userRec?.rewardPoints === "number" ? (userRec.rewardPoints as number) : undefined;
-    const fromLeaderboard = leaderboardUser?.points;
-    const candidates = [fromAuth, fromLeaderboard, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints].filter(
-      (v): v is number => typeof v === "number" && !isNaN(v) && v > 0
-    );
-    if (candidates.length > 0) {
-      return Math.max(...candidates);
+    if (typeof leaderboardUser?.points === "number") {
+      return leaderboardUser.points;
     }
-    return fromAuth ?? (analytics?.monthlyPerformance?.totalPoints || 0);
-  }, [auth.user, leaderboardUser, completedTasksPoints, analytics?.monthlyPerformance?.totalPoints]);
+    const userRec = auth.user as unknown as Record<string, unknown> | null;
+    const fromAuth =
+      typeof userRec?.points === "number"
+        ? (userRec.points as number)
+        : typeof userRec?.rewardPoints === "number"
+          ? (userRec.rewardPoints as number)
+          : undefined;
+    return typeof fromAuth === "number" ? fromAuth : (analytics?.monthlyPerformance?.totalPoints || 0);
+  }, [leaderboardUser?.points, auth.user, analytics?.monthlyPerformance?.totalPoints]);
 
-  const monthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const completedCount = useMemo(() => {
+    if (typeof leaderboardUser?.completedTasks === "number") {
+      return leaderboardUser.completedTasks;
+    }
+    return recent.length;
+  }, [leaderboardUser?.completedTasks, recent.length]);
+
+  const periodicMetric = getEmployeePeriodicMetric(currentUserId || auth.user?.empId);
+  const rawMonthlyPoints = analytics?.monthlyPerformance?.totalPoints ?? 0;
+  const monthlyPoints = periodicMetric?.monthlyPoints ?? Math.min(points, rawMonthlyPoints);
 
   const nextTier = tiers.find((t) => t.min > points) ?? tiers[tiers.length - 1];
   const currentTier = [...tiers].reverse().find((t) => points >= t.min) || tiers[0];
@@ -96,7 +106,7 @@ function PointsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total points" value={points.toLocaleString()} icon={Sparkles} accent="primary" />
         <StatCard label="Current rank" value={`#${rank}`} icon={Trophy} accent="warning" />
-        <StatCard label="Completed tasks" value={`${recent.length}`} icon={Zap} hint="Verified closes" accent="info" />
+        <StatCard label="Completed tasks" value={`${completedCount}`} icon={Zap} hint="Verified closes" accent="info" />
         <StatCard label="This month" value={`+${monthlyPoints}`} icon={Star} accent="success" />
       </div>
 
