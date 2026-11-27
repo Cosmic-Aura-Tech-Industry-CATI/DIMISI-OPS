@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import {
@@ -443,11 +444,11 @@ function StatisticsPage() {
     });
 
     const colors = [
-      "oklch(0.72 0.19 45)",
-      "oklch(0.68 0.16 265)",
-      "oklch(0.72 0.16 165)",
-      "oklch(0.78 0.16 85)",
-      "oklch(0.65 0.2 330)",
+      "var(--chart-1)",
+      "var(--chart-2)",
+      "var(--chart-3)",
+      "var(--chart-4)",
+      "var(--chart-5)",
     ];
 
     if (catMap.size === 0) {
@@ -675,12 +676,12 @@ function StatisticsPage() {
             <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Target className="h-3.5 w-3.5 text-primary" /> Monthly Points Goal
             </span>
-            <span className="text-xs font-semibold text-primary">{monthlyStats.progressPct}%</span>
+            <span className="text-xs font-semibold text-primary"><MetricValue value={monthlyStats.progressPct} />%</span>
           </div>
           <div className="flex items-baseline justify-between text-xs">
             <span className="text-lg font-bold text-foreground">
-              {monthlyStats.pointsEarned.toLocaleString()}{" "}
-              <span className="text-xs font-normal text-muted-foreground">/ {monthlyStats.pointsGoal.toLocaleString()} pts</span>
+              <MetricValue value={monthlyStats.pointsEarned} formatNumber={localizedNumber} />{" "}
+              <span className="text-xs font-normal text-muted-foreground">/ <MetricValue value={monthlyStats.pointsGoal} formatNumber={localizedNumber} /> pts</span>
             </span>
           </div>
           <Progress value={monthlyStats.progressPct} className="h-2 bg-secondary" />
@@ -698,7 +699,7 @@ function StatisticsPage() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-xl font-bold text-foreground">{monthlyStats.avgPerDay}</span>
+            <span className="text-xl font-bold text-foreground"><MetricValue value={monthlyStats.avgPerDay} /></span>
             <span className="text-xs text-muted-foreground">pts / day</span>
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">Average points per day this month</p>
@@ -711,7 +712,7 @@ function StatisticsPage() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-xl font-bold text-foreground">{monthlyStats.bestDay}</span>
+            <span className="text-xl font-bold text-foreground"><MetricValue value={monthlyStats.bestDay} /></span>
             <span className="text-xs text-muted-foreground">pts</span>
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">Single day highest output record</p>
@@ -724,7 +725,7 @@ function StatisticsPage() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-xl font-bold text-foreground">{monthlyStats.tasksPerWeek}</span>
+            <span className="text-xl font-bold text-foreground"><MetricValue value={monthlyStats.tasksPerWeek} /></span>
             <span className="text-xs text-muted-foreground">tasks / wk</span>
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">Estimated weekly task completion rate</p>
@@ -779,19 +780,19 @@ function StatisticsPage() {
                   name="Tasks completed"
                   type="monotone"
                   dataKey="tasks"
-                  stroke="oklch(0.68 0.16 265)"
+                  stroke="var(--chart-2)"
                   strokeWidth={2}
-                  dot={{ r: 4, fill: "oklch(0.68 0.16 265)" }}
+                  dot={{ r: 4, fill: "var(--chart-2)" }}
                 />
                 {timeRange === "7d" && (
                   <Line
                     name="Tasks planned"
                     type="monotone"
                     dataKey="planned"
-                    stroke="oklch(0.78 0.16 85)"
+                    stroke="var(--chart-4)"
                     strokeWidth={1.75}
                     strokeDasharray="4 4"
-                    dot={{ r: 3, fill: "oklch(0.78 0.16 85)" }}
+                    dot={{ r: 3, fill: "var(--chart-4)" }}
                   />
                 )}
               </AreaChart>
@@ -840,8 +841,8 @@ function StatisticsPage() {
                   <span className="font-medium text-foreground">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-3 text-muted-foreground">
-                  <span>{item.value} {item.value === 1 ? "task" : "tasks"}</span>
-                  <span className="font-semibold text-primary">{item.points} pts</span>
+                  <span><MetricValue value={item.value} /> {item.value === 1 ? "task" : "tasks"}</span>
+                  <span className="font-semibold text-primary"><MetricValue value={item.points} /> pts</span>
                 </div>
               </li>
             ))}
@@ -854,33 +855,33 @@ function StatisticsPage() {
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Approval Rate</span>
-            <span className="font-semibold text-success">{approvalRate}%</span>
+            <span className="font-semibold text-success"><MetricValue value={approvalRate} />%</span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div className="h-full rounded-full bg-success transition-all" style={{ width: `${approvalRate}%` }} />
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            {completed.length} of {completed.length + rejectedTasks.length} approved
+            <MetricValue value={completed.length} /> of <MetricValue value={completed.length + rejectedTasks.length} /> approved
           </p>
         </div>
 
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>On-Time Delivery</span>
-            <span className="font-semibold text-primary">{onTimeStats.rate}%</span>
+            <span className="font-semibold text-primary"><MetricValue value={onTimeStats.rate} />%</span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${onTimeStats.rate}%` }} />
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            {onTimeStats.count} tasks delivered before deadline
+            <MetricValue value={onTimeStats.count} /> tasks delivered before deadline
           </p>
         </div>
 
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Quality Score</span>
-            <span className="font-semibold text-warning">{qualityScore} / 5.0</span>
+            <span className="font-semibold text-warning"><MetricValue value={qualityScore} /> / 5.0</span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
@@ -894,7 +895,7 @@ function StatisticsPage() {
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Bonus Multiplier</span>
-            <span className="font-semibold text-info">{bonusMultiplier}</span>
+            <span className="font-semibold text-info"><MetricValue value={bonusMultiplier} /></span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
@@ -919,7 +920,7 @@ function StatisticsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={skillsRadar}>
                 <PolarGrid stroke={GRID_STROKE} />
-                <PolarAngleAxis dataKey="skill" tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
+                <PolarAngleAxis dataKey="skill" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
                 <PolarRadiusAxis stroke={GRID_STROKE} tick={false} axisLine={false} />
                 <Radar
                   name="Proficiency"
@@ -934,7 +935,7 @@ function StatisticsPage() {
 
           <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-xs">
             <span className="text-muted-foreground">Overall Mastery</span>
-            <span className="font-semibold text-primary">{overallMastery} / 100</span>
+            <span className="font-semibold text-primary"><MetricValue value={overallMastery} /> / 100</span>
           </div>
         </div>
 
@@ -959,7 +960,7 @@ function StatisticsPage() {
                 <YAxis yAxisId="right" orientation="right" {...axisStyle} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="left" dataKey="completed" name="Tasks completed" fill="oklch(0.68 0.16 265)" radius={[6, 6, 0, 0]} />
+                <Bar yAxisId="left" dataKey="completed" name="Tasks completed" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
                 <Bar yAxisId="right" dataKey="points" name="Points earned" fill={ACCENT} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -975,7 +976,7 @@ function StatisticsPage() {
             <p className="text-xs text-muted-foreground">Recognition badges for exceptional performance</p>
           </div>
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-            <Star className="mr-1 h-3 w-3" /> {unlockedCount} of {achievements.length} unlocked
+            <Star className="mr-1 h-3 w-3" /> <MetricValue value={unlockedCount} /> of <MetricValue value={achievements.length} /> unlocked
           </Badge>
         </div>
 

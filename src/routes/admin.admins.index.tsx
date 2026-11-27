@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -742,7 +743,7 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
         </div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
       </div>
-      <p className="mt-3 font-display text-2xl font-semibold">{value}</p>
+      <p className="mt-3 font-display text-2xl font-semibold"><MetricValue value={value} /></p>
     </div>
   );
 }

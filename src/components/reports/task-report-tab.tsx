@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -44,7 +45,7 @@ export function TaskReportTab({
         {buckets.map((t) => (
           <div key={t.key} className="glass rounded-2xl p-5">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{t.label}</div>
-            <div className={cn("mt-1 font-display text-3xl font-semibold", t.tone)}>{t.value}</div>
+            <div className={cn("mt-1 font-display text-3xl font-semibold", t.tone)}><MetricValue value={t.value} /></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
@@ -94,7 +95,7 @@ export function TaskReportTab({
                   <TableCell>
                     <StatusBadge status={t.status as any} />
                   </TableCell>
-                  <TableCell className="text-right font-medium">+{t.points}</TableCell>
+                  <TableCell className="text-right font-medium">+<MetricValue value={t.points} /></TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">
                     {t.dueDate
                       ? new Date(t.dueDate).toLocaleDateString(undefined, {

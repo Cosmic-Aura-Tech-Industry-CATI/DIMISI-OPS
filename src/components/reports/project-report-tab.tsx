@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import {
   Bar,
   BarChart,
@@ -51,7 +52,7 @@ export function ProjectReportTab({
               <YAxis {...axisStyle} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="total" name="Total" fill="oklch(0.35 0 0)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="total" name="Total" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
               <Bar dataKey="completed" name="Completed" fill={ACCENT} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -126,11 +127,11 @@ export function ProjectReportTab({
                     {projectStatusLabel[p.status]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right text-sm">{p.total}</TableCell>
-                <TableCell className="text-right text-sm">{p.available}</TableCell>
-                <TableCell className="text-right text-sm">{p.inReview}</TableCell>
-                <TableCell className="text-right text-sm text-primary">{p.completed}</TableCell>
-                <TableCell className="text-right text-sm">{p.employees}</TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.total} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.available} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.inReview} /></TableCell>
+                <TableCell className="text-right text-sm text-primary"><MetricValue value={p.completed} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.employees} /></TableCell>
                 <TableCell>
                   <CompletionMeter rate={p.rate} />
                 </TableCell>

@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -633,7 +634,7 @@ function TasksPage() {
                     label: "Points",
                     value: (
                       <span className="inline-flex items-center gap-1">
-                        <Trophy className="h-3 w-3 text-warning" /> {t.points}
+                        <Trophy className="h-3 w-3 text-warning" /> <MetricValue value={t.points} />
                       </span>
                     ),
                   },
@@ -827,7 +828,7 @@ function SummaryCard({
         <p className="mt-2 font-display text-sm font-medium text-destructive">Error</p>
       ) : value !== undefined && value !== null ? (
         <p className={`mt-2 font-display text-2xl font-semibold ${tone}`}>
-          {value.toLocaleString()}
+          <MetricValue value={value} formatNumber={localizedNumber} />
         </p>
       ) : (
         <p

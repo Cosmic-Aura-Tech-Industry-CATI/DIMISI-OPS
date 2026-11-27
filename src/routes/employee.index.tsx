@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
@@ -371,7 +372,7 @@ function EmployeeOverview() {
               <p className="mt-1 text-sm text-muted-foreground">
                 You have{" "}
                 <span className="font-medium text-foreground">
-                  {pending.length} active {pending.length === 1 ? "task" : "tasks"}
+                  <MetricValue value={pending.length} /> active {pending.length === 1 ? "task" : "tasks"}
                 </span>{" "}
                 on your plate. Keep it going.
               </p>
@@ -539,8 +540,8 @@ function EmployeeOverview() {
           <div className="mt-6 flex items-center gap-5">
             <CircularProgress value={monthlyProgress} />
             <div>
-              <p className="font-display text-2xl font-semibold">{monthlyPoints}</p>
-              <p className="text-xs text-muted-foreground">of {monthlyGoal} pts goal</p>
+              <p className="font-display text-2xl font-semibold"><MetricValue value={monthlyPoints} /></p>
+              <p className="text-xs text-muted-foreground">of <MetricValue value={monthlyGoal} /> pts goal</p>
               <p className="mt-2 text-xs text-success">
                 {monthlyProgress >= 100 ? "Goal achieved!" : `${monthlyProgress}% completed`}
               </p>
@@ -712,7 +713,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+      <p className="mt-1 text-sm font-semibold"><MetricValue value={value} /></p>
     </div>
   );
 }
@@ -748,7 +749,7 @@ function CircularProgress({ value }: { value: number }) {
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center">
-        <span className="font-display text-lg font-semibold">{value}%</span>
+        <span className="font-display text-lg font-semibold"><MetricValue value={value} />%</span>
       </div>
     </div>
   );

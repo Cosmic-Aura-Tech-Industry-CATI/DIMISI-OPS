@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { Sparkles } from "lucide-react";
 import {
   Table,
@@ -49,15 +50,15 @@ export function EmployeeReportTab({
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{e.department}</TableCell>
-              <TableCell className="text-right text-sm">{e.assigned}</TableCell>
-              <TableCell className="text-right text-sm text-primary">{e.completed}</TableCell>
-              <TableCell className="text-right text-sm text-primary">{e.overdue}</TableCell>
+              <TableCell className="text-right text-sm"><MetricValue value={e.assigned} /></TableCell>
+              <TableCell className="text-right text-sm text-primary"><MetricValue value={e.completed} /></TableCell>
+              <TableCell className="text-right text-sm text-primary"><MetricValue value={e.overdue} /></TableCell>
               <TableCell>
                 <CompletionMeter rate={e.rate} />
               </TableCell>
               <TableCell className="text-right font-display font-semibold">
                 <span className="inline-flex items-center gap-1 text-primary">
-                  <Sparkles className="h-3 w-3" /> {e.points.toLocaleString()}
+                  <Sparkles className="h-3 w-3" /> <MetricValue value={e.points} formatNumber={localizedNumber} />
                 </span>
               </TableCell>
             </TableRow>

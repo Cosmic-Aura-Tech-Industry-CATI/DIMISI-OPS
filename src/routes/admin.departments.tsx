@@ -1,3 +1,5 @@
+import SpecularButton from "@/components/ui/SpecularButton";
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -122,9 +124,9 @@ function DepartmentsPage() {
                 className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
               />
             </Button>
-            <Button className="rounded-md" onClick={() => setCreateOpen(true)}>
+            <SpecularButton onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> New department
-            </Button>
+            </SpecularButton>
           </div>
         }
       />
@@ -422,7 +424,7 @@ function DepartmentCard({
       {/* Designations Section */}
       <div className="space-y-2 border-t border-border/40 pt-3">
         <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          <span>Designations ({designations.length})</span>
+          <span>Designations (<MetricValue value={designations.length} />)</span>
           {isLoadingDesigs && <Loader2 className="h-3 w-3 animate-spin" />}
         </div>
 

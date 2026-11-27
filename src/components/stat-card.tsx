@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import type { LucideIcon } from "lucide-react";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,8 +53,8 @@ export function StatCard({ label, value, icon: Icon, delta, hint, accent = "prim
       />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="line-clamp-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground [overflow-wrap:normal]" title={label}>{label}</p>
-          <p className="mt-2 truncate font-sans text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+          <p data-stat-label className="line-clamp-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground [overflow-wrap:normal]" title={label}>{label}</p>
+          <p className="mt-2 truncate font-sans text-3xl font-semibold tracking-tight tabular-nums"><MetricValue value={value} /></p>
           {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </div>
         <div
@@ -83,7 +84,7 @@ export function StatCard({ label, value, icon: Icon, delta, hint, accent = "prim
             ) : (
               <ArrowDownRight className="h-3 w-3" />
             )}
-            {Math.abs(delta)}%
+            <MetricValue value={Math.abs(delta)} />%
           </span>
           <span className="text-muted-foreground">vs last week</span>
         </div>

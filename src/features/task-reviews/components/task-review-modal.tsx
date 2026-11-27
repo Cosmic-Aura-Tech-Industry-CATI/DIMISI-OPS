@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import React, { useState, useEffect, Component, type ErrorInfo } from "react";
 import {
   CheckCircle2,
@@ -751,7 +752,7 @@ function TaskReviewModalContent({
                     <div className="min-w-0 flex-1">
                       <div className="text-muted-foreground text-[11px] font-medium">Reward Points</div>
                       <div className="font-bold text-warning truncate">
-                        {rewardPointsDisplay} pts
+                        <MetricValue value={rewardPointsDisplay} /> pts
                       </div>
                     </div>
                   </div>

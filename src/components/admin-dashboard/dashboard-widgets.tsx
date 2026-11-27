@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { Link } from "@tanstack/react-router";
 import { CalendarClock, Star, Trophy, Users } from "lucide-react";
 import { IdBadge } from "@/components/id-badge";
@@ -166,7 +167,7 @@ export function LeaderboardPreview({ entries = [] }: { entries?: LeaderboardEntr
                   <p className="text-xs text-muted-foreground">{departmentName}</p>
                 </div>
                 <div className="flex items-center gap-1 text-xs font-semibold text-primary">
-                  <Star className="h-3 w-3 fill-primary" /> {Number(e.points || 0).toLocaleString()}
+                  <Star className="h-3 w-3 fill-primary" /> <MetricValue value={Number(e.points || 0)} formatNumber={localizedNumber} />
                 </div>
               </li>
             );
@@ -246,7 +247,7 @@ export function LatestEmployeesTable({ employees = [] }: { employees?: AuthUser[
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
-                      {Number(e.points || 0).toLocaleString()}
+                      <MetricValue value={Number(e.points || 0)} formatNumber={localizedNumber} />
                     </td>
                   </tr>
                 );

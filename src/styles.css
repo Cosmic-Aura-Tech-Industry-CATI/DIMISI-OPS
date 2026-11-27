@@ -59,12 +59,12 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --shadow-glass: 0 8px 32px 0 rgb(0 0 0 / 0.45);
-  --shadow-glow: 0 0 24px rgb(201 169 97 / 0.14);
-  --shadow-glow-lg: 0 0 48px rgb(201 169 97 / 0.12), 0 0 18px rgb(201 169 97 / 0.10);
+  --shadow-glow: 0 0 24px rgb(var(--glow-rgb, 201 169 97) / 0.14);
+  --shadow-glow-lg: 0 0 48px rgb(var(--glow-rgb, 201 169 97) / 0.12), 0 0 18px rgb(var(--glow-rgb, 201 169 97) / 0.10);
   --shadow-soft: 0 12px 32px -14px rgb(0 0 0 / 0.7);
   --shadow-elegant: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 16px 44px -22px rgb(0 0 0 / 0.75), 0 2px 8px -2px rgb(0 0 0 / 0.4);
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 10px 26px -16px rgb(0 0 0 / 0.6);
-  --shadow-ring-primary: 0 0 0 3px rgb(201 169 97 / 0.30);
+  --shadow-ring-primary: 0 0 0 3px rgb(var(--glow-rgb, 201 169 97) / 0.30);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
@@ -150,8 +150,8 @@
   --info: #8A8A8A;
   --info-foreground: #070707;
 
-  --border: rgb(201 169 97 / 0.18);
-  --input: rgb(201 169 97 / 0.22);
+  --border: rgb(var(--glow-rgb, 201 169 97) / 0.18);
+  --input: rgb(var(--glow-rgb, 201 169 97) / 0.22);
   --ring: #C9A961;
 
   --chart-1: #FFFFFF;
@@ -166,13 +166,98 @@
   --sidebar-primary-foreground: #070707;
   --sidebar-accent: #1C1C1C;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgb(201 169 97 / 0.18);
+  --sidebar-border: rgb(var(--glow-rgb, 201 169 97) / 0.18);
   --sidebar-ring: #C9A961;
 }
 
 
 
 
+/* The login and OTP scene owns its reference palette, including its portaled controls. */
+:root:not(:has(.login-scene)) {
+  --background: #f4f6fc;
+  --foreground: #101629;
+  --card: #fff;
+  --popover: var(--card);
+  --primary: #ce1038;
+  --primary-foreground: #fff;
+  --secondary: #e8edf7;
+  --muted: var(--secondary);
+  --muted-foreground: #596579;
+  --accent: #e1e8f4;
+  --accent-foreground: var(--foreground);
+  --border: #d5dce8;
+  --input: #a4b0c4;
+  --ring: var(--primary);
+  --destructive: #b42324;
+  --success: #11704e;
+  --warning: #815000;
+  --info: #285e9a;
+  --destructive-foreground: var(--primary-foreground);
+  --success-foreground: var(--primary-foreground);
+  --warning-foreground: var(--primary-foreground);
+  --info-foreground: var(--primary-foreground);
+  --chart-1: var(--primary);
+  --chart-2: #3b64a3;
+  --chart-3: #237763;
+  --chart-4: #995e18;
+  --chart-5: #8058a3;
+  --chart-6: #16778a;
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --secondary-foreground: var(--foreground);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --glow-rgb: 239 18 60;
+  --gradient-primary: linear-gradient(115deg, var(--primary), #ab1938);
+  --shadow-card: 0 5px 18px -10px rgb(43 60 90 / .22);
+  --shadow-elegant: 0 10px 28px -13px rgb(39 55 84 / .24);
+  --page-wash: linear-gradient(155deg, #fcfdff, transparent 58%, #e9eef8);
+}
+:root.dark:not(:has(.login-scene)) {
+  --background: #080d15;
+  --foreground: #f5f7fa;
+  --card: #151d28;
+  --popover: #1a2432;
+  --primary: #ff485d;
+  --primary-foreground: #130911;
+  --secondary: #101822;
+  --muted: #1b2532;
+  --muted-foreground: #a1aab8;
+  --accent: #242f3e;
+  --border: #303946;
+  --input: #536176;
+  --destructive: #ff827b;
+  --success: #6fd4a6;
+  --warning: #efbc68;
+  --info: #8ebcf9;
+  --chart-2: #84aef6;
+  --chart-3: #62c7a9;
+  --chart-4: #e4af65;
+  --chart-5: #c5a0df;
+  --chart-6: #77c6d6;
+  --sidebar: var(--secondary);
+  --glow-rgb: 255 48 69;
+  --gradient-primary: linear-gradient(115deg, #ff96a2, var(--primary));
+  --shadow-card: 0 6px 20px -9px rgb(0 4 12 / .55);
+  --shadow-elegant: 0 12px 30px -12px rgb(0 4 12 / .65);
+  --page-wash: linear-gradient(150deg, #101b29, transparent 58%, #0c121e);
+}
+:root:not(:has(.login-scene)) body {
+  background-image: radial-gradient(ellipse at 100% 0%, rgb(var(--glow-rgb) / .045), transparent 43%), var(--page-wash);
+}
+:root:not(:has(.login-scene)) :is(button.bg-primary, [aria-current="page"], [role="tab"][data-state="active"]) {
+  box-shadow: inset 0 0 0 1px rgb(var(--glow-rgb) / .3), 0 2px 10px rgb(var(--glow-rgb) / .12);
+}
+:root:not(:has(.login-scene)) .site-theme-switch sakuga-toggle {
+  --switch-art-filter: grayscale(.8) sepia(.6) hue-rotate(302deg) saturate(1.5);
+}
 @layer base {
   * {
     border-color: var(--color-border);
@@ -201,8 +286,8 @@
   }
   .dark body {
     background-image:
-      radial-gradient(1200px 600px at -10% -20%, rgb(201 169 97 / 0.07), transparent 60%),
-      radial-gradient(900px 500px at 110% 10%, rgb(201 169 97 / 0.045), transparent 60%);
+      radial-gradient(1200px 600px at -10% -20%, rgb(var(--glow-rgb, 201 169 97) / 0.07), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgb(var(--glow-rgb, 201 169 97) / 0.045), transparent 60%);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -351,8 +436,8 @@
   50% { transform: translateY(-6px); }
 }
 @keyframes pollPulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(201 169 97 / 0.22), var(--shadow-card); }
-  50% { box-shadow: 0 0 0 8px rgb(201 169 97 / 0), var(--shadow-glow-lg); }
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--glow-rgb, 201 169 97) / 0.22), var(--shadow-card); }
+  50% { box-shadow: 0 0 0 8px rgb(var(--glow-rgb, 201 169 97) / 0), var(--shadow-glow-lg); }
 }
 
 
