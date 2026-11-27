@@ -1,9 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/api/client/query-keys";
+import type { AuthUser } from "@/auth/types/auth";
+import { EmployeeTaskPicker } from "@/features/tasks/components/employee-task-picker";
 import {
   AlertCircle,
   ArrowUpDown,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -50,14 +53,14 @@ import {
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import {
-  admins,
-  type Task,
   type TaskPriority,
   type TaskStatus,
   type TaskType,
 } from "@/lib/mock-data";
 import {
   useTasksQuery,
+  tasksService,
+  type Task,
   useTaskStatsQuery,
   useDeleteTask,
   mapTaskResponse,
@@ -90,6 +93,13 @@ export const Route = createFileRoute("/admin/tasks/")({
 
 type SortKey = "title" | "priority" | "points" | "dueDate";
 type SortDir = "asc" | "desc";
+
+const sortOptions = [
+  ["title", "Title"],
+  ["priority", "Priority"],
+  ["points", "Points"],
+  ["dueDate", "Deadline"],
+] as const satisfies ReadonlyArray<readonly [SortKey, string]>;
 
 const DEFAULT_PAGE_SIZE = 10;
 const taskId = (id: string) => id;
@@ -134,7 +144,10 @@ function TasksPage() {
 
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
-  const isSearchActive = debouncedQuery.trim().length > 0;
+  const [employee, setEmployee] = useState<AuthUser | null>(null);
+  const [showInProgressFirst, setShowInProgressFirst] = useState(true);
+  const employeeId = employee?._id || employee?.id;
+  const isSearchActive = !employeeId && debouncedQuery.trim().length > 0;
 
   const [status, setStatus] = useState<"all" | TaskStatus | "submitted" | "rejected">("all");
   const [priority, setPriority] = useState<"all" | TaskPriority>("all");
@@ -171,11 +184,27 @@ function TasksPage() {
   );
 
   const {
-    data: tasks = [],
+    data: generalTasks = [],
     isLoading: isBaseLoading,
-    isError,
-    refetch,
-  } = useTasksQuery(taskFilters);
+    isError: generalError,
+    refetch: refetchGeneral,
+  } = useTasksQuery(taskFilters, { enabled: !employeeId });
+  const employeeTasks = useQuery({
+    queryKey: queryKeys.tasks.list({ assignedTo: employeeId, allPages: true }),
+    enabled: Boolean(employeeId),
+    queryFn: async ({ signal }) => {
+      const first = await tasksService.getTasks({ assignedTo: employeeId, page: 1 });
+      const items = [...first];
+      for (let n = 2; n <= (first.pagination?.totalPages ?? 1); n++) {
+        signal.throwIfAborted();
+        items.push(...await tasksService.getTasks({ assignedTo: employeeId, page: n }));
+      }
+      return items.filter((task) => task.assigneeId === employeeId);
+    },
+  });
+  const tasks = employeeId ? employeeTasks.data ?? [] : generalTasks;
+  const isError = employeeId ? employeeTasks.isError : generalError;
+  const refetch = employeeId ? employeeTasks.refetch : refetchGeneral;
   const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useTaskStatsQuery();
   const deleteTask = useDeleteTask({
     onSuccess: () => {
@@ -220,7 +249,7 @@ function TasksPage() {
         !deletedTaskIds.has(t._id),
     );
   }, [rawTaskPool, deletedTaskIds]);
-  const isLoading = isSearchActive ? isSearching && !searchResponse : isBaseLoading;
+  const isLoading = employeeId ? employeeTasks.isLoading : isSearchActive ? isSearching && !searchResponse : isBaseLoading;
 
   const categories = useMemo(
     () => Array.from(new Set(tasks.map((t) => getCategoryLabel(t.category)))).sort(),
@@ -229,19 +258,20 @@ function TasksPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return activeTaskPool.filter((t) => {
+    const localFilters = Boolean(employeeId) || isSearchActive;
+    const matches = activeTaskPool.filter((t) => {
       if (status === "rejected") {
         if (t.reviewState !== "rejected") return false;
-      } else if (isSearchActive) {
+      } else if (localFilters) {
         if (status === "submitted" || status === "pending") {
           if (t.reviewState !== "in_review") return false;
         } else if (status !== "all" && t.status !== status) {
           return false;
         }
       }
-      if (isSearchActive && priority !== "all" && t.priority !== priority) return false;
+      if (localFilters && priority !== "all" && t.priority !== priority) return false;
       if (category !== "all" && getCategoryLabel(t.category) !== category) return false;
-      if (isSearchActive && taskType !== "all" && (t.taskType ?? "direct") !== taskType)
+      if (localFilters && taskType !== "all" && (t.taskType ?? "direct") !== taskType)
         return false;
       if (!q || isSearchActive) return true;
       return (
@@ -251,7 +281,21 @@ function TasksPage() {
         getCategoryLabel(t.category).toLowerCase().includes(q)
       );
     });
-  }, [activeTaskPool, query, isSearchActive, status, priority, category, taskType]);
+    if (employeeId) {
+      matches.sort((a, b) => {
+        if (status === "all" && showInProgressFirst) {
+          const progressOrder = Number(b.status === "in_progress") - Number(a.status === "in_progress");
+          if (progressOrder !== 0) return progressOrder;
+        }
+        const order = sortKey === "title" ? a.title.localeCompare(b.title)
+          : sortKey === "points" ? a.points - b.points
+          : sortKey === "priority" ? priorityRank[a.priority] - priorityRank[b.priority]
+          : new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        return sortDir === "asc" ? order : -order;
+      });
+    }
+    return matches;
+  }, [activeTaskPool, query, employeeId, isSearchActive, status, priority, category, taskType, sortKey, sortDir, showInProgressFirst]);
 
   const isServerPaginated = isSearchActive
     ? Boolean(searchResponse?.pagination)
@@ -274,6 +318,7 @@ function TasksPage() {
     : filtered.slice((current - 1) * pageSize, current * pageSize);
 
   const toggleSort = (key: SortKey) => {
+    if (employeeId) setShowInProgressFirst(false);
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else {
       setSortKey(key);
@@ -350,6 +395,17 @@ function TasksPage() {
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <EmployeeTaskPicker onSelect={(person) => {
+          clearFilters();
+          setShowInProgressFirst(true);
+          setEmployee(person);
+        }} />
+        {employee && <>
+          <h2 className="font-medium">{employee.name}’s tasks</h2>
+          <Button variant="ghost" size="sm" onClick={() => { clearFilters(); setEmployee(null); }}>Show all tasks</Button>
+        </>}
+      </div>
       <div className="glass flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -478,14 +534,31 @@ function TasksPage() {
               Page {current} of {pages}
             </span>
           </div>
-          {/* Mobile: cards instead of horizontal scrolling */}
-          <div className="space-y-3 p-3 lg:hidden">
-            {slice.length === 0 && (
-              <EmptyState
-                icon={ListTodo}
-                title="No tasks match"
-                description="Try clearing filters or creating a new task."
+          <div
+            role="group"
+            aria-label="Sort tasks"
+            className="flex flex-wrap items-center gap-2 px-5 pt-3 text-xs text-muted-foreground"
+          >
+            <span>Sort by</span>
+            {sortOptions.map(([key, label]) => (
+              <SortBtn
+                key={key}
+                label={label}
+                active={sortKey === key}
+                dir={sortDir}
+                onClick={() => toggleSort(key)}
               />
+            ))}
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4 p-4 [&_dd]:whitespace-normal [&_dd]:break-words">
+            {slice.length === 0 && (
+              <div className="col-span-full">
+                <EmptyState
+                  icon={ListTodo}
+                  title={employee && tasks.length === 0 ? "No tasks assigned" : "No tasks match"}
+                  description={employee && tasks.length === 0 ? `${employee.name} has no tasks to display.` : "Try clearing filters or creating a new task."}
+                />
+              </div>
             )}
             {slice.map((t, i) => (
               <RecordCard
@@ -499,32 +572,50 @@ function TasksPage() {
                   />
                 }
                 title={
-                  <Link
-                    to="/admin/tasks/$id"
-                    params={{ id: t.id }}
-                    className="hover:text-primary line-clamp-2 break-words"
-                    title={t.title}
-                  >
-                    {t.title}
-                  </Link>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to="/admin/tasks/$id"
+                          params={{ id: t.id }}
+                          className="block font-medium hover:text-primary line-clamp-2 whitespace-normal break-words leading-snug"
+                          title={t.title}
+                        >
+                          {t.title}
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-md break-words">
+                        <p>{t.title}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 }
                 subtitle={formatTaskSubtitle(t.category, t.id)}
                 badges={
                   <>
                     <TaskTypeBadge type={t.taskType} />
                     <StatusBadge status={t.status} />
+                    {employeeId && t.status !== "rejected" && t.reviewState === "rejected" && <StatusBadge status="rejected" />}
                     <PriorityBadge priority={t.priority} />
                   </>
                 }
                 fields={[
                   {
                     label: "Employee",
-                    value: t.assignee
-                      ? `${t.assignee}${t.assigneeCode ? ` · ${t.assigneeCode}` : ""}`
-                      : t.taskType === "project"
-                        ? `Open · ${projectName(t.projectId)}`
-                        : "Unassigned",
+                    value: t.assignee ? (
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        {t.assignee}
+                        {t.assigneeCode && <IdBadge id={t.assigneeCode} />}
+                      </span>
+                    ) : t.taskType === "project" ? (
+                      "Open"
+                    ) : (
+                      "Unassigned"
+                    ),
                   },
+                  ...(t.taskType === "project"
+                    ? [{ label: "Project", value: projectName(t.projectId) }]
+                    : []),
                   ...(t.assignedAt
                     ? [
                         {
@@ -556,283 +647,73 @@ function TasksPage() {
                   },
                   { label: "Created by", value: createdByFor(t) },
                 ]}
-                actions={
-                  (() => {
-                    const isOverdue = isTaskOverdue(t);
-                    const isCompleted = isTaskCompleted(t);
+                actions={(() => {
+                  const isOverdue = isTaskOverdue(t);
+                  const isCompleted = isTaskCompleted(t);
 
-                    return (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
+                  return (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Actions for ${t.title}`}
+                          className="h-9 w-9 rounded-md"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            navigate({
+                              to: "/admin/tasks/$id",
+                              params: { id: t.id || (t as any)._id },
+                            })
+                          }
+                        >
+                          <Eye className="mr-2 h-4 w-4" /> View
+                        </DropdownMenuItem>
+
+                        {/* Editing is only for overdue task or on process task, not for completed task */}
+                        {!isCompleted && (
                           <DropdownMenuItem
                             onClick={() =>
                               navigate({
-                                to: "/admin/tasks/$id",
+                                to: "/admin/tasks/$id/edit",
                                 params: { id: t.id || (t as any)._id },
                               })
                             }
                           >
-                            <Eye className="mr-2 h-4 w-4" /> View
+                            <Pencil className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
+                        )}
 
-                          {/* Editing is only for overdue task or on process task, not for completed task */}
-                          {!isCompleted && (
+                        {/* Reassign is available when task is overdue */}
+                        {isOverdue && (
+                          <DropdownMenuItem onClick={() => setPendingReassign(t)}>
+                            <UserCheck className="mr-2 h-4 w-4 text-warning" /> Reassign
+                          </DropdownMenuItem>
+                        )}
+
+                        {/* Delete is ONLY available for overdue tasks */}
+                        {isOverdue && (
+                          <>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() =>
-                                navigate({
-                                  to: "/admin/tasks/$id/edit",
-                                  params: { id: t.id || (t as any)._id },
-                                })
-                              }
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setPendingDelete(t)}
                             >
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
-                          )}
-
-                          {/* Reassign is available when task is overdue */}
-                          {isOverdue && (
-                            <DropdownMenuItem onClick={() => setPendingReassign(t)}>
-                              <UserCheck className="mr-2 h-4 w-4 text-warning" /> Reassign
-                            </DropdownMenuItem>
-                          )}
-
-                          {/* Delete is ONLY available for overdue tasks */}
-                          {isOverdue && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => setPendingDelete(t)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    );
-                  })()
-                }
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                })()}
               />
             ))}
-          </div>
-
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[760px] whitespace-nowrap text-sm xl:min-w-[900px]">
-              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-3 font-medium min-w-[200px] max-w-[320px]">
-                    <SortBtn
-                      label="Title"
-                      active={sortKey === "title"}
-                      dir={sortDir}
-                      onClick={() => toggleSort("title")}
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">Type</th>
-                  <th className="px-5 py-3 font-medium">Employee</th>
-                  <th className="px-5 py-3 font-medium">
-                    <SortBtn
-                      label="Priority"
-                      active={sortKey === "priority"}
-                      dir={sortDir}
-                      onClick={() => toggleSort("priority")}
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">
-                    <SortBtn
-                      label="Points"
-                      active={sortKey === "points"}
-                      dir={sortDir}
-                      onClick={() => toggleSort("points")}
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">
-                    <SortBtn
-                      label="Deadline"
-                      active={sortKey === "dueDate"}
-                      dir={sortDir}
-                      onClick={() => toggleSort("dueDate")}
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="hidden px-5 py-3 font-medium xl:table-cell">Created by</th>
-                  <th className="px-5 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {slice.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="p-0">
-                      <EmptyState
-                        icon={ListTodo}
-                        title="No tasks match"
-                        description="Try clearing filters or creating a new task."
-                      />
-                    </td>
-                  </tr>
-                )}
-                {slice.map((t, i) => (
-                  <tr
-                    key={t.id}
-                    className="border-t border-border/40 transition-colors hover:bg-muted/40 animate-in fade-in slide-in-from-bottom-1"
-                    style={{ animationDelay: `${i * 20}ms` }}
-                  >
-                    <td className="px-5 py-3.5 max-w-[240px] xl:max-w-[340px] min-w-[180px] whitespace-normal">
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              to="/admin/tasks/$id"
-                              params={{ id: t.id }}
-                              className="block font-medium hover:text-primary line-clamp-2 break-words leading-snug"
-                              title={t.title}
-                            >
-                              {t.title}
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-md break-words">
-                            <p>{t.title}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <div className="text-xs text-muted-foreground truncate mt-0.5">
-                        {formatTaskSubtitle(t.category, t.id)}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <TaskTypeBadge type={t.taskType} />
-                      {t.taskType === "project" && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {projectName(t.projectId)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {t.assignee ? (
-                        <div className="flex items-center gap-2">
-                          <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary/30 to-primary/60 text-[11px] font-semibold text-primary-foreground">
-                            {(t.assignee || "—")
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate">{t.assignee}</div>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              {t.assigneeCode && <IdBadge id={t.assigneeCode} />}
-                              {t.assignedAt && (
-                                <span>
-                                  {new Date(t.assignedAt).toLocaleString(undefined, {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <PriorityBadge priority={t.priority} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center gap-1 font-medium">
-                        <Trophy className="h-3.5 w-3.5 text-warning" /> {t.points}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="inline-flex items-center gap-1.5 text-muted-foreground">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {new Date(t.dueDate).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="hidden px-5 py-3.5 text-muted-foreground xl:table-cell">
-                      {createdByFor(t)}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {(() => {
-                        const isOverdue = isTaskOverdue(t);
-                        const isCompleted = isTaskCompleted(t);
-
-                        return (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  navigate({
-                                    to: "/admin/tasks/$id",
-                                    params: { id: t.id || (t as any)._id },
-                                  })
-                                }
-                              >
-                                <Eye className="mr-2 h-4 w-4" /> View
-                              </DropdownMenuItem>
-
-                              {/* Editing is only for overdue task or on process task, not for completed task */}
-                              {!isCompleted && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    navigate({
-                                      to: "/admin/tasks/$id/edit",
-                                      params: { id: t.id || (t as any)._id },
-                                    })
-                                  }
-                                >
-                                  <Pencil className="mr-2 h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                              )}
-
-                              {/* Reassign is available when task is overdue */}
-                              {isOverdue && (
-                                <DropdownMenuItem onClick={() => setPendingReassign(t)}>
-                                  <UserCheck className="mr-2 h-4 w-4 text-warning" /> Reassign
-                                </DropdownMenuItem>
-                              )}
-
-                              {/* Delete is ONLY available for overdue tasks */}
-                              {isOverdue && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => setPendingDelete(t)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-5 py-3">
@@ -899,7 +780,11 @@ function TasksPage() {
                   const idToDelete = pendingDelete.id || (pendingDelete as any)._id || "";
                   setDeletedTaskIds(
                     (prev) =>
-                      new Set([...prev, idToDelete, pendingDelete.id, (pendingDelete as any)._id].filter(Boolean) as string[]),
+                      new Set(
+                        [...prev, idToDelete, pendingDelete.id, (pendingDelete as any)._id].filter(
+                          Boolean,
+                        ) as string[],
+                      ),
                   );
                   deleteTask.mutate(idToDelete);
                 }
@@ -970,6 +855,8 @@ function SortBtn({
   return (
     <button
       type="button"
+      aria-pressed={active}
+      aria-label={active ? `Sort by ${label}, currently ${dir === "asc" ? "ascending" : "descending"}` : `Sort by ${label}`}
       onClick={onClick}
       className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:text-foreground ${active ? "text-foreground" : ""}`}
     >

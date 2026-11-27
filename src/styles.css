@@ -431,3 +431,33 @@
   letter-spacing: 0;
   line-height: 1.35;
 }
+.site-theme-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 75px;
+  height: 44px;
+  overflow: visible;
+}
+
+.site-theme-switch sakuga-toggle {
+  zoom: 0.5;
+  --sk-acc: var(--primary);
+  --switch-art-filter: grayscale(1) sepia(1) saturate(2.1) brightness(.92);
+}
+
+.dark .site-theme-switch sakuga-toggle {
+  --switch-art-filter: grayscale(1) sepia(1) saturate(1.8);
+}
+
+/* The canvas uses painted frames. Tint their midtones and retain the ink and highlights. */
+.site-theme-switch sakuga-toggle::part(switch) {
+  filter: var(--switch-art-filter);
+}
+
+.site-theme-switch sakuga-toggle::part(switch)::after {
+  content: "";
+  position: absolute;
+  inset: -17px 0;
+}

@@ -597,10 +597,15 @@ function AccountsPage() {
 
                       {/* 3. Purpose */}
                       <td
-                        className="px-5 py-3.5 max-w-[240px] truncate text-muted-foreground text-xs"
+                        className="px-5 py-3.5 max-w-[240px] text-muted-foreground text-xs"
                         title={tx.purpose}
                       >
-                        {tx.purpose || "—"}
+                        <div
+                          tabIndex={0}
+                          className="overflow-x-auto overscroll-x-contain whitespace-nowrap [scrollbar-width:thin] focus-visible:outline-primary"
+                        >
+                          {tx.purpose || "—"}
+                        </div>
                       </td>
 
                       {/* 4. Credit (+) */}

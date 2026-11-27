@@ -180,6 +180,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script src="/toggle.js" defer />
       </head>
       <body>
         {children}
