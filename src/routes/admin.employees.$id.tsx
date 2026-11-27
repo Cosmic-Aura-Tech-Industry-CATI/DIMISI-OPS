@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -211,7 +212,7 @@ function EmployeeProfilePage() {
             Overview
           </TabsTrigger>
           <TabsTrigger value="tasks" className="rounded-md">
-            Tasks ({userTasks.length})
+            Tasks (<MetricValue value={userTasks.length} />)
           </TabsTrigger>
         </TabsList>
 
@@ -227,7 +228,7 @@ function EmployeeProfilePage() {
             </div>
             <div className={card}>
               <h3 className="font-display text-lg">Completion rate</h3>
-              <p className="mt-4 font-display text-4xl text-primary">{successRate}%</p>
+              <p className="mt-4 font-display text-4xl text-primary"><MetricValue value={successRate} />%</p>
               <Progress value={successRate} className="mt-3 h-1.5" />
             </div>
           </div>
@@ -264,7 +265,7 @@ function EmployeeProfilePage() {
                       <td className="px-4 py-3 font-medium">{t.title}</td>
                       <td className="px-4 py-3">{t.status}</td>
                       <td className="px-4 py-3 text-muted-foreground">{t.taskType}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{t.points}</td>
+                      <td className="px-4 py-3 text-right font-semibold"><MetricValue value={t.points} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -307,7 +308,7 @@ function Stat({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  value: React.ReactNode;
+  value: string | number;
 }) {
   return (
     <div className="rounded-md border border-border/60 bg-card/40 p-4 transition-colors hover:border-primary/30">
@@ -317,7 +318,7 @@ function Stat({
           {label}
         </p>
       </div>
-      <p className="mt-3 font-sans text-2xl font-semibold">{value}</p>
+      <p className="mt-3 font-sans text-2xl font-semibold"><MetricValue value={value} /></p>
     </div>
   );
 }

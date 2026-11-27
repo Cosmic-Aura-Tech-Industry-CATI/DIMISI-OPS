@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import {
   Area,
   AreaChart,
@@ -58,7 +59,7 @@ export function WeeklyCompletionChart({
           <YAxis {...axisStyle} tickLine={false} axisLine={false} />
           <Tooltip contentStyle={tooltipStyle} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="created" fill="oklch(0.35 0 0)" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="created" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
           <Bar dataKey="completed" fill={ACCENT} radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
@@ -96,7 +97,7 @@ export function TaskStatusMixChart({ taskReport = [] }: { taskReport?: TaskBucke
           <li key={t.key} className="flex items-center gap-2">
             <ColorDot color={chartColorAt(i)} />
             <span className="text-muted-foreground">{t.label}</span>
-            <span className="ml-auto font-medium">{t.value}</span>
+            <span className="ml-auto font-medium"><MetricValue value={t.value} /></span>
           </li>
         ))}
       </ul>

@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -404,20 +405,20 @@ function EmployeeLeaderboardPage() {
                     </h3>
                     <p className="text-xs text-muted-foreground">{e.department}</p>
                     <p className="mt-3 font-display text-3xl font-semibold text-gradient">
-                      {e.points.toLocaleString()}
+                      <MetricValue value={e.points} formatNumber={localizedNumber} />
                     </p>
                     <p className="text-xs uppercase tracking-widest text-muted-foreground">
                       points
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
                       <span>
-                        <span className="font-medium text-foreground">{e.tasksCompleted}</span>{" "}
+                        <span className="font-medium text-foreground"><MetricValue value={e.tasksCompleted} /></span>{" "}
                         tasks
                       </span>
                       <span className="h-3 w-px bg-border/60" />
                       <span>
                         <span className="font-medium text-foreground">
-                          {e.completionRate !== null ? `${e.completionRate}%` : "—"}
+                          <MetricValue value={e.completionRate !== null ? `${e.completionRate}%` : "—"} />
                         </span>{" "}
                         rate
                       </span>
@@ -439,7 +440,7 @@ function EmployeeLeaderboardPage() {
                 </p>
               </div>
               <Badge variant="outline" className="border-border/60">
-                {table.length} teammates
+                <MetricValue value={table.length} /> teammates
               </Badge>
             </div>
             <div className="overflow-x-auto">
@@ -516,9 +517,9 @@ function EmployeeLeaderboardPage() {
                           {e.department}
                         </TableCell>
                         <TableCell className="text-right font-display text-base font-semibold">
-                          {e.points.toLocaleString()}
+                          <MetricValue value={e.points} formatNumber={localizedNumber} />
                         </TableCell>
-                        <TableCell className="text-right text-sm">{e.tasksCompleted}</TableCell>
+                        <TableCell className="text-right text-sm"><MetricValue value={e.tasksCompleted} /></TableCell>
                         <TableCell>
                           {e.completionRate !== null ? (
                             <div className="flex items-center gap-2">
@@ -529,7 +530,7 @@ function EmployeeLeaderboardPage() {
                                 />
                               </div>
                               <span className="w-10 text-right text-xs text-muted-foreground">
-                                {e.completionRate}%
+                                <MetricValue value={e.completionRate} />%
                               </span>
                             </div>
                           ) : (

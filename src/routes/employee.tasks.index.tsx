@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -340,7 +341,7 @@ function EmployeeTasksPage() {
             <UserCheck className="h-4 w-4" />
             <span>Assigned Tasks</span>
             <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
-              {safeAssignedTasks.length}
+              <MetricValue value={safeAssignedTasks.length} />
             </span>
           </TabsTrigger>
           <TabsTrigger
@@ -350,7 +351,7 @@ function EmployeeTasksPage() {
             <Layers className="h-4 w-4" />
             <span>All Tasks</span>
             <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold">
-              {safeAllTasks.length}
+              <MetricValue value={safeAllTasks.length} />
             </span>
           </TabsTrigger>
         </TabsList>
@@ -565,7 +566,7 @@ function EmployeeTasksPage() {
                     <dt className="flex items-center gap-1 text-muted-foreground">
                       <Trophy className="h-3 w-3 text-warning" /> Reward
                     </dt>
-                    <dd className="mt-0.5 font-medium">{task.points || task.rewardPoints || 0} pts</dd>
+                    <dd className="mt-0.5 font-medium"><MetricValue value={task.points || task.rewardPoints || 0} /> pts</dd>
                   </div>
                 </dl>
 
@@ -751,7 +752,7 @@ function EmployeeTasksPage() {
                       <td className="px-5 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 font-semibold text-xs text-warning">
                           <Trophy className="h-3.5 w-3.5" />
-                          {task.points || task.rewardPoints || 0} pts
+                          <MetricValue value={task.points || task.rewardPoints || 0} /> pts
                         </span>
                       </td>
 

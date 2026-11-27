@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -115,7 +116,7 @@ function SubmissionDetailsPage() {
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-2.5 py-0.5 text-xs font-medium text-warning">
-                <Trophy className="h-3 w-3" /> {task.points} pts
+                <Trophy className="h-3 w-3" /> <MetricValue value={task.points} /> pts
               </span>
             </div>
 
@@ -317,7 +318,7 @@ function SubmissionDetailsPage() {
                 {submission?.status === "draft" ? "Draft" : "Submitted"}
               </Row>
               <Row icon={Trophy} label="Reward">
-                {task.points} pts
+                <MetricValue value={task.points} /> pts
               </Row>
             </dl>
           </div>

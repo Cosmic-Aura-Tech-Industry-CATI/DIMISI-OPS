@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { CalendarClock, CheckCircle2, Download, Paperclip, Trophy, User } from "lucide-react";
 import {
   Dialog,
@@ -54,7 +55,7 @@ export function SubmissionDetailDialog({
             <StatusBadge status={task.status} />
             <PriorityBadge priority={task.priority} />
             <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-2.5 py-0.5 text-xs font-medium text-warning">
-              <Trophy className="h-3 w-3" /> {task.points} pts
+              <Trophy className="h-3 w-3" /> <MetricValue value={task.points} /> pts
             </span>
           </div>
 

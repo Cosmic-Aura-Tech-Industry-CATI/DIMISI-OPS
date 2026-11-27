@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { Link } from "@tanstack/react-router";
 import { Activity, Award, ClipboardList, Plus, Shield, Sparkles, UserPlus } from "lucide-react";
 import { performanceTrend } from "@/lib/mock-data";
@@ -60,7 +61,7 @@ export function QuickActionsPanel({ weeklyMomentum }: { weeklyMomentum?: number 
       <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
         <p className="text-xs font-medium uppercase tracking-wider text-primary">Weekly momentum</p>
         <p className="mt-2 font-display text-2xl font-semibold">
-          {isPositive ? `+${momentum}` : `${momentum}`} pts
+          <MetricValue value={isPositive ? `+${momentum}` : `${momentum}`} /> pts
         </p>
         <p className="mt-1 text-xs text-muted-foreground">Compared to last week across all teams.</p>
       </div>

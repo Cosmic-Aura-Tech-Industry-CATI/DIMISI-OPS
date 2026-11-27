@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -324,7 +325,7 @@ function AccountsPage() {
               Current Ledger Balance
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-foreground">
-              {formatCurrency(stats.currentBalance)}
+              <MetricValue value={stats.currentBalance} formatNumber={formatCurrency} />
             </h3>
             <p className="text-[11px] text-muted-foreground">
               Real-time running balance
@@ -342,7 +343,7 @@ function AccountsPage() {
               Total Inflow (Credit)
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-emerald-500">
-              {formatCurrency(stats.totalCredit)}
+              <MetricValue value={stats.totalCredit} formatNumber={formatCurrency} />
             </h3>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-emerald-500" /> Page revenue & receivables
@@ -360,7 +361,7 @@ function AccountsPage() {
               Total Outflow (Debit)
             </p>
             <h3 className="font-mono text-2xl font-bold tracking-tight text-rose-500">
-              {formatCurrency(stats.totalDebit)}
+              <MetricValue value={stats.totalDebit} formatNumber={formatCurrency} />
             </h3>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <TrendingDown className="h-3 w-3 text-rose-500" /> Page expenses & disbursements
@@ -378,11 +379,11 @@ function AccountsPage() {
               Total Transactions
             </p>
             <h3 className="font-display text-2xl font-bold tracking-tight text-foreground">
-              {stats.totalRecords.toLocaleString()}
+              <MetricValue value={stats.totalRecords} formatNumber={localizedNumber} />
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              <span className="text-primary font-medium">{stats.uploadedCount} PDF</span> ·{" "}
-              {stats.manualCount} manual (page)
+              <span className="text-primary font-medium"><MetricValue value={stats.uploadedCount} /> PDF</span> ·{" "}
+              <MetricValue value={stats.manualCount} /> manual (page)
             </p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -612,7 +613,7 @@ function AccountsPage() {
                       <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
                         {tx.creditAmount > 0 ? (
                           <span className="text-emerald-500 font-semibold">
-                            +{formatCurrency(tx.creditAmount)}
+                            +<MetricValue value={tx.creditAmount} formatNumber={formatCurrency} />
                           </span>
                         ) : (
                           <span className="text-muted-foreground/40">—</span>
@@ -623,7 +624,7 @@ function AccountsPage() {
                       <td className="px-5 py-3.5 text-right font-mono font-medium text-xs">
                         {tx.debitAmount > 0 ? (
                           <span className="text-rose-500 font-semibold">
-                            -{formatCurrency(tx.debitAmount)}
+                            -<MetricValue value={tx.debitAmount} formatNumber={formatCurrency} />
                           </span>
                         ) : (
                           <span className="text-muted-foreground/40">—</span>
@@ -632,7 +633,7 @@ function AccountsPage() {
 
                       {/* 6. Running Balance */}
                       <td className="px-5 py-3.5 text-right font-mono font-bold text-xs text-foreground">
-                        {formatCurrency(tx.runningBalance)}
+                        <MetricValue value={tx.runningBalance} formatNumber={formatCurrency} />
                       </td>
 
                       {/* 7. Uploaded Status */}

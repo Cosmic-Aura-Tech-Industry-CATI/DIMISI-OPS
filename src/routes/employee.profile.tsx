@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -556,7 +557,7 @@ function ProfilePage() {
       {/* Hero Header */}
       <div className="glass overflow-hidden rounded-2xl">
         <div className="relative h-28 border-b border-border/60 bg-gradient-to-r from-primary/15 via-card to-card sm:h-32">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_120%,hsl(var(--primary)/0.18),transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_120%,rgb(var(--glow-rgb)/0.18),transparent_65%)]" />
           <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:32px_32px]" />
         </div>
         <div className="-mt-12 flex flex-col gap-5 p-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
@@ -607,7 +608,7 @@ function ProfilePage() {
               )}
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                {e.points.toLocaleString()} pts
+                <MetricValue value={e.points} formatNumber={localizedNumber} /> pts
               </span>
             </div>
           </div>
@@ -629,7 +630,7 @@ function ProfilePage() {
                 <Icon className="h-4 w-4" />
               </div>
               <div>
-                <div className="font-display text-lg font-semibold">{value}</div>
+                <div className="font-display text-lg font-semibold"><MetricValue value={value} /></div>
                 <div className="text-xs text-muted-foreground">{label}</div>
               </div>
             </div>
@@ -699,42 +700,42 @@ function ProfilePage() {
                 <AreaChart data={weeklyTrend}>
                   <defs>
                     <linearGradient id="ptsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="points"
                     name="Points"
-                    stroke="#C9A961"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                     fill="url(#ptsGrad)"
                   />
@@ -759,7 +760,7 @@ function ProfilePage() {
             </div>
             <div className="text-right">
               <div className="font-display text-xl font-semibold text-gradient">
-                {(pointsHistory[pointsHistory.length - 1]?.cumulative || 0).toLocaleString()}
+                <MetricValue value={(pointsHistory[pointsHistory.length - 1]?.cumulative || 0)} formatNumber={localizedNumber} />
               </div>
               <div className="text-xs text-muted-foreground">total pts</div>
             </div>
@@ -770,42 +771,42 @@ function ProfilePage() {
                 <AreaChart data={pointsHistory}>
                   <defs>
                     <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="cumulative"
                     name="Cumulative Points"
-                    stroke="#C9A961"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                     fill="url(#cumGrad)"
                   />
@@ -834,36 +835,36 @@ function ProfilePage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyTrend}>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Bar
                     dataKey="tasks"
                     name="Tasks Completed"
-                    fill="#C9A961"
+                    fill="var(--primary)"
                     radius={[6, 6, 0, 0]}
                   />
                 </BarChart>
@@ -929,7 +930,7 @@ function ProfilePage() {
                     <TableCell>
                       <TaskStatusBadge status={t.status} reviewState={t.reviewState} />
                     </TableCell>
-                    <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
+                    <TableCell className="text-right font-medium">+<MetricValue value={t.points || 0} /></TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {formatDateSafe(t.dueDate, { day: "numeric", month: "short" })}
                     </TableCell>
@@ -980,7 +981,7 @@ function ProfilePage() {
                       <TableCell className="font-medium">{p.week}</TableCell>
                       <TableCell className="text-right">
                         <span className="inline-flex items-center gap-1 font-medium text-primary">
-                          <Sparkles className="h-3 w-3" />+{p.points || 0}
+                          <Sparkles className="h-3 w-3" />+<MetricValue value={p.points || 0} />
                         </span>
                       </TableCell>
                       <TableCell className="text-right">{p.tasks || 0}</TableCell>
@@ -988,7 +989,7 @@ function ProfilePage() {
                         {avgPerTask}
                       </TableCell>
                       <TableCell className="text-right font-display font-semibold">
-                        {(p.cumulative || 0).toLocaleString()}
+                        <MetricValue value={(p.cumulative || 0)} formatNumber={localizedNumber} />
                       </TableCell>
                     </TableRow>
                   );

@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Clock, Search, StickyNote, Calendar, Trophy } from "lucide-react";
@@ -152,7 +153,7 @@ function PendingTasksPage() {
                       <td className="px-5 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 font-semibold text-xs text-warning">
                           <Trophy className="h-3.5 w-3.5" />
-                          {task.points || task.rewardPoints || 0} pts
+                          <MetricValue value={task.points || task.rewardPoints || 0} /> pts
                         </span>
                       </td>
 

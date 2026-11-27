@@ -270,7 +270,7 @@ function AdminOverview() {
       />
 
       {/* Top stat cards from live backend MongoDB data */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 sm:[&_[data-stat-label]]:min-h-[2lh] lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Total employees"
           value={totalEmployees}

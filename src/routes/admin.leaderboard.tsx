@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Trophy, Medal, Award, AlertCircle } from "lucide-react";
@@ -303,7 +304,7 @@ function LeaderboardPage() {
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{e.department}</p>
                     <p className="mt-3 font-display text-3xl font-semibold text-gradient">
-                      {e.points.toLocaleString()}
+                      <MetricValue value={e.points} formatNumber={localizedNumber} />
                     </p>
                     <p className="text-xs uppercase tracking-widest text-muted-foreground">
                       points
@@ -323,7 +324,7 @@ function LeaderboardPage() {
                     className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/40"
                   >
                     <div className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-xs font-semibold">
-                      #{e.rank}
+                      #<MetricValue value={e.rank} />
                     </div>
                     <UserAvatar
                       user={e.raw}
@@ -340,9 +341,9 @@ function LeaderboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-display text-lg font-semibold">
-                        {e.points.toLocaleString()}
+                        <MetricValue value={e.points} formatNumber={localizedNumber} />
                       </div>
-                      <div className="text-xs text-muted-foreground">{e.tasksCompleted} tasks</div>
+                      <div className="text-xs text-muted-foreground"><MetricValue value={e.tasksCompleted} /> tasks</div>
                     </div>
                   </li>
                 ))}

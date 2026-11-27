@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { CalendarDays, Trophy } from "lucide-react";
 import type { Task } from "@/lib/mock-data";
 import { PriorityBadge, StatusBadge } from "@/components/status-badge";
@@ -56,7 +57,7 @@ export function TaskTable({ tasks, showAssignee = true }: { tasks: Task[]; showA
                 </td>
                 <td className="px-5 py-3.5">
                   <span className="inline-flex items-center gap-1 font-medium">
-                    <Trophy className="h-3.5 w-3.5 text-warning" /> {t.points}
+                    <Trophy className="h-3.5 w-3.5 text-warning" /> <MetricValue value={t.points} />
                   </span>
                 </td>
               </tr>

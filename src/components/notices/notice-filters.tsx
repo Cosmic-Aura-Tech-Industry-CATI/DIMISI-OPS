@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +41,7 @@ export function NoticeFilters({
         <TabsList className="flex-wrap">
           {noticeFilterKeys.map((k) => (
             <TabsTrigger key={k} value={k} className="capitalize">
-              {k} <span className="ml-1 text-muted-foreground">{counts[k]}</span>
+              {k} <span className="ml-1 text-muted-foreground"><MetricValue value={counts[k]} /></span>
             </TabsTrigger>
           ))}
         </TabsList>

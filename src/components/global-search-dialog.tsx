@@ -229,7 +229,7 @@ export function GlobalSearchDialog({
                 >
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-white"
-                    style={{ backgroundColor: proj.color || "#C9A961" }}
+                    style={{ backgroundColor: proj.color || "var(--primary)" }}
                   >
                     <FolderKanban className="h-4 w-4" />
                   </div>

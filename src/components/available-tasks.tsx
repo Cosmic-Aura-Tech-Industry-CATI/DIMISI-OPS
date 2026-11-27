@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -89,7 +90,7 @@ export function PoolCard({
           <dt className="flex items-center gap-1 text-muted-foreground">
             <Trophy className="h-3 w-3 text-warning" /> Reward
           </dt>
-          <dd className="mt-0.5 font-medium">{task.points || task.rewardPoints || 0} pts</dd>
+          <dd className="mt-0.5 font-medium"><MetricValue value={task.points || task.rewardPoints || 0} /> pts</dd>
         </div>
         <div>
           <dt className="flex items-center gap-1 text-muted-foreground">
@@ -247,7 +248,7 @@ export function AvailableTasks() {
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-0.5 text-xs font-semibold text-primary shadow-glow">
                     <Sparkles className="h-3 w-3 text-primary" />
-                    {count} Available
+                    <MetricValue value={count} /> Available
                   </span>
                 )}
               </div>

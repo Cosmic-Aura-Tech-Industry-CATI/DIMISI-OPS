@@ -9,6 +9,7 @@ import { NotificationsMenu } from "@/components/notifications-menu";
 import { ProfileMenu } from "@/components/profile-menu";
 import { GlobalSearchDialog } from "@/components/global-search-dialog";
 import type { Role } from "@/lib/auth";
+import "./workspace.css";
 
 export function DashboardShell({ role, children }: { role: Role; children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -25,7 +26,12 @@ export function DashboardShell({ role, children }: { role: Role; children: React
   }, []);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="workspace">
+      <div className="workspace-landscape" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
       <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} role={role} />
       <a
         href="#main-content"
