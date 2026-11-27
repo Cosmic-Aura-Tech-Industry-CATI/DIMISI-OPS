@@ -99,6 +99,39 @@ function truncateText(str: unknown, maxLen: number): string {
   return s.length > maxLen ? s.slice(0, maxLen - 2) + ".." : s;
 }
 
+// Widths of printable ASCII glyphs in the PDF's Helvetica font (1/1000 em).
+const helveticaWidths = [
+  278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,
+  1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,
+  667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,
+  333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,
+  556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,
+];
+
+function wrapPurpose(text: string, availableWidth: number): string[] {
+  const lines: string[] = [];
+  for (let paragraph of text.split(/\r\n?|\n/)) {
+    paragraph = paragraph.replace(/\t/g, " ");
+    while (paragraph.length) {
+      let width = 0;
+      let end = 0;
+      let space = -1;
+      for (; end < paragraph.length; end++) {
+        width += (helveticaWidths[paragraph.charCodeAt(end) - 32] ?? 278) * 8 / 1000;
+        if (width > availableWidth) break;
+        if (paragraph[end] === " ") space = end;
+      }
+      if (end === paragraph.length) break;
+      const split = space > 0 ? space + 1 : end;
+      lines.push(paragraph.slice(0, split));
+      paragraph = paragraph.slice(split);
+    }
+    lines.push(paragraph);
+  }
+  return lines;
+}
+
 function formatInrNumber(val: number | string | undefined | null): string {
   if (val === undefined || val === null || val === "" || isNaN(Number(val))) return "-";
   const num = Number(val);
@@ -155,7 +188,9 @@ export function buildAccountPdfBlob(
   const PAGE_HEIGHT = 595;
   const MARGIN = 36;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2; // 770 pt
-  const ROWS_PER_PAGE = 17;
+  const singleRowHeight = 21;
+  const lineHeight = 10;
+  const pageRowBudget = 17 * singleRowHeight;
 
   // Table Column definitions (Total width: 770 pt)
   const columns = [
@@ -167,12 +202,32 @@ export function buildAccountPdfBlob(
     { title: "BALANCE (INR)", width: 100, align: "right" },
   ];
 
-  const totalPages = Math.max(1, Math.ceil(transactions.length / ROWS_PER_PAGE));
+  type Row = { tx: AccountTransaction; lines: string[]; height: number; continuation: boolean };
+  const pages: Row[][] = [[]];
+  let remaining = pageRowBudget;
+  for (const tx of transactions) {
+    const lines = wrapPurpose(tx.purpose || "—", columns[2].width - 12);
+    let offset = 0;
+    while (offset < lines.length) {
+      const fullHeight = singleRowHeight + (lines.length - offset - 1) * lineHeight;
+      if (fullHeight > remaining && remaining < pageRowBudget) {
+        pages.push([]);
+        remaining = pageRowBudget;
+      }
+      const capacity = 1 + Math.floor((remaining - singleRowHeight) / lineHeight);
+      const part = lines.slice(offset, offset + capacity);
+      const height = singleRowHeight + (part.length - 1) * lineHeight;
+      pages[pages.length - 1].push({ tx, lines: part, height, continuation: offset > 0 });
+      offset += part.length;
+      remaining -= height;
+    }
+  }
+  const totalPages = pages.length;
   const pageContents: string[] = [];
   const encoder = new TextEncoder();
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-    const chunk = transactions.slice(pageIdx * ROWS_PER_PAGE, (pageIdx + 1) * ROWS_PER_PAGE);
+    const chunk = pages[pageIdx];
     let stream = "";
 
     // ── Header Banner (Dimisi Dark Theme #111827) ──
@@ -245,10 +300,11 @@ export function buildAccountPdfBlob(
     stream += "Q\n";
 
     // ── Table Data Rows ──
-    const rowHeight = 21;
-    let currentY = tableHeaderY - rowHeight;
+    let currentY = tableHeaderY;
 
-    chunk.forEach((tx, rowIdx) => {
+    chunk.forEach(({ tx, lines, height: rowHeight, continuation }, rowIdx) => {
+      const firstBaseline = currentY - singleRowHeight + 6;
+      currentY -= rowHeight;
       const isAlt = rowIdx % 2 === 1;
 
       // Row background
@@ -267,12 +323,11 @@ export function buildAccountPdfBlob(
       // Cell Values
       const dateText = formatDateString(tx.transactionDate);
       const partyText = truncateText(tx.partyName || "—", 28);
-      const purposeText = truncateText(tx.purpose || "—", 36);
       const creditText = formatInrNumber(tx.creditAmount);
       const debitText = formatInrNumber(tx.debitAmount);
       const balanceText = formatInrNumber(tx.runningBalance);
 
-      const cellValues = [dateText, partyText, purposeText, creditText, debitText, balanceText];
+      const cellValues = [dateText, partyText, "", creditText, debitText, balanceText];
 
       let cellX = MARGIN;
       columns.forEach((col, cIdx) => {
@@ -287,13 +342,19 @@ export function buildAccountPdfBlob(
           stream += "0.12 0.14 0.17 rg\n"; // Dark slate
         }
 
-        stream += `${cellX + 6} ${currentY + 6} Td\n`;
-        stream += `(${escapePdfText(cellValues[cIdx])}) Tj\n`;
+        stream += `${cellX + 6} ${firstBaseline} Td\n`;
+        if (cIdx === 2) {
+          lines.forEach((line, i) => {
+            if (i > 0) stream += `0 -${lineHeight} Td\n`;
+            stream += `(${escapePdfText(line)}) Tj\n`;
+          });
+        } else if (!continuation) {
+          stream += `(${escapePdfText(cellValues[cIdx])}) Tj\n`;
+        }
         stream += "ET\n";
         cellX += col.width;
       });
 
-      currentY -= rowHeight;
     });
 
     // ── Page Footer ──
