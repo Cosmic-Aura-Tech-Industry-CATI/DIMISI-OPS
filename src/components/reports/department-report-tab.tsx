@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import {
   Bar,
@@ -131,14 +132,14 @@ export function DepartmentReportTab({
                         <span className="font-medium">{d.department}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-sm">{d.employees}</TableCell>
-                    <TableCell className="text-right text-sm">{d.assigned}</TableCell>
-                    <TableCell className="text-right text-sm text-primary">{d.completed}</TableCell>
+                    <TableCell className="text-right text-sm"><MetricValue value={d.employees} /></TableCell>
+                    <TableCell className="text-right text-sm"><MetricValue value={d.assigned} /></TableCell>
+                    <TableCell className="text-right text-sm text-primary"><MetricValue value={d.completed} /></TableCell>
                     <TableCell>
                       <CompletionMeter rate={d.rate} />
                     </TableCell>
                     <TableCell className="text-right font-display font-semibold text-primary">
-                      {d.points.toLocaleString()}
+                      <MetricValue value={d.points} formatNumber={localizedNumber} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline" className={cn("gap-1", TREND_BADGE)}>

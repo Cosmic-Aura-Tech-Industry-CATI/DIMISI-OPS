@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import {
   Bar,
   BarChart,
@@ -126,11 +127,11 @@ export function ProjectReportTab({
                     {projectStatusLabel[p.status]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right text-sm">{p.total}</TableCell>
-                <TableCell className="text-right text-sm">{p.available}</TableCell>
-                <TableCell className="text-right text-sm">{p.inReview}</TableCell>
-                <TableCell className="text-right text-sm text-primary">{p.completed}</TableCell>
-                <TableCell className="text-right text-sm">{p.employees}</TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.total} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.available} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.inReview} /></TableCell>
+                <TableCell className="text-right text-sm text-primary"><MetricValue value={p.completed} /></TableCell>
+                <TableCell className="text-right text-sm"><MetricValue value={p.employees} /></TableCell>
                 <TableCell>
                   <CompletionMeter rate={p.rate} />
                 </TableCell>

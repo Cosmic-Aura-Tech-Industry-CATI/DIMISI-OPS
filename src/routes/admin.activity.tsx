@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -732,7 +733,7 @@ function ActivityPage() {
         ].map((s) => (
           <div key={s.label} className="glass rounded-2xl p-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</div>
-            <div className={cn("mt-1 font-display text-2xl font-semibold", s.tone)}>{s.value}</div>
+            <div className={cn("mt-1 font-display text-2xl font-semibold", s.tone)}><MetricValue value={s.value} /></div>
           </div>
         ))}
       </div>
@@ -860,7 +861,7 @@ function ActivityPage() {
                     {label}
                   </h3>
                   <Badge variant="outline" className="border-border/60">
-                    {list.length}
+                    <MetricValue value={list.length} />
                   </Badge>
                   <div className="h-px flex-1 bg-border/60" />
                 </div>

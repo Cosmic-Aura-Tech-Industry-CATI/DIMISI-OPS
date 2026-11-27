@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import {
   Area,
   AreaChart,
@@ -96,7 +97,7 @@ export function TaskStatusMixChart({ taskReport = [] }: { taskReport?: TaskBucke
           <li key={t.key} className="flex items-center gap-2">
             <ColorDot color={chartColorAt(i)} />
             <span className="text-muted-foreground">{t.label}</span>
-            <span className="ml-auto font-medium">{t.value}</span>
+            <span className="ml-auto font-medium"><MetricValue value={t.value} /></span>
           </li>
         ))}
       </ul>

@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -607,7 +608,7 @@ function ProfilePage() {
               )}
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                {e.points.toLocaleString()} pts
+                <MetricValue value={e.points} formatNumber={localizedNumber} /> pts
               </span>
             </div>
           </div>
@@ -629,7 +630,7 @@ function ProfilePage() {
                 <Icon className="h-4 w-4" />
               </div>
               <div>
-                <div className="font-display text-lg font-semibold">{value}</div>
+                <div className="font-display text-lg font-semibold"><MetricValue value={value} /></div>
                 <div className="text-xs text-muted-foreground">{label}</div>
               </div>
             </div>
@@ -759,7 +760,7 @@ function ProfilePage() {
             </div>
             <div className="text-right">
               <div className="font-display text-xl font-semibold text-gradient">
-                {(pointsHistory[pointsHistory.length - 1]?.cumulative || 0).toLocaleString()}
+                <MetricValue value={(pointsHistory[pointsHistory.length - 1]?.cumulative || 0)} formatNumber={localizedNumber} />
               </div>
               <div className="text-xs text-muted-foreground">total pts</div>
             </div>
@@ -929,7 +930,7 @@ function ProfilePage() {
                     <TableCell>
                       <TaskStatusBadge status={t.status} reviewState={t.reviewState} />
                     </TableCell>
-                    <TableCell className="text-right font-medium">+{t.points || 0}</TableCell>
+                    <TableCell className="text-right font-medium">+<MetricValue value={t.points || 0} /></TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {formatDateSafe(t.dueDate, { day: "numeric", month: "short" })}
                     </TableCell>
@@ -980,7 +981,7 @@ function ProfilePage() {
                       <TableCell className="font-medium">{p.week}</TableCell>
                       <TableCell className="text-right">
                         <span className="inline-flex items-center gap-1 font-medium text-primary">
-                          <Sparkles className="h-3 w-3" />+{p.points || 0}
+                          <Sparkles className="h-3 w-3" />+<MetricValue value={p.points || 0} />
                         </span>
                       </TableCell>
                       <TableCell className="text-right">{p.tasks || 0}</TableCell>
@@ -988,7 +989,7 @@ function ProfilePage() {
                         {avgPerTask}
                       </TableCell>
                       <TableCell className="text-right font-display font-semibold">
-                        {(p.cumulative || 0).toLocaleString()}
+                        <MetricValue value={(p.cumulative || 0)} formatNumber={localizedNumber} />
                       </TableCell>
                     </TableRow>
                   );

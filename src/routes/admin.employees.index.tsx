@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -472,7 +473,7 @@ function EmployeesPage() {
                 fields={[
                   { label: "ID", value: e.code },
                   { label: "Department", value: e.department },
-                  { label: "Points", value: e.points.toLocaleString() },
+                  { label: "Points", value: <MetricValue value={e.points} formatNumber={localizedNumber} /> },
                   {
                     label: "Joined",
                     value: new Date(e.joinedAt).toLocaleDateString(undefined, {
@@ -597,7 +598,7 @@ function EmployeesPage() {
                         {e.jobTitle}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3.5 font-semibold">{e.points.toLocaleString()}</td>
+                    <td className="px-5 py-3.5 font-semibold"><MetricValue value={e.points} formatNumber={localizedNumber} /></td>
                     <td className="px-5 py-3.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

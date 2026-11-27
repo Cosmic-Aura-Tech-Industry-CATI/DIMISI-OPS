@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import {
   Area,
   AreaChart,
@@ -210,7 +211,7 @@ export function DepartmentDistributionPanel({ data = [] }: { data?: TaskDistribu
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
                   <span className="text-xs text-muted-foreground">{d.name}</span>
                 </div>
-                <p className="mt-1 font-display text-lg font-semibold">{d.value}</p>
+                <p className="mt-1 font-display text-lg font-semibold"><MetricValue value={d.value} /></p>
               </li>
             ))}
           </ul>

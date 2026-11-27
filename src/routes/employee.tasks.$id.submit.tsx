@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -665,7 +666,7 @@ function SubmitProofPage() {
                 <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Trophy className="h-3.5 w-3.5 text-warning" /> Reward
                 </dt>
-                <dd className="font-medium">{task.points ?? task.rewardPoints ?? 0} pts</dd>
+                <dd className="font-medium"><MetricValue value={task.points ?? task.rewardPoints ?? 0} /> pts</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-xs text-muted-foreground">Draft saved</dt>

@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -183,7 +184,7 @@ function ProjectManagementPage() {
                 {s === "all" ? "All projects" : projectStatusLabel[s] || s}
               </p>
               <p className="mt-1 font-display text-2xl font-semibold">
-                {isLoading ? "…" : count}
+                <MetricValue value={isLoading ? "…" : count} />
               </p>
             </button>
           );
@@ -340,9 +341,9 @@ function ProjectManagementPage() {
                         <td className="px-5 py-3.5">{s.available}</td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-1.5">
-                            <span>{completedTasks}</span>
+                            <span><MetricValue value={completedTasks} /></span>
                             {totalTasks > 0 && (
-                              <span className="text-xs text-muted-foreground">/ {totalTasks}</span>
+                              <span className="text-xs text-muted-foreground">/ <MetricValue value={totalTasks} /></span>
                             )}
                           </div>
                         </td>

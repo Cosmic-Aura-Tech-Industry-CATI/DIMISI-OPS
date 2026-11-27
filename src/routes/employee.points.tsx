@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Sparkles, Trophy, Zap, Star } from "lucide-react";
@@ -122,7 +123,7 @@ function PointsPage() {
         </div>
         <div className="mt-6">
           <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{points.toLocaleString()} points</span>
+            <span className="text-muted-foreground"><MetricValue value={points} formatNumber={localizedNumber} /> points</span>
             <span className="font-medium">
               {nextTier.name === currentTier.name ? "Max tier reached" : `${(nextTier.min - points).toLocaleString()} to ${nextTier.name}`}
             </span>
@@ -139,7 +140,7 @@ function PointsPage() {
             >
               <div className={`mx-auto mb-2 h-6 w-6 rounded-full bg-gradient-to-br ${t.color}`} />
               <div className="font-medium">{t.name}</div>
-              <div className="text-muted-foreground">{t.min.toLocaleString()}+</div>
+              <div className="text-muted-foreground"><MetricValue value={t.min} formatNumber={localizedNumber} />+</div>
             </div>
           ))}
         </div>
@@ -160,7 +161,7 @@ function PointsPage() {
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-sm font-medium text-success">
-                  +{t.points}
+                  +<MetricValue value={t.points} />
                 </div>
               </li>
             ))}

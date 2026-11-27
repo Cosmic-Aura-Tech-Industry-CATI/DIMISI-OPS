@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { Link } from "@tanstack/react-router";
 import {
   CalendarClock,
@@ -128,7 +129,7 @@ export function TaskCard({ task, bucket, index = 0 }: { task: Task; bucket: Buck
           <dt className="flex items-center gap-1 text-muted-foreground">
             <Trophy className="h-3 w-3 text-warning" /> Reward
           </dt>
-          <dd className="mt-0.5 font-medium">{task.points} pts</dd>
+          <dd className="mt-0.5 font-medium"><MetricValue value={task.points} /> pts</dd>
         </div>
       </dl>
 

@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Send,
@@ -393,7 +394,7 @@ export function TaskSubmissionModal({
               </span>
               <span className="inline-flex items-center gap-1 font-medium text-warning">
                 <Trophy className="h-3 w-3" />
-                {task.points || task.rewardPoints || 0} Reward Points
+                <MetricValue value={task.points || task.rewardPoints || 0} /> Reward Points
               </span>
             </div>
           </div>

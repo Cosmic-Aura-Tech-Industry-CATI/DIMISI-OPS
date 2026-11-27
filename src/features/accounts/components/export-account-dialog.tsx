@@ -1,3 +1,4 @@
+import { MetricValue, localizedNumber } from "@/components/metric-value";
 import { useState, useEffect } from "react";
 import {
   AlertCircle,
@@ -262,14 +263,14 @@ export function ExportAccountDialog({
                   <div className="rounded-xl bg-background/60 p-2.5 border border-border/40">
                     <p className="text-[10px] text-muted-foreground">Matched Records</p>
                     <p className="mt-0.5 font-mono text-base font-bold text-foreground">
-                      {(estimate.rows ?? 0).toLocaleString()}
+                      <MetricValue value={(estimate.rows ?? 0)} formatNumber={localizedNumber} />
                     </p>
                   </div>
 
                   <div className="rounded-xl bg-background/60 p-2.5 border border-border/40">
                     <p className="text-[10px] text-muted-foreground">Sync Threshold</p>
                     <p className="mt-0.5 font-mono text-base font-bold text-muted-foreground">
-                      {(estimate.threshold ?? 0).toLocaleString()}
+                      <MetricValue value={(estimate.threshold ?? 0)} formatNumber={localizedNumber} />
                     </p>
                   </div>
 

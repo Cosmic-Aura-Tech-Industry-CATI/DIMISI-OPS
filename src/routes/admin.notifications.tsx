@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -171,7 +172,7 @@ function AdminNotificationsPage() {
         <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
           <TabsTrigger value="all" className="gap-1.5 sm:gap-2">
             All
-            <span className="text-xs text-muted-foreground">{notifications.length}</span>
+            <span className="text-xs text-muted-foreground"><MetricValue value={notifications.length} /></span>
           </TabsTrigger>
           <TabsTrigger value="unread" className="gap-1.5 sm:gap-2">
             Unread

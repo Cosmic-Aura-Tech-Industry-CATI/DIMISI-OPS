@@ -1,3 +1,4 @@
+import { MetricValue } from "@/components/metric-value";
 import type { ReactNode } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,7 @@ export function CompletionMeter({ rate }: { rate: number }) {
           style={{ width: `${rate}%` }}
         />
       </div>
-      <span className="w-10 text-right text-xs text-muted-foreground">{rate}%</span>
+      <span className="w-10 text-right text-xs text-muted-foreground"><MetricValue value={rate} />%</span>
     </div>
   );
 }
