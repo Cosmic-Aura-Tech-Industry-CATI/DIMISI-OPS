@@ -1,3 +1,4 @@
+import SpecularButton from "@/components/ui/SpecularButton";
 import { MetricValue } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -123,9 +124,9 @@ function DepartmentsPage() {
                 className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
               />
             </Button>
-            <Button className="rounded-md" onClick={() => setCreateOpen(true)}>
+            <SpecularButton onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> New department
-            </Button>
+            </SpecularButton>
           </div>
         }
       />

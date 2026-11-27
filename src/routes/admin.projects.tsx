@@ -1,3 +1,4 @@
+import SpecularButton from "@/components/ui/SpecularButton";
 import { MetricValue } from "@/components/metric-value";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -156,9 +157,9 @@ function ProjectManagementPage() {
         title="Project management"
         subtitle="Every project, its manager and live task counters."
         actions={
-          <Button className="rounded-md shadow-glow" onClick={() => setCreateOpen(true)}>
+          <SpecularButton onClick={() => setCreateOpen(true)}>
             <FolderPlus className="mr-1.5 h-4 w-4" /> Add project
-          </Button>
+          </SpecularButton>
         }
       />
 

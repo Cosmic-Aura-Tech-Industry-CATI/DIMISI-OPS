@@ -1,3 +1,4 @@
+import SpecularButton from "@/components/ui/SpecularButton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -1219,7 +1220,7 @@ export function TaskForm({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="rounded-md shadow-glow">
+          <SpecularButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Saving...
@@ -1229,7 +1230,7 @@ export function TaskForm({
                 <Save className="mr-1.5 h-4 w-4" /> {submitLabel}
               </>
             )}
-          </Button>
+          </SpecularButton>
         </div>
       </div>
     </form>

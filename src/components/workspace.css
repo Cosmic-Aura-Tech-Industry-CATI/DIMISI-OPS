@@ -1,0 +1,125 @@
+﻿/* Portaled menus, sheets and dialogs inherit the workspace palette too. */
+body:has(.workspace) {
+  --landscape: url("/assets/workspace-day.webp");
+  --scene-base: #f4f7ff;
+  --glass: rgb(251 253 255 / .88);
+  --glass-dense: rgb(251 253 255 / .97);
+  --edge: rgb(238 21 62 / .64);
+  --glint: rgb(255 65 91 / .2);
+  --reflection: rgb(255 255 255 / .85);
+  --panel-shadow: 0 8px 25px -15px rgb(32 48 82 / .36);
+  --lit-shadow: inset 0 0 12px var(--glint), 0 0 5px var(--glint), 0 0 16px var(--glint);
+  --button-fill: linear-gradient(175deg, #d91e46, #ac1030);
+}
+.dark body:has(.workspace) {
+  --landscape: url("/assets/workspace-night.webp");
+  --scene-base: #050910;
+  --glass: rgb(15 23 35 / .87);
+  --glass-dense: rgb(17 25 37 / .97);
+  --edge: rgb(255 57 82 / .85);
+  --glint: rgb(255 45 69 / .25);
+  --reflection: rgb(203 220 244 / .12);
+  --panel-shadow: 0 14px 30px -17px rgb(0 0 0 / .8);
+  --button-fill: linear-gradient(175deg, #922138, #551024);
+}
+.workspace { isolation: isolate; }
+.workspace-landscape {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--scene-base) var(--landscape) 65% center / cover no-repeat;
+}
+.workspace-landscape::after {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  background: radial-gradient(ellipse at 27% 66%, rgb(150 179 206 / .16), transparent 40%),
+    radial-gradient(ellipse at 88% 16%, rgb(241 48 74 / .10), transparent 32%);
+}
+.workspace-landscape i {
+  position: absolute;
+  top: 13%;
+  right: 6%;
+  width: 9px;
+  height: 14px;
+  clip-path: polygon(0 42%, 29% 47%, 21% 10%, 46% 32%, 58% 0, 64% 33%, 97% 19%, 81% 55%, 100% 60%, 55% 80%, 39% 100%, 44% 78%);
+  background: #e7344c;
+  opacity: .65;
+}
+.workspace-landscape i:nth-child(2) { top: 58%; right: 3%; animation-delay: -9s; }
+.workspace-landscape i:nth-child(3) { top: 80%; right: 87%; animation-delay: -17s; }
+.workspace main { container: workspace-content / inline-size; }
+.workspace :is(.glass, .glass-strong, .bg-card),
+body:has(.workspace) :is([role="dialog"], [role="menu"], [role="listbox"]):not([data-sidebar]) {
+  background: linear-gradient(125deg, var(--reflection), transparent 24%) 0 0 / 100% 1px no-repeat,
+    linear-gradient(150deg, var(--glass-dense), var(--glass));
+  border-color: color-mix(in srgb, var(--border) 85%, var(--foreground));
+  box-shadow: var(--panel-shadow), inset 0 1px var(--reflection);
+  backdrop-filter: blur(10px);
+}
+.workspace [role="banner"], body:has(.workspace) [data-sidebar="sidebar"] {
+  background: radial-gradient(ellipse at top left, var(--glint), transparent 55%), var(--glass-dense);
+  box-shadow: inset -1px 0 var(--reflection), var(--panel-shadow);
+}
+body:has(.workspace) [data-sidebar="menu-button"][aria-current="page"] {
+  color: var(--foreground);
+  background: linear-gradient(95deg, var(--glint), transparent), var(--glass);
+  box-shadow: inset 3px 0 var(--edge), inset 7px 0 14px -7px var(--edge);
+}
+body:has(.workspace) [data-sidebar="menu-button"][aria-current="page"] svg { color: var(--primary); }
+body:has(.workspace) :is(button, a):is(.bg-primary, .specular-button):not([data-sidebar]):not(:disabled) {
+  color: white;
+  background-image: linear-gradient(110deg, transparent 32%, rgb(255 255 255 / .19) 48%, transparent 64%), var(--button-fill);
+  background-size: 250% 100%, cover;
+  background-position: 100% 0, center;
+  box-shadow: inset 0 0 0 1px var(--edge), var(--lit-shadow);
+  transition: background-position .5s ease, box-shadow .2s ease, transform .2s ease;
+}
+@media (hover: hover) {
+  body:has(.workspace) :is(button, a):is(.bg-primary, .specular-button):not([data-sidebar]):not(:disabled):hover {
+    background-position: 0 0, center;
+    transform: translateY(-1px);
+  }
+  .workspace :is(.hover-lift, .card-interactive):hover { border-color: var(--edge); box-shadow: var(--lit-shadow); }
+  body:has(.workspace) button.border:not(:disabled):hover { border-color: var(--edge); }
+}
+.workspace [role="tab"][data-state="active"], .workspace button[aria-pressed="true"],
+.workspace .grid > article:first-child:has([data-stat-label]) {
+  border-color: var(--edge);
+  box-shadow: inset 0 1px var(--edge), var(--lit-shadow);
+}
+body:has(.workspace) :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: var(--lit-shadow);
+}
+.workspace thead { background: var(--glass-dense); }
+.workspace .grid:has(> article [data-stat-label]) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+}
+@container workspace-content (max-width: 47rem) {
+  .workspace header:has(h1) { flex-wrap: wrap; align-items: flex-start; }
+  .workspace header:has(h1) :is(h1, p) { white-space: normal; }
+  .workspace header:has(h1) .flex-wrap { max-width: 100%; }
+}
+@media (max-width: 767px) {
+  .workspace-landscape { background-position: 80% center; }
+  .workspace .glass { backdrop-filter: none; }
+  .workspace header[role="banner"] { gap: .25rem; }
+  body:has(.workspace) [data-sidebar="sidebar"][data-mobile="true"] { max-width: 90vw; }
+  body:has(.workspace) :is([role="menu"], [role="listbox"]) { max-width: calc(100vw - 1rem); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-landscape::after { animation: workspace-mist 25s ease-in-out infinite alternate; }
+  .workspace-landscape i { animation-name: workspace-drift; animation-duration: 24s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+  .workspace article:has([data-stat-label]):nth-child(2) { animation-delay: 45ms; }
+  .workspace article:has([data-stat-label]):nth-child(3) { animation-delay: 90ms; }
+}
+@keyframes workspace-mist { to { transform: translate(4%, -2%); } }
+@keyframes workspace-drift {
+  0%, 100% { opacity: 0; transform: translate(0, -8px) rotate(-22deg); }
+  28%, 70% { opacity: .65; }
+  98% { opacity: 0; transform: translate(-28px, 85px) rotate(45deg); }
+}

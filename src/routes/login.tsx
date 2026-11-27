@@ -16,6 +16,7 @@ interface PendingLogin {
 }
 
 import { Button } from "@/components/ui/button";
+import SpecularButton from "@/components/ui/SpecularButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -365,7 +366,15 @@ function LoginPage() {
           </p>
         )}
 
-        <Button type="submit" disabled={!canSubmit || googleSubmitting} className="mt-6 h-11 w-full rounded-md text-sm shadow-glow">
+        <SpecularButton
+          type="submit"
+          disabled={!canSubmit || googleSubmitting}
+          className="w-full"
+          radius={10}
+          lineColor="#ffd0d6"
+          baseColor="#ff304d"
+          thickness={1.5}
+        >
           {submitting ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
@@ -376,7 +385,7 @@ function LoginPage() {
               Continue as {role} <ArrowRight className="h-4 w-4" />
             </span>
           )}
-        </Button>
+        </SpecularButton>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Database verification active — enter your registered work email & password (8+ characters) to sign in.
