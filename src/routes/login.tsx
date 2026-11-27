@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { AuthShell } from "@/components/auth-shell";
+import { LoginShell } from "@/components/login-shell";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -176,7 +176,7 @@ function LoginPage() {
 
   if (pending) {
     return (
-      <AuthShell
+      <LoginShell
         title="Verify your identity"
         subtitle="We've sent a 6-digit verification code to your registered email address."
       >
@@ -186,12 +186,12 @@ function LoginPage() {
           onBack={() => setPending(null)}
           onFailure={(reason) => logLoginFailure(reason)}
         />
-      </AuthShell>
+      </LoginShell>
     );
   }
 
   return (
-    <AuthShell
+    <LoginShell
       title="Welcome back"
       subtitle="Sign in to continue to your workspace."
     >
@@ -250,9 +250,9 @@ function LoginPage() {
               <span className="flex items-center justify-center gap-2">
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 23 23">
                   <path fill="#f35325" d="M1 1h10v10H1z" />
-                  <path fill="#81bc06" d="M12 1h10v10H1z" />
+                  <path fill="#81bc06" d="M12 1h10v10H12z" />
                   <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                  <path fill="#ffba08" d="M12 12h10v10H1z" />
+                  <path fill="#ffba08" d="M12 12h10v10H12z" />
                 </svg>
                 Microsoft SSO
               </span>
@@ -284,6 +284,7 @@ function LoginPage() {
               <button
                 type="button"
                 key={r.id}
+                aria-pressed={selected}
                 onClick={() => setRole(r.id)}
                 className={`group rounded-2xl border p-4 text-left transition-all ${selected
                   ? "border-primary bg-primary/10 shadow-glow"
@@ -301,7 +302,7 @@ function LoginPage() {
           })}
         </div>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-3 space-y-4">
           <div>
             <Label htmlFor="email">Work email</Label>
             <div className="relative mt-1.5">
@@ -381,7 +382,7 @@ function LoginPage() {
           Database verification active — enter your registered work email & password (8+ characters) to sign in.
         </p>
       </form>
-    </AuthShell>
+    </LoginShell>
   );
 }
 

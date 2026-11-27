@@ -59,7 +59,7 @@ export function WeeklyCompletionChart({
           <YAxis {...axisStyle} tickLine={false} axisLine={false} />
           <Tooltip contentStyle={tooltipStyle} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="created" fill="oklch(0.35 0 0)" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="created" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
           <Bar dataKey="completed" fill={ACCENT} radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

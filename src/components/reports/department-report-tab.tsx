@@ -81,7 +81,7 @@ export function DepartmentReportTab({
               <PolarGrid stroke={GRID_STROKE} />
               <PolarAngleAxis
                 dataKey="department"
-                tick={{ fill: "oklch(0.75 0 0)", fontSize: 11 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
               />
               <Radar
                 name="Score"

@@ -444,11 +444,11 @@ function StatisticsPage() {
     });
 
     const colors = [
-      "oklch(0.72 0.19 45)",
-      "oklch(0.68 0.16 265)",
-      "oklch(0.72 0.16 165)",
-      "oklch(0.78 0.16 85)",
-      "oklch(0.65 0.2 330)",
+      "var(--chart-1)",
+      "var(--chart-2)",
+      "var(--chart-3)",
+      "var(--chart-4)",
+      "var(--chart-5)",
     ];
 
     if (catMap.size === 0) {
@@ -780,19 +780,19 @@ function StatisticsPage() {
                   name="Tasks completed"
                   type="monotone"
                   dataKey="tasks"
-                  stroke="oklch(0.68 0.16 265)"
+                  stroke="var(--chart-2)"
                   strokeWidth={2}
-                  dot={{ r: 4, fill: "oklch(0.68 0.16 265)" }}
+                  dot={{ r: 4, fill: "var(--chart-2)" }}
                 />
                 {timeRange === "7d" && (
                   <Line
                     name="Tasks planned"
                     type="monotone"
                     dataKey="planned"
-                    stroke="oklch(0.78 0.16 85)"
+                    stroke="var(--chart-4)"
                     strokeWidth={1.75}
                     strokeDasharray="4 4"
-                    dot={{ r: 3, fill: "oklch(0.78 0.16 85)" }}
+                    dot={{ r: 3, fill: "var(--chart-4)" }}
                   />
                 )}
               </AreaChart>
@@ -920,7 +920,7 @@ function StatisticsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={skillsRadar}>
                 <PolarGrid stroke={GRID_STROKE} />
-                <PolarAngleAxis dataKey="skill" tick={{ fill: "oklch(0.7 0 0)", fontSize: 11 }} />
+                <PolarAngleAxis dataKey="skill" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
                 <PolarRadiusAxis stroke={GRID_STROKE} tick={false} axisLine={false} />
                 <Radar
                   name="Proficiency"
@@ -960,7 +960,7 @@ function StatisticsPage() {
                 <YAxis yAxisId="right" orientation="right" {...axisStyle} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="left" dataKey="completed" name="Tasks completed" fill="oklch(0.68 0.16 265)" radius={[6, 6, 0, 0]} />
+                <Bar yAxisId="left" dataKey="completed" name="Tasks completed" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
                 <Bar yAxisId="right" dataKey="points" name="Points earned" fill={ACCENT} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

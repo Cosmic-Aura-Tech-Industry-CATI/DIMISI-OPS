@@ -557,7 +557,7 @@ function ProfilePage() {
       {/* Hero Header */}
       <div className="glass overflow-hidden rounded-2xl">
         <div className="relative h-28 border-b border-border/60 bg-gradient-to-r from-primary/15 via-card to-card sm:h-32">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_120%,hsl(var(--primary)/0.18),transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_120%,rgb(var(--glow-rgb)/0.18),transparent_65%)]" />
           <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:32px_32px]" />
         </div>
         <div className="-mt-12 flex flex-col gap-5 p-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
@@ -700,42 +700,42 @@ function ProfilePage() {
                 <AreaChart data={weeklyTrend}>
                   <defs>
                     <linearGradient id="ptsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="points"
                     name="Points"
-                    stroke="#C9A961"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                     fill="url(#ptsGrad)"
                   />
@@ -771,42 +771,42 @@ function ProfilePage() {
                 <AreaChart data={pointsHistory}>
                   <defs>
                     <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C9A961" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#C9A961" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="cumulative"
                     name="Cumulative Points"
-                    stroke="#C9A961"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                     fill="url(#cumGrad)"
                   />
@@ -835,36 +835,36 @@ function ProfilePage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyTrend}>
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="var(--border)"
                     strokeDasharray="3 3"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="week"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--muted-foreground)"
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#141414",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: 12,
                       fontSize: 12,
-                      color: "#fff",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Bar
                     dataKey="tasks"
                     name="Tasks Completed"
-                    fill="#C9A961"
+                    fill="var(--primary)"
                     radius={[6, 6, 0, 0]}
                   />
                 </BarChart>
